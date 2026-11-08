@@ -23,8 +23,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { cleanup, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -78,77 +77,15 @@ async function renderHome() {
   )
 }
 
-it('a guest enters the dashboard through Get Started and keeps the configured site identity', async () => {
+it('renders the Mobius homepage when no custom home page is configured', async () => {
   await renderHome()
-  expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-    'Gateway Example'
-  )
-  const hero = screen.getByRole('region', { name: /Gateway Example/ })
   expect(
-    within(hero).getByRole('link', { name: 'Get Started' })
-  ).toHaveAttribute('href', '/dashboard')
-  expect(
-    within(hero).getByRole('link', { name: 'Download RelayDesk' })
-  ).toHaveAttribute('href', '#relaydesk')
-  expect(
-    within(hero).queryByRole('link', { name: 'Docs' })
-  ).not.toBeInTheDocument()
-  expect(screen.queryByRole('link', { name: 'Docs' })).not.toBeInTheDocument()
-  expect(screen.getAllByRole('link', { name: 'RelayDesk' })[0]).toHaveAttribute(
-    'href',
-    '/#relaydesk'
-  )
+    await screen.findByRole('link', { name: 'Go to home' })
+  ).toHaveTextContent('ZH Api')
+  expect(document.querySelector('.mobius-page')).toBeInTheDocument()
 })
 
-it('the desktop companion follows the hero and links only to the official release listing', async () => {
-  await renderHome()
-  await screen.findByRole('heading', { level: 1 })
-  const regions = within(screen.getByRole('main')).getAllByRole('region')
-  expect(
-    regions.map((region) => region.getAttribute('aria-labelledby'))
-  ).toEqual([
-    'relaydesk-hero-title',
-    'relaydesk-heading',
-    'capabilities-heading',
-  ])
-  const companion = screen.getByRole('region', { name: 'RelayDesk' })
-  for (const link of within(companion).getAllByRole('link')) {
-    expect(link).toHaveAttribute(
-      'href',
-      'https://github.com/zhang520zy-prog/RelayDesk/releases'
-    )
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-  }
-  expect(within(companion).getByText('01 / INSTALL')).toBeVisible()
-  expect(within(companion).getByText('02 / CHECK')).toBeVisible()
-  expect(within(companion).getByText('03 / APPLY')).toBeVisible()
-})
-
-it('the visual-effects control toggles with the keyboard without changing navigation', async () => {
-  await renderHome()
-  const toggle = await screen.findByRole('button', {
-    name: 'Pause visual effects',
-  })
-  const user = userEvent.setup()
-  toggle.focus()
-  await user.keyboard('{Enter}')
-  expect(
-    screen.getByRole('button', { name: 'Play visual effects' })
-  ).toHaveAttribute('aria-pressed', 'true')
-  expect(
-    screen.getByRole('button', { name: 'Play visual effects' })
-  ).toHaveFocus()
-  await user.keyboard(' ')
-  expect(
-    screen.getByRole('button', { name: 'Pause visual effects' })
-  ).toHaveAttribute('aria-pressed', 'false')
-  const hero = screen.getByRole('region', { name: /Gateway Example/ })
-  expect(
-    within(hero).getByRole('link', { name: 'Get Started' })
-  ).toHaveAttribute('href', '/dashboard')
-})
-
-it('an administrator-provided homepage URL keeps the sandbox and replaces the default visual', async () => {
+it('an administrator-provided homepage URL keeps the sandbox and does not render the Mobius homepage', async () => {
   customContent = 'https://homepage.example.com/'
   await renderHome()
   const iframe = await screen.findByTitle('Custom Home Page')
@@ -157,39 +94,10 @@ it('an administrator-provided homepage URL keeps the sandbox and replaces the de
     'sandbox',
     'allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation-by-user-activation'
   )
-  expect(
-    screen.queryByRole('region', { name: 'RelayDesk' })
-  ).not.toBeInTheDocument()
+  expect(document.querySelector('.mobius-page')).not.toBeInTheDocument()
 })
 
-it('opening mobile navigation exposes the three-language switcher and closing it removes the menu from interaction', async () => {
-  await renderHome()
-  await screen.findByRole('heading', { level: 1 })
-  const user = userEvent.setup()
-  const toggle = screen.getByRole('button', { name: 'Toggle navigation menu' })
-  expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  const menuId = toggle.getAttribute('aria-controls')
-  expect(menuId).toBeTruthy()
-  const menu = document.querySelector<HTMLElement>(`[id="${menuId}"]`)
-  expect(menu).toBeInTheDocument()
-  if (!menu) throw new Error('Mobile navigation target is missing')
-  expect(menu).toHaveAttribute('inert')
-  await user.click(toggle)
-  expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  expect(menu).not.toHaveAttribute('inert')
-  await user.click(
-    within(menu).getByRole('button', { name: 'Change language' })
-  )
-  expect(
-    screen.getAllByRole('menuitem').map((item) => item.textContent)
-  ).toEqual(['简体中文', '繁體中文', 'English'])
-  await user.keyboard('{Escape}')
-  await user.click(toggle)
-  expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  expect(menu).toHaveAttribute('inert')
-})
-
-it('an administrator-provided Markdown homepage preserves its content', async () => {
+it('an administrator-provided Markdown homepage preserves its content and does not render the Mobius homepage', async () => {
   customContent =
     '# Site announcement\n\nGateway configuration remains available.'
   await renderHome()
@@ -199,7 +107,5 @@ it('an administrator-provided Markdown homepage preserves its content', async ()
   expect(
     screen.getByText('Gateway configuration remains available.')
   ).toBeVisible()
-  expect(
-    screen.queryByRole('region', { name: 'RelayDesk' })
-  ).not.toBeInTheDocument()
+  expect(document.querySelector('.mobius-page')).not.toBeInTheDocument()
 })

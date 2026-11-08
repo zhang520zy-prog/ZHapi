@@ -16,7 +16,7 @@
   font-weight: 400 700;
   font-display: swap;
 }
-:root {
+.mobius-page {
   color-scheme: dark;
   font-family:
     MobiusInter,
@@ -31,37 +31,37 @@
   --mobius-line: #ffffff21;
   --mobius-accent: #c4f58b;
 }
-* {
+.mobius-page,
+.mobius-page *,
+.mobius-page *::before,
+.mobius-page *::after {
   box-sizing: border-box;
 }
-body {
-  margin: 0;
-}
-html {
+html[data-mobius-page] {
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
 }
-button,
-a {
+.mobius-page button,
+.mobius-page a {
   -webkit-tap-highlight-color: transparent;
 }
-a {
+.mobius-page a {
   color: inherit;
   text-decoration: none;
 }
-button {
+.mobius-page button {
   font: inherit;
 }
-button,
-a {
+.mobius-page button,
+.mobius-page a {
   touch-action: manipulation;
 }
-button:focus-visible,
-a:focus-visible {
+.mobius-page button:focus-visible,
+.mobius-page a:focus-visible {
   outline: 2px solid var(--mobius-accent);
   outline-offset: 6px;
 }
-::selection {
+.mobius-page ::selection {
   background: #c4f58b;
   color: #090c0b;
 }
@@ -394,51 +394,51 @@ a:focus-visible {
 .mobius-copy {
   max-width: 560px;
 }
-.section-hero {
+.mobius-page .section-hero {
   min-height: 112svh;
   align-items: center;
   text-align: center;
 }
-.section-hero .mobius-copy {
+.mobius-page .section-hero .mobius-copy {
   max-width: 640px;
 }
-.section-hero .mobius-eyebrow,
-.section-hero .mobius-actions {
+.mobius-page .section-hero .mobius-eyebrow,
+.mobius-page .section-hero .mobius-actions {
   justify-content: center;
 }
-.section-hero .section-description {
+.mobius-page .section-hero .section-description {
   margin-inline: auto;
 }
-.section-models {
+.mobius-page .section-models {
   min-height: 130svh;
   align-items: flex-end;
 }
-.section-models .mobius-copy {
+.mobius-page .section-models .mobius-copy {
   width: min(460px, 36%);
   padding: 32px 0;
 }
-.section-desktop {
+.mobius-page .section-desktop {
   min-height: 130svh;
 }
-.section-desktop .mobius-copy {
+.mobius-page .section-desktop .mobius-copy {
   width: min(480px, 40%);
 }
-.section-tools {
+.mobius-page .section-tools {
   min-height: 160svh;
   gap: 40px;
 }
-.section-tools-grid {
+.mobius-page .section-tools-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 48px 72px;
   align-items: start;
 }
-.section-closing {
+.mobius-page .section-closing {
   min-height: 140svh;
   align-items: center;
   text-align: center;
 }
-.section-closing .mobius-eyebrow {
+.mobius-page .section-closing .mobius-eyebrow {
   justify-content: center;
 }
 .mobius-section h1,
@@ -474,8 +474,8 @@ a:focus-visible {
   letter-spacing: 3px;
   color: #5f7a62;
 }
-.section-hero h1::after,
-.section-closing h2::after {
+.mobius-page .section-hero h1::after,
+.mobius-page .section-closing h2::after {
   margin-inline: auto;
 }
 .mobius-section [data-decoding='true'] > :not(.mobius-decode) {
@@ -529,13 +529,13 @@ a:focus-visible {
   background: var(--mobius-accent);
   border-radius: 50%;
 }
-.section-models .mobius-eyebrow,
-.section-desktop .mobius-eyebrow,
-.section-tools .mobius-eyebrow {
+.mobius-page .section-models .mobius-eyebrow,
+.mobius-page .section-desktop .mobius-eyebrow,
+.mobius-page .section-tools .mobius-eyebrow {
   padding-bottom: 14px;
   border-bottom: 1px solid #ffffff1f;
 }
-.section-description {
+.mobius-page .section-description {
   font-size: clamp(14px, 1.15vw, 17px);
   line-height: 1.95;
   color: #b8c0b4;
@@ -591,7 +591,7 @@ a:focus-visible {
     translate: 0 4px;
   }
 }
-.section-providers {
+.mobius-page .section-providers {
   display: flex;
   flex-wrap: wrap;
   gap: 16px 24px;
@@ -601,15 +601,15 @@ a:focus-visible {
   border-top: 1px solid #ffffff1a;
   color: #c4ccbd;
 }
-.section-providers strong {
+.mobius-page .section-providers strong {
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.5px;
 }
-.section-providers .mobius-claude {
+.mobius-page .section-providers .mobius-claude {
   font-family: MobiusLora, serif;
 }
-.section-note {
+.mobius-page .section-note {
   color: #a0aa98;
   font-size: 10px;
   line-height: 1.6;
@@ -631,19 +631,19 @@ a:focus-visible {
   min-height: 235px;
   font-size: 11px;
 }
-.section-features {
+.mobius-page .section-features {
   display: grid;
   gap: 0;
 }
-.section-feature {
+.mobius-page .section-feature {
   position: relative;
   padding: 24px 0 24px 44px;
   border-top: 1px solid #ffffff1a;
 }
-.section-feature:last-child {
+.mobius-page .section-feature:last-child {
   border-bottom: 1px solid #ffffff1a;
 }
-.section-feature > span {
+.mobius-page .section-feature > span {
   position: absolute;
   top: 30px;
   left: 0;
@@ -652,14 +652,14 @@ a:focus-visible {
     monospace;
   color: #a8c38c;
 }
-.section-feature h3 {
+.mobius-page .section-feature h3 {
   margin: 0 0 10px;
   font-family: MobiusLora, 'Songti SC', serif;
   font-weight: 400;
   font-size: 24px;
   letter-spacing: -0.4px;
 }
-.section-feature p {
+.mobius-page .section-feature p {
   margin: 0;
   color: #b8c0b4;
   font-size: 14px;
@@ -721,11 +721,11 @@ a:focus-visible {
   .mobius-header-actions {
     gap: 16px;
   }
-  .section-models .mobius-copy,
-  .section-desktop .mobius-copy {
+  .mobius-page .section-models .mobius-copy,
+  .mobius-page .section-desktop .mobius-copy {
     width: min(460px, 48%);
   }
-  .section-tools-grid {
+  .mobius-page .section-tools-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -751,15 +751,15 @@ a:focus-visible {
     padding: 96px 6% 72px;
     justify-content: flex-end;
   }
-  .section-hero {
+  .mobius-page .section-hero {
     justify-content: center;
   }
-  .section-models,
-  .section-desktop {
+  .mobius-page .section-models,
+  .mobius-page .section-desktop {
     align-items: stretch;
   }
-  .section-models .mobius-copy,
-  .section-desktop .mobius-copy {
+  .mobius-page .section-models .mobius-copy,
+  .mobius-page .section-desktop .mobius-copy {
     width: 100%;
     padding: 24px 0 0;
     background: linear-gradient(#080c0a00, #080c0ad9 30%);
@@ -778,7 +778,7 @@ a:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  html {
+  html[data-mobius-page] {
     scroll-behavior: auto;
   }
   .mobius-shot,
@@ -811,14 +811,14 @@ a:focus-visible {
 }
 /* Section 4 sits over the vortex: heading on top, features along the bottom,
    the tunnel's core and its agents left clear in the middle. */
-.section-tools {
+.mobius-page .section-tools {
   min-height: 150svh;
   justify-content: center;
 }
-.section-tools .mobius-copy {
+.mobius-page .section-tools .mobius-copy {
   max-width: 520px;
 }
-.section-tools-grid {
+.mobius-page .section-tools-grid {
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -842,34 +842,34 @@ a:focus-visible {
   letter-spacing: 1px;
   backdrop-filter: blur(6px);
 }
-.section-tools .section-features {
+.mobius-page .section-tools .section-features {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 40px;
 }
-.section-tools .section-feature {
+.mobius-page .section-tools .section-feature {
   padding: 22px 0 0 0;
   border-top: 1px solid #ffffff2e;
   border-bottom: 0;
 }
-.section-tools .section-feature > span {
+.mobius-page .section-tools .section-feature > span {
   position: static;
   display: block;
   margin-bottom: 12px;
 }
-.section-tools .section-feature h3 {
+.mobius-page .section-tools .section-feature h3 {
   font-size: 22px;
   text-shadow: 0 2px 12px #07100d;
 }
-.section-tools .section-feature p {
+.mobius-page .section-tools .section-feature p {
   font-size: 13px;
   text-shadow: 0 1px 4px #07100d;
 }
 @media (max-width: 700px) {
-  .section-tools-grid {
+  .mobius-page .section-tools-grid {
     margin-top: 24px;
   }
-  .section-tools .section-features {
+  .mobius-page .section-tools .section-features {
     grid-template-columns: 1fr;
     gap: 18px;
   }

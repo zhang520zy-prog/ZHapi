@@ -17,14 +17,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { MobiusHomePreview } from '..'
+import { useAuthStore } from '@/stores/auth-store'
+
+import { MobiusHome } from '..'
 
 let client: QueryClient
 beforeEach(() => {
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
@@ -32,17 +41,24 @@ afterEach(() => {
   cleanup()
   client.clear()
   vi.restoreAllMocks()
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
 })
 
-const renderPage = () =>
-  render(
+const renderPage = async () => {
+  const router = createRouter({
+    routeTree: createRootRoute({ component: MobiusHome }),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  await router.load()
+  return render(
     <QueryClientProvider client={client}>
-      <MobiusHomePreview />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
+}
 
-it('without canvas every section is in the document flow and reachable, in reading order', () => {
-  renderPage()
+it('without canvas every section is in the document flow and reachable, in reading order', async () => {
+  await renderPage()
   const main = screen.getByRole('main')
   const regions = within(main).getAllByRole('region')
   expect(
@@ -60,8 +76,8 @@ it('without canvas every section is in the document flow and reachable, in readi
   }
 })
 
-it('the homepage shows its own brand and keeps the required upstream attribution in the footer', () => {
-  renderPage()
+it('the homepage shows its own brand and keeps the required upstream attribution in the footer', async () => {
+  await renderPage()
   expect(screen.getByRole('link', { name: 'Go to home' })).toHaveTextContent(
     'ZH Api'
   )
@@ -72,8 +88,8 @@ it('the homepage shows its own brand and keeps the required upstream attribution
   ).toHaveAttribute('href', 'https://github.com/QuantumNous/new-api')
 })
 
-it('in-page navigation targets real sections instead of switching chapters', () => {
-  renderPage()
+it('in-page navigation targets real sections instead of switching chapters', async () => {
+  await renderPage()
   const header = within(
     screen.getByRole('navigation', { name: 'Main navigation' })
   )
@@ -88,8 +104,61 @@ it('in-page navigation targets real sections instead of switching chapters', () 
   )
 })
 
+it('site links use in-app routes instead of absolute preview URLs', async () => {
+  await renderPage()
+  const header = within(
+    screen.getByRole('navigation', { name: 'Main navigation' })
+  )
+  expect(header.getByRole('link', { name: 'Models' })).toHaveAttribute(
+    'href',
+    '/pricing'
+  )
+  expect(header.getByRole('link', { name: 'Console' })).toHaveAttribute(
+    'href',
+    '/dashboard'
+  )
+  for (const link of screen.getAllByRole('link')) {
+    expect(link.getAttribute('href') ?? '').not.toContain('127.0.0.1')
+  }
+})
+
+it('a guest sees Sign In and Get Started pointing at the auth pages', async () => {
+  await renderPage()
+  expect(screen.getByRole('link', { name: 'Sign In' })).toHaveAttribute(
+    'href',
+    '/sign-in'
+  )
+  for (const link of screen.getAllByRole('link', { name: 'Get Started' })) {
+    expect(link).toHaveAttribute('href', '/sign-up')
+  }
+})
+
+it('a signed-in user sees the console targets instead of auth pages', async () => {
+  useAuthStore.setState({
+    auth: {
+      ...useAuthStore.getState().auth,
+      user: { id: 1, username: 'tester', role: 1 },
+    },
+  })
+  await renderPage()
+  const header = within(
+    screen.getByRole('navigation', { name: 'Main navigation' }).closest(
+      'header'
+    ) as HTMLElement
+  )
+  const consoleLinks = header.getAllByRole('link', { name: 'Console' })
+  expect(consoleLinks.length).toBeGreaterThanOrEqual(2)
+  for (const link of consoleLinks) {
+    expect(link).toHaveAttribute('href', '/dashboard')
+  }
+  expect(screen.queryByRole('link', { name: 'Sign In' })).not.toBeInTheDocument()
+  for (const link of screen.getAllByRole('link', { name: 'Get Started' })) {
+    expect(link).toHaveAttribute('href', '/dashboard')
+  }
+})
+
 it('keyboard users can tab from the hero call to action into later sections without any timer', async () => {
-  renderPage()
+  await renderPage()
   const user = userEvent.setup()
   const download = screen.getByRole('link', { name: 'Download RelayDesk' })
   for (let step = 0; step < 20 && document.activeElement !== download; step++) {
@@ -102,8 +171,8 @@ it('keyboard users can tab from the hero call to action into later sections with
   )
 })
 
-it('the pause control is disabled when the sculpture cannot draw', () => {
-  renderPage()
+it('the pause control is disabled when the sculpture cannot draw', async () => {
+  await renderPage()
   expect(
     screen.getByRole('button', { name: 'Pause visual effects' })
   ).toBeDisabled()

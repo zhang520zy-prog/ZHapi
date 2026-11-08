@@ -16,15 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { ArrowDown, ArrowRight, ArrowUpRight, Globe2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
-import { RELAYDESK_RELEASES_URL } from '@/features/home/components/sections/relaydesk'
 import { toIntlLocale } from '@/i18n/languages'
+import { useAuthStore } from '@/stores/auth-store'
+
+import '@/styles/home-mobius.css'
 
 import { DataSculpture } from './components/data-sculpture'
+import { RELAYDESK_RELEASES_URL } from './constants'
 import {
   autoplayAt,
   sectionReveal,
@@ -32,7 +37,6 @@ import {
   type AutoplayStop,
 } from './lib/scroll-morph'
 
-const APP_ORIGIN = 'http://127.0.0.1:31088'
 const SCRAMBLE = '01アイウカキクサシ数链流源∑<>[]{}#$%01'
 const DECODE_MS = 900
 /** Seconds each section rests on screen while autoplaying, then seconds to glide on. */
@@ -86,8 +90,9 @@ function decodeHeading(heading: HTMLElement, reveal: number) {
  * document sets the sculpture's stage; its own place in the viewport sets how
  * readable its copy is.
  */
-export function MobiusHomePreview() {
+export function MobiusHome() {
   const { t, i18n } = useTranslation()
+  const user = useAuthStore((s) => s.auth.user)
   const pageRef = useRef<HTMLDivElement>(null)
   const sections = useRef<(HTMLElement | null)[]>([])
   const decoded = useRef<boolean[]>([])
@@ -107,6 +112,17 @@ export function MobiusHomePreview() {
       section ? section.offsetTop + section.offsetHeight / 2 : 0
     )
     return stageAt(window.scrollY + window.innerHeight / 2, centers)
+  }, [])
+
+  // Scope html-level styles (smooth scroll, scroll padding) to this page only;
+  // the attribute is removed on unmount so the console keeps its own behaviour.
+  useEffect(() => {
+    const element = document.documentElement
+    element.dataset.mobiusPage = 'true'
+    return () => {
+      delete element.dataset.mobiusPage
+      delete element.dataset.autoplay
+    }
   }, [])
 
   useEffect(() => {
@@ -261,6 +277,7 @@ export function MobiusHomePreview() {
       stop()
       for (const name of events) window.removeEventListener(name, stop)
       window.removeEventListener('keydown', onKey)
+      delete document.documentElement.dataset.autoplay
     }
   }, [])
 
@@ -288,32 +305,20 @@ export function MobiusHomePreview() {
         </a>
         <nav aria-label={t('Main navigation')}>
           <a href='#top'>{t('Homepage')}</a>
-          <a href={`${APP_ORIGIN}/pricing`}>{t('Models')}</a>
-          <a href={`${APP_ORIGIN}/dashboard`}>{t('Console')}</a>
+          <Link to='/pricing'>{t('Models')}</Link>
+          <Link to='/dashboard'>{t('Console')}</Link>
           <a href='#relaydesk'>
             RelayDesk <span className='mobius-nav-dot' />
           </a>
         </nav>
         <div className='mobius-header-actions'>
-          <Button
-            variant='ghost'
-            className='mobius-language'
-            aria-label={t('Switch language')}
-            onClick={() =>
-              void i18n.changeLanguage(
-                i18n.language.startsWith('zh') ? 'en' : 'zhCN'
-              )
-            }
-          >
-            <Globe2 aria-hidden='true' />
-            <span>{i18n.language.startsWith('zh') ? 'EN' : '中文'}</span>
-          </Button>
+          <LanguageSwitcher />
           <Button
             className='mobius-button mobius-header-cta'
             role='link'
-            render={<a href={`${APP_ORIGIN}/sign-in`} />}
+            render={<Link to={user ? '/dashboard' : '/sign-in'} />}
           >
-            {t('Sign In')}
+            {user ? t('Console') : t('Sign In')}
             <ArrowUpRight aria-hidden='true' />
           </Button>
         </div>
@@ -350,7 +355,7 @@ export function MobiusHomePreview() {
                 <Button
                   className='mobius-button'
                   role='link'
-                  render={<a href={`${APP_ORIGIN}/dashboard`} />}
+                  render={<Link to={user ? '/dashboard' : '/sign-up'} />}
                 >
                   {t('Get Started')}
                   <ArrowUpRight aria-hidden='true' />
@@ -411,7 +416,7 @@ export function MobiusHomePreview() {
               <Button
                 className='mobius-button'
                 role='link'
-                render={<a href={`${APP_ORIGIN}/pricing`} />}
+                render={<Link to='/pricing' />}
               >
                 {t('Models & Pricing')}
                 <ArrowUpRight aria-hidden='true' />
@@ -541,7 +546,7 @@ export function MobiusHomePreview() {
               <Button
                 className='mobius-button'
                 role='link'
-                render={<a href={`${APP_ORIGIN}/dashboard`} />}
+                render={<Link to={user ? '/dashboard' : '/sign-up'} />}
               >
                 {t('Get Started')}
                 <ArrowUpRight aria-hidden='true' />
@@ -554,9 +559,9 @@ export function MobiusHomePreview() {
       <footer className='mobius-footer'>
         <span>{siteName} / AI GATEWAY</span>
         <nav aria-label={t('Footer')}>
-          <a href={`${APP_ORIGIN}/pricing`}>{t('Models & Pricing')}</a>
+          <Link to='/pricing'>{t('Models & Pricing')}</Link>
           <a href='#relaydesk'>RelayDesk</a>
-          <a href={`${APP_ORIGIN}/dashboard`}>{t('Console')}</a>
+          <Link to='/dashboard'>{t('Console')}</Link>
         </nav>
         <span>
           {/* Attribution and link required by NOTICE (AGPLv3 §7(b)); wording must stay verbatim. */}
