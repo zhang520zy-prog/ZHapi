@@ -16,6 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
@@ -176,4 +180,30 @@ it('the pause control is disabled when the sculpture cannot draw', async () => {
   expect(
     screen.getByRole('button', { name: 'Pause visual effects' })
   ).toBeDisabled()
+})
+
+// The audit found white buttons rendering with invisible text: the page-scoped
+// `a { color: inherit }` reset had gained class specificity and overrode the
+// button's own dark ink. Element-level resets must stay inside :where() so the
+// scope wrapper contributes zero specificity.
+it('element-level resets keep zero specificity so buttons keep their own text color', () => {
+  const css = readFileSync(
+    path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../../styles/home-mobius.css'
+    ),
+    'utf-8'
+  )
+  // Resets derived from the old global rules must be scoped with :where().
+  expect(css).toMatch(/:where\(\.mobius-page\) a\s*{[^}]*color:\s*inherit/)
+  expect(css).toMatch(
+    /:where\(\.mobius-page\) ::selection\s*{[^}]*color:\s*#090c0b/
+  )
+  // No bare `.mobius-page <element>` selector may remain — it would outrank
+  // component rules like `.mobius-button { color: #111610 }`.
+  expect(css).not.toMatch(
+    /(?:^|[,{}])\s*\.mobius-page\s+(?:a|button|\*|::selection)/
+  )
+  // The light pill buttons still declare their dark ink.
+  expect(css).toMatch(/\.mobius-button\s*{[^}]*color:\s*#111610/)
 })

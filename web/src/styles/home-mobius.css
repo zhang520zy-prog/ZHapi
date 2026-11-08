@@ -31,37 +31,37 @@
   --mobius-line: #ffffff21;
   --mobius-accent: #c4f58b;
 }
-.mobius-page,
-.mobius-page *,
-.mobius-page *::before,
-.mobius-page *::after {
+:where(.mobius-page),
+:where(.mobius-page) *,
+:where(.mobius-page) *::before,
+:where(.mobius-page) *::after {
   box-sizing: border-box;
 }
 html[data-mobius-page] {
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
 }
-.mobius-page button,
-.mobius-page a {
+:where(.mobius-page) button,
+:where(.mobius-page) a {
   -webkit-tap-highlight-color: transparent;
 }
-.mobius-page a {
+:where(.mobius-page) a {
   color: inherit;
   text-decoration: none;
 }
-.mobius-page button {
+:where(.mobius-page) button {
   font: inherit;
 }
-.mobius-page button,
-.mobius-page a {
+:where(.mobius-page) button,
+:where(.mobius-page) a {
   touch-action: manipulation;
 }
-.mobius-page button:focus-visible,
-.mobius-page a:focus-visible {
+:where(.mobius-page) button:focus-visible,
+:where(.mobius-page) a:focus-visible {
   outline: 2px solid var(--mobius-accent);
   outline-offset: 6px;
 }
-.mobius-page ::selection {
+:where(.mobius-page) ::selection {
   background: #c4f58b;
   color: #090c0b;
 }
