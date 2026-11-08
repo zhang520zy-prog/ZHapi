@@ -37,7 +37,7 @@ import {
   isWaffoPancakePayment,
   submitPaymentForm,
 } from '../lib'
-import type { AmountRequest, AmountResponse } from '../types'
+import type { AmountRequest, AmountResponse, PaymentQuote } from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -59,11 +59,25 @@ const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
   waffoPancake: calculateWaffoPancakeAmount,
 }
 
+export interface PaymentAmountOptions {
+  /** Server-side Waffo payment method index */
+  payMethodIndex?: number
+  calculators?: PaymentAmountCalculators
+}
+
+export interface PaymentAmountResult {
+  /** Total amount to pay */
+  amount: number
+  /** Server-side quote (credited / fee / total) */
+  quote?: PaymentQuote
+}
+
 export async function requestPaymentAmount(
   topupAmount: number,
   paymentType: string,
-  calculators: PaymentAmountCalculators = defaultPaymentAmountCalculators
-): Promise<number> {
+  options: PaymentAmountOptions = {}
+): Promise<PaymentAmountResult> {
+  const calculators = options.calculators ?? defaultPaymentAmountCalculators
   let calculator = calculators.regular
   if (isStripePayment(paymentType)) {
     calculator = calculators.stripe
@@ -73,32 +87,41 @@ export async function requestPaymentAmount(
     calculator = calculators.waffoPancake
   }
 
-  const response = await calculator({ amount: topupAmount })
-  if (!isApiSuccess(response) || !response.data) {
-    return 0
+  const request: AmountRequest = { amount: topupAmount }
+  if (isWaffoPayment(paymentType)) {
+    request.pay_method_index = options.payMethodIndex
+  } else {
+    request.payment_method = paymentType
   }
 
-  return Number.parseFloat(response.data)
+  const response = await calculator(request)
+  if (!isApiSuccess(response) || !response.data) {
+    return { amount: 0 }
+  }
+
+  return { amount: Number.parseFloat(response.data), quote: response.quote }
 }
 
 export function usePayment() {
   const [amount, setAmount] = useState<number>(0)
+  const [quote, setQuote] = useState<PaymentQuote | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
-    async (topupAmount: number, paymentType: string) => {
+    async (topupAmount: number, paymentType: string, payMethodIndex?: number) => {
       try {
         setCalculating(true)
-        const calculatedAmount = await requestPaymentAmount(
-          topupAmount,
-          paymentType
-        )
-        setAmount(calculatedAmount)
-        return calculatedAmount
+        const result = await requestPaymentAmount(topupAmount, paymentType, {
+          payMethodIndex,
+        })
+        setAmount(result.amount)
+        setQuote(result.quote ?? null)
+        return result.amount
       } catch {
         setAmount(0)
+        setQuote(null)
         return 0
       } finally {
         setCalculating(false)
@@ -161,6 +184,7 @@ export function usePayment() {
 
   return {
     amount,
+    quote,
     calculating,
     processing,
     calculatePaymentAmount,

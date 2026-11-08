@@ -33,8 +33,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatLocalCurrencyAmount } from '@/lib/currency'
 
 import { DEFAULT_DISCOUNT_RATE } from '../../constants'
-import { formatCurrency, getPaymentIcon } from '../../lib'
-import type { PaymentMethod } from '../../types'
+import {
+  formatCurrency,
+  formatQuoteMoney,
+  getPaymentIcon,
+} from '../../lib'
+import type { PaymentMethod, PaymentQuote } from '../../types'
 
 interface PaymentConfirmDialogProps {
   open: boolean
@@ -42,6 +46,7 @@ interface PaymentConfirmDialogProps {
   onConfirm: () => void
   topupAmount: number
   paymentAmount: number
+  quote?: PaymentQuote | null
   paymentMethod: PaymentMethod | undefined
   calculating: boolean
   processing: boolean
@@ -55,6 +60,7 @@ export function PaymentConfirmDialog({
   onConfirm,
   topupAmount,
   paymentAmount,
+  quote,
   paymentMethod,
   calculating,
   processing,
@@ -92,6 +98,27 @@ export function PaymentConfirmDialog({
             </span>
           </div>
 
+          {quote && !calculating && (
+            <>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Credited')}
+                </span>
+                <span className='font-medium'>
+                  {formatQuoteMoney(quote.credited_money, quote.currency)}
+                </span>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Service fee')}
+                </span>
+                <span className='font-medium'>
+                  {formatQuoteMoney(quote.fee, quote.currency)}
+                </span>
+              </div>
+            </>
+          )}
+
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
               {t('You Pay')}
@@ -101,7 +128,9 @@ export function PaymentConfirmDialog({
             ) : (
               <div className='flex items-baseline gap-2'>
                 <span className='text-2xl font-semibold'>
-                  {formatCurrency(paymentAmount)}
+                  {quote
+                    ? formatQuoteMoney(quote.total, quote.currency)
+                    : formatCurrency(paymentAmount)}
                 </span>
                 {hasDiscount && (
                   <span className='text-muted-foreground text-sm line-through'>

@@ -24,26 +24,60 @@ import { requestPaymentAmount } from './use-payment'
 describe('payment amount routing', () => {
   test('uses the dedicated Waffo amount calculator', async () => {
     const calls: string[] = []
-    const amount = await requestPaymentAmount(120, PAYMENT_TYPES.WAFFO, {
-      regular: async () => {
-        calls.push('regular')
-        return { success: true, data: '1' }
-      },
-      stripe: async () => {
-        calls.push('stripe')
-        return { success: true, data: '2' }
-      },
-      waffo: async (request) => {
-        calls.push(`waffo:${request.amount}`)
-        return { success: true, data: '18.75' }
-      },
-      waffoPancake: async () => {
-        calls.push('pancake')
-        return { success: true, data: '4' }
+    const result = await requestPaymentAmount(120, PAYMENT_TYPES.WAFFO, {
+      payMethodIndex: 1,
+      calculators: {
+        regular: async () => {
+          calls.push('regular')
+          return { success: true, data: '1' }
+        },
+        stripe: async () => {
+          calls.push('stripe')
+          return { success: true, data: '2' }
+        },
+        waffo: async (request) => {
+          calls.push(`waffo:${request.amount}:${request.pay_method_index}`)
+          return { success: true, data: '18.75' }
+        },
+        waffoPancake: async () => {
+          calls.push('pancake')
+          return { success: true, data: '4' }
+        },
       },
     })
 
-    expect(amount).toBe(18.75)
-    expect(calls).toEqual(['waffo:120'])
+    expect(result.amount).toBe(18.75)
+    expect(calls).toEqual(['waffo:120:1'])
+  })
+
+  test('returns the server quote and payment_method for regular payments', async () => {
+    const requests: string[] = []
+    const result = await requestPaymentAmount(100, 'alipay', {
+      calculators: {
+        regular: async (request) => {
+          requests.push(`${request.amount}:${request.payment_method}`)
+          return {
+            success: true,
+            data: '101.50',
+            quote: {
+              credited_money: '100.00',
+              fee_rate_bps: 150,
+              fee: '1.50',
+              total: '101.50',
+              currency: 'CNY',
+              fee_included: false,
+            },
+          }
+        },
+        stripe: async () => ({ success: true, data: '2' }),
+        waffo: async () => ({ success: true, data: '3' }),
+        waffoPancake: async () => ({ success: true, data: '4' }),
+      },
+    })
+
+    expect(requests).toEqual(['100:alipay'])
+    expect(result.amount).toBe(101.5)
+    expect(result.quote?.fee).toBe('1.50')
+    expect(result.quote?.total).toBe('101.50')
   })
 })

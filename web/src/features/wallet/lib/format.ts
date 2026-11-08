@@ -34,6 +34,29 @@ export function formatCreemPrice(
 }
 
 /**
+ * Format a fee rate given in basis points (e.g. 150 -> "1.5%").
+ */
+export function formatFeeRateBps(bps?: number): string {
+  const rate = (bps ?? 0) / 100
+  return `${Number.isInteger(rate) ? rate.toFixed(0) : Number.parseFloat(rate.toFixed(2))}%`
+}
+
+const QUOTE_CURRENCY_SYMBOLS: Record<string, string> = {
+  CNY: '¥',
+  USD: '$',
+  EUR: '€',
+}
+
+/**
+ * Format a money string from a server PaymentQuote with its currency symbol.
+ */
+export function formatQuoteMoney(amount: string, currency: string): string {
+  const code = currency?.toUpperCase() ?? ''
+  const symbol = QUOTE_CURRENCY_SYMBOLS[code] ?? (code ? `${code} ` : '')
+  return `${symbol}${amount}`
+}
+
+/**
  * Format large quota numbers with K/M suffix
  */
 export function formatQuotaShort(quota: number): string {

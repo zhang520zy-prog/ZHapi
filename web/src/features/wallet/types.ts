@@ -34,7 +34,26 @@ export interface ApiResponse<T = unknown> {
  */
 export type TopupInfoResponse = ApiResponse<TopupInfo>
 export type RedemptionResponse = ApiResponse<number>
-export type AmountResponse = ApiResponse<string>
+
+/**
+ * Server-side payment quote returned alongside amount previews.
+ */
+export interface PaymentQuote {
+  /** Money credited to the wallet */
+  credited_money: string
+  /** Fee rate in basis points */
+  fee_rate_bps: number
+  /** Channel fee */
+  fee: string
+  /** Total amount to pay (credited + fee) */
+  total: string
+  /** Quote currency (ISO 4217) */
+  currency: string
+  /** Whether the fee is already included in the listed price */
+  fee_included: boolean
+}
+
+export type AmountResponse = ApiResponse<string> & { quote?: PaymentQuote }
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
@@ -74,6 +93,8 @@ export interface CreemProduct {
   quota: number
   /** Currency (USD or EUR) */
   currency: 'USD' | 'EUR'
+  /** Whether the channel fee is already included in the product price */
+  fee_included?: boolean
 }
 
 /**
@@ -100,6 +121,8 @@ export interface PaymentMethod {
   min_topup?: number
   /** Optional react-icons component name or safe icon URL */
   icon?: string
+  /** Channel fee rate in basis points */
+  fee_rate_bps?: number
 }
 
 /**
@@ -114,6 +137,8 @@ export interface WaffoPayMethod {
   payMethodType?: string
   /** Waffo pay method name */
   payMethodName?: string
+  /** Channel fee rate in basis points */
+  fee_rate_bps?: number
 }
 
 /**
@@ -150,6 +175,8 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Waffo Pancake fee rate in basis points */
+  waffo_pancake_fee_rate_bps?: number
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
@@ -210,6 +237,10 @@ export interface WaffoPancakePaymentRequest {
 export interface AmountRequest {
   /** Topup amount to calculate */
   amount: number
+  /** Payment method identifier (epay channel type) */
+  payment_method?: string
+  /** Server-side Waffo payment method index */
+  pay_method_index?: number
 }
 
 /**

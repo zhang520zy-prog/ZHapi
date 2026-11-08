@@ -39,6 +39,8 @@ import { cn } from '@/lib/utils'
 
 import {
   formatCurrency,
+  formatFeeRateBps,
+  formatQuoteMoney,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
@@ -46,6 +48,7 @@ import {
 } from '../lib'
 import type {
   PaymentMethod,
+  PaymentQuote,
   PresetAmount,
   TopupInfo,
   CreemProduct,
@@ -61,6 +64,7 @@ interface RechargeFormCardProps {
   topupAmount: number
   onTopupAmountChange: (amount: number) => void
   paymentAmount: number
+  quote?: PaymentQuote | null
   calculating: boolean
   onPaymentMethodSelect: (method: PaymentMethod) => void
   paymentLoading: string | null
@@ -91,6 +95,7 @@ export function RechargeFormCard({
   topupAmount,
   onTopupAmountChange,
   paymentAmount,
+  quote,
   calculating,
   onPaymentMethodSelect,
   paymentLoading,
@@ -306,11 +311,33 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {quote
+                          ? formatQuoteMoney(quote.total, quote.currency)
+                          : formatCurrency(paymentAmount)}
                       </span>
                     )}
                   </div>
                 </div>
+                {quote && !calculating && (
+                  <dl className='bg-muted/30 mt-2 space-y-1 rounded-md border px-3 py-2 text-xs'>
+                    <div className='flex items-center justify-between'>
+                      <dt className='text-muted-foreground'>
+                        {t('Credited')}
+                      </dt>
+                      <dd>{formatQuoteMoney(quote.credited_money, quote.currency)}</dd>
+                    </div>
+                    <div className='flex items-center justify-between'>
+                      <dt className='text-muted-foreground'>
+                        {t('Service fee')}
+                      </dt>
+                      <dd>{formatQuoteMoney(quote.fee, quote.currency)}</dd>
+                    </div>
+                    <div className='flex items-center justify-between font-medium'>
+                      <dt>{t('Total')}</dt>
+                      <dd>{formatQuoteMoney(quote.total, quote.currency)}</dd>
+                    </div>
+                  </dl>
+                )}
               </div>
 
               <div className='space-y-2.5 sm:space-y-3'>
@@ -362,11 +389,10 @@ export function RechargeFormCard({
                             <span className='max-w-full truncate'>
                               {method.name}
                             </span>
-                            {disabledLabel && (
-                              <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
-                                {disabledLabel}
-                              </span>
-                            )}
+                            <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
+                              {disabledLabel ??
+                                `${t('Fee rate')} ${formatFeeRateBps(method.fee_rate_bps)}`}
+                            </span>
                           </span>
                         </Button>
                       )
@@ -451,11 +477,10 @@ export function RechargeFormCard({
                               <span className='max-w-full truncate'>
                                 {method.name}
                               </span>
-                              {disabledLabel && (
-                                <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
-                                  {disabledLabel}
-                                </span>
-                              )}
+                              <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
+                                {disabledLabel ??
+                                  `${t('Fee rate')} ${formatFeeRateBps(method.fee_rate_bps)}`}
+                              </span>
                             </span>
                           </Button>
                         )
@@ -496,6 +521,11 @@ export function RechargeFormCard({
             <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
               {t('Creem Payment')}
             </Label>
+            {creemProducts.some((product) => product.fee_included) && (
+              <p className='text-muted-foreground text-xs'>
+                {t('Service fee is already included in the price')}
+              </p>
+            )}
             <CreemProductsSection
               products={creemProducts}
               onProductSelect={onCreemProductSelect}
