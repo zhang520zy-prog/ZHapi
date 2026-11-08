@@ -12,9 +12,12 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay/channel/claude"
+	"github.com/QuantumNous/new-api/relay/channel/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
@@ -218,6 +221,152 @@ func TestOaiResponsesToChatStreamSensitiveOutput(t *testing.T) {
 	assert.True(t, strings.HasSuffix(strings.TrimSpace(body), "data: [DONE]"))
 	assert.NotContains(t, body, "kedzz")
 	assert.EqualValues(t, 1, countOutputStageEvents(t, user.Id))
+}
+
+// 原生 Claude 上游的 SSE：违禁词切在第 3、4 个 text_delta 之间。
+func sensitiveClaudeStreamBody() string {
+	deltas := []string{"hello ", "world ", "zzbloc", "kedzz and ", "tail end"}
+	var body strings.Builder
+	body.WriteString(`data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-3-5","usage":{"input_tokens":10,"output_tokens":1}}}` + "\n\n")
+	body.WriteString(`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}` + "\n\n")
+	for i, delta := range deltas {
+		body.WriteString(fmt.Sprintf(`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":%q}}`, delta) + "\n\n")
+		_ = i
+	}
+	body.WriteString(`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}` + "\n\n")
+	body.WriteString(`data: {"type":"message_stop"}` + "\n\n")
+	return body.String()
+}
+
+// 原生 Gemini 上游的 SSE：违禁词同样切在第 3、4 个 part 之间。
+func sensitiveGeminiStreamBody() string {
+	parts := []string{"hello ", "world ", "zzbloc", "kedzz and ", "tail end"}
+	var body strings.Builder
+	for i, text := range parts {
+		meta := ""
+		if i == len(parts)-1 {
+			meta = `,"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":9,"totalTokenCount":12}`
+		}
+		body.WriteString(fmt.Sprintf(`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"text":%q}]}}]%s}`, text, meta) + "\n\n")
+	}
+	return body.String()
+}
+
+func runClaudeNativeStream(t *testing.T, user *model.User, format types.RelayFormat, relayMode int, includeUsage bool, path string) (*httptest.ResponseRecorder, *dto.Usage) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, path, nil)
+	info := &relaycommon.RelayInfo{
+		OriginModelName:     "claude-3-5",
+		RelayFormat:         format,
+		RelayMode:           relayMode,
+		IsStream:            true,
+		DisablePing:         true,
+		StartTime:           time.Now(),
+		UserId:              user.Id,
+		ShouldIncludeUsage:  includeUsage,
+		ChannelMeta:         &relaycommon.ChannelMeta{UpstreamModelName: "claude-3-5"},
+		ThinkingContentInfo: relaycommon.ThinkingContentInfo{IsFirstThinkingContent: true},
+	}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(sensitiveClaudeStreamBody()))}
+	usage, apiErr := claude.ClaudeStreamHandler(c, resp, info)
+	require.Nil(t, apiErr)
+	require.NotNil(t, usage)
+	return recorder, usage
+}
+
+// A-7：原生 Claude 渠道 + Claude 客户端格式——截断后流的最后一个
+// SSE 事件是 error 事件，其后没有拼接 JSON 错误体。
+func TestClaudeNativeStreamSensitiveOutputNoTrailingJSON(t *testing.T) {
+	user := setupSensitiveOutputTest(t)
+	recorder, _ := runClaudeNativeStream(t, user, types.RelayFormatClaude, relayconstant.RelayModeUnknown, false, "/v1/messages")
+	body := recorder.Body.String()
+
+	assert.Contains(t, body, "hello ")
+	assert.Contains(t, body, "zzbloc")
+	assert.Contains(t, body, "event: error")
+	assert.Equal(t, 1, strings.Count(body, "sensitive_words_detected"), "error must appear exactly once: %s", body)
+	assert.NotContains(t, body, "kedzz")
+	assert.NotContains(t, body, "tail end")
+	events := strings.Split(strings.TrimSpace(body), "\n\n")
+	last := strings.TrimSpace(events[len(events)-1])
+	assert.True(t, strings.HasPrefix(last, "event: error"), "last SSE event must be the error event: %q", last)
+	assert.True(t, strings.HasSuffix(last, "}"), "error event must end the stream cleanly: %q", last)
+	assert.EqualValues(t, 1, countOutputStageEvents(t, user.Id))
+}
+
+// A-6/A-7：原生 Claude 渠道 + OpenAI 客户端格式——命中后只有一个
+// [DONE]，且是最后一条；include_usage 时用量 chunk 在其之前。
+func TestClaudeNativeStreamSensitiveOutputOpenAIFormat(t *testing.T) {
+	user := setupSensitiveOutputTest(t)
+
+	recorder, usage := runClaudeNativeStream(t, user, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, false, "/v1/chat/completions")
+	require.NotNil(t, usage)
+	body := recorder.Body.String()
+	assert.Contains(t, body, "hello ")
+	assert.Contains(t, body, "zzbloc")
+	assert.Contains(t, body, "content_filter")
+	assert.Equal(t, 1, strings.Count(body, "[DONE]"), "should emit exactly one [DONE]: %s", body)
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(body), "data: [DONE]"))
+	assert.NotContains(t, body, "request blocked by content policy", "no trailing JSON error body: %s", body)
+	assert.NotContains(t, body, "kedzz")
+
+	recorderUsage, usage2 := runClaudeNativeStream(t, user, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, true, "/v1/chat/completions")
+	require.NotNil(t, usage2)
+	bodyWithUsage := recorderUsage.Body.String()
+	assert.Equal(t, 1, strings.Count(bodyWithUsage, "[DONE]"), "should emit exactly one [DONE]: %s", bodyWithUsage)
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(bodyWithUsage), "data: [DONE]"))
+	usageIdx := strings.LastIndex(bodyWithUsage, `"usage"`)
+	doneIdx := strings.LastIndex(bodyWithUsage, "[DONE]")
+	require.Greater(t, usageIdx, -1)
+	assert.Less(t, usageIdx, doneIdx, "usage chunk must precede [DONE]: %s", bodyWithUsage)
+	assert.EqualValues(t, 2, countOutputStageEvents(t, user.Id))
+}
+
+// A-6：原生 Gemini 渠道 + OpenAI 客户端格式——命中后只有一个
+// [DONE]，且是最后一条；include_usage 时用量 chunk 在其之前。
+func TestGeminiNativeStreamSensitiveOutputOpenAIFormat(t *testing.T) {
+	user := setupSensitiveOutputTest(t)
+	run := func(includeUsage bool) string {
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+		info := &relaycommon.RelayInfo{
+			OriginModelName:     "gemini-2.5",
+			RelayFormat:         types.RelayFormatOpenAI,
+			RelayMode:           relayconstant.RelayModeChatCompletions,
+			IsStream:            true,
+			DisablePing:         true,
+			StartTime:           time.Now(),
+			UserId:              user.Id,
+			ShouldIncludeUsage:  includeUsage,
+			ChannelMeta:         &relaycommon.ChannelMeta{UpstreamModelName: "gemini-2.5"},
+			ThinkingContentInfo: relaycommon.ThinkingContentInfo{IsFirstThinkingContent: true},
+		}
+		resp := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(sensitiveGeminiStreamBody()))}
+		usage, apiErr := gemini.GeminiChatStreamHandler(c, info, resp)
+		require.Nil(t, apiErr)
+		require.NotNil(t, usage)
+		return recorder.Body.String()
+	}
+
+	body := run(false)
+	assert.Contains(t, body, "hello ")
+	assert.Contains(t, body, "zzbloc")
+	assert.Contains(t, body, "content_filter")
+	assert.Equal(t, 1, strings.Count(body, "[DONE]"), "should emit exactly one [DONE]: %s", body)
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(body), "data: [DONE]"))
+	assert.NotContains(t, body, "kedzz")
+
+	bodyWithUsage := run(true)
+	assert.Equal(t, 1, strings.Count(bodyWithUsage, "[DONE]"), "should emit exactly one [DONE]: %s", bodyWithUsage)
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(bodyWithUsage), "data: [DONE]"))
+	usageIdx := strings.LastIndex(bodyWithUsage, `"usage"`)
+	doneIdx := strings.LastIndex(bodyWithUsage, "[DONE]")
+	require.Greater(t, usageIdx, -1)
+	assert.Less(t, usageIdx, doneIdx, "usage chunk must precede [DONE]: %s", bodyWithUsage)
+	assert.EqualValues(t, 2, countOutputStageEvents(t, user.Id))
 }
 
 // A-5：非流式输出命中时同一请求只写一条 "request blocked by content policy" 日志。

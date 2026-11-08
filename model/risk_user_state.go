@@ -58,6 +58,14 @@ func applyRiskHitTx(tx *gorm.DB, state *RiskUserState, now int64, immediate bool
 		state.Hits = 0
 	}
 
+	// 限制期内到达的命中（限制生效前已通过受限检查的并发请求、以及
+	// 限制期内才进入输出阶段的流）只记事件：不计数、不升级。
+	// block_restrict 在限制期内同样不升级——规则三.3 只在限制结束
+	// 后的窗口内计数，否则一轮并发命中可直接连升直至停用。
+	if state.RestrictedUntil > now {
+		return state.RestrictedUntil, false, false, 0, nil
+	}
+
 	// 计数窗口：第 0 级看 first_window_seconds；第 1～3 级的窗口从上次
 	// 限制结束（WindowStart 已设为 RestrictedUntil）起算 escalation_window_seconds。
 	if !immediate {

@@ -167,6 +167,22 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, base+3+600, result.RestrictedUntil)
 			assert.False(t, result.Notify)
 
+			// A-8：限制期内同一时刻再来 10 次命中——只记事件，不计数
+			// 不升级；block_restrict 在限制期内同样不升级。
+			for range 10 {
+				during := applyHitAt(t, db, owner.Id, base+4, false)
+				assert.Equal(t, 1, during.Level)
+				assert.False(t, during.Escalated)
+				assert.Equal(t, base+3+600, during.RestrictedUntil)
+			}
+			duringRestrict := applyHitAt(t, db, owner.Id, base+5, true)
+			assert.Equal(t, 1, duringRestrict.Level)
+			assert.False(t, duringRestrict.Escalated)
+			state, err := GetRiskUserState(owner.Id)
+			require.NoError(t, err)
+			assert.Equal(t, 1, state.Level)
+			assert.Equal(t, 0, state.Hits)
+
 			until, err := RiskRestrictionUntil(owner.Id, base+10)
 			require.NoError(t, err)
 			assert.Equal(t, result.RestrictedUntil, until)
@@ -198,7 +214,7 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			cold := applyHitAt(t, db, owner.Id, coldBase, false)
 			assert.False(t, cold.Escalated)
 			assert.Equal(t, 0, cold.Level)
-			state, err := GetRiskUserState(owner.Id)
+			state, err = GetRiskUserState(owner.Id)
 			require.NoError(t, err)
 			assert.Equal(t, 0, state.Level)
 			assert.Equal(t, 1, state.Hits)
@@ -218,7 +234,8 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			require.NoError(t, err)
 			assert.Zero(t, until)
 
-			// 并发 20 次命中：3/6/9/12 次升级，第 12 次停用。
+			// A-8：并发 20 次命中（同一时刻）——升到第 1 级后其余命中
+			// 落在限制期内，只记事件不计数，一轮并发只升一级。
 			parallelUser := User{Username: "ladder-parallel", Password: "x", Role: common.RoleCommonUser, AffCode: "ladder-parallel", Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&parallelUser).Error)
 			authBefore := parallelUser.AuthVersion
@@ -243,14 +260,28 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			}
 			state, err = GetRiskUserState(parallelUser.Id)
 			require.NoError(t, err)
-			assert.Equal(t, RiskMaxLevel, state.Level)
-			assert.True(t, state.Disabled)
+			assert.Equal(t, 1, state.Level)
+			assert.Equal(t, 0, state.Hits)
+			assert.False(t, state.Disabled)
+			assert.Equal(t, fixed+600, state.RestrictedUntil)
 			var locked User
 			require.NoError(t, db.Take(&locked, parallelUser.Id).Error)
-			assert.Equal(t, common.UserStatusDisabled, locked.Status)
+			assert.Equal(t, common.UserStatusEnabled, locked.Status)
+
+			// 限制结束后 block_restrict 逐级升到第 4 级 → 停用。
 			// A-3：停用走用户状态变更流程——AuthVersion 提升、提交后会话撤销。
+			disableHit := applyHitAt(t, db, parallelUser.Id, state.RestrictedUntil+10, true)
+			assert.Equal(t, 2, disableHit.Level)
+			disableHit = applyHitAt(t, db, parallelUser.Id, disableHit.RestrictedUntil+10, true)
+			assert.Equal(t, 3, disableHit.Level)
+			disableHit = applyHitAt(t, db, parallelUser.Id, disableHit.RestrictedUntil+10, true)
+			assert.Equal(t, RiskMaxLevel, disableHit.Level)
+			assert.True(t, disableHit.Disabled)
+			assert.Greater(t, disableHit.AuthVersion, int64(0))
+			require.NoError(t, db.Take(&locked, parallelUser.Id).Error)
+			assert.Equal(t, common.UserStatusDisabled, locked.Status)
 			assert.Greater(t, locked.AuthVersion, authBefore)
-			FinishRiskDisable(parallelUser.Id, locked.AuthVersion)
+			FinishRiskDisable(parallelUser.Id, disableHit.AuthVersion)
 			var session UserSession
 			require.NoError(t, db.Take(&session, "sid = ?", "sess-risk-1").Error)
 			assert.Equal(t, UserSessionStatusRevoked, session.Status)

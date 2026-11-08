@@ -146,7 +146,7 @@ func GeminiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, r
 		return true
 	}
 
-	usage, streamAPIError := geminiStreamHandler(c, info, resp, func(_ string, geminiResponse *dto.GeminiChatResponse) bool {
+	usage, sensitiveBlocked, streamAPIError := geminiStreamHandler(c, info, resp, func(_ string, geminiResponse *dto.GeminiChatResponse) bool {
 		hostedBridge.Observe(geminiResponse)
 		return sendChunk(geminiResponse)
 	})
@@ -155,6 +155,10 @@ func GeminiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, r
 			return usage, nil
 		}
 		return usage, streamAPIError
+	}
+	if sensitiveBlocked {
+		// A-6：截断后只结算用量，不再输出 finalized/失败事件。
+		return usage, nil
 	}
 	if info.StreamStatus != nil && !info.StreamStatus.IsNormalEnd() {
 		if info.StreamStatus.EndReason != relaycommon.StreamEndReasonClientGone {

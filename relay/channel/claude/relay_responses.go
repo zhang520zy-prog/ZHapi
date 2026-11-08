@@ -175,6 +175,7 @@ func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *rel
 		return nil, streamErr
 	}
 	if streamFailed {
+		finalizeClaudeStreamUsage(c, info, claudeInfo)
 		return claudeInfo.Usage, nil
 	}
 

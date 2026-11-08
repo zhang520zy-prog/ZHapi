@@ -165,13 +165,18 @@ func handleFinalStream(c *gin.Context, info *relaycommon.RelayInfo, resp *dto.Ch
 	return nil
 }
 
-func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response, callback func(data string, geminiResponse *dto.GeminiChatResponse) bool) (*dto.Usage, *types.NewAPIError) {
+// geminiStreamHandler 返回（用量, 是否被输出检查截断, 错误）。
+// sensitiveBlocked 让调用方跳过各自的最终响应输出；OpenAI 客户端的
+// 结束标记在本函数内用量算完后统一发出。
+func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response, callback func(data string, geminiResponse *dto.GeminiChatResponse) bool) (*dto.Usage, bool, *types.NewAPIError) {
 	var usage = &dto.Usage{}
 	var imageCount int
 	var hasBillableUsageMetadata bool
 	var streamErr error
+	var streamBlockedErr *types.NewAPIError
 	var accumulatedUsageMetadata *dto.GeminiUsageMetadata
 	responseText := strings.Builder{}
+	streamCreatedAt := common.GetTimestamp()
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		var geminiResponse dto.GeminiChatResponse
@@ -220,7 +225,12 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		if category := service.FeedStreamGuard(c, chunkText.String()); category != nil {
 			blockErr := service.CheckSensitiveOutputHit(c, info, category)
 			service.RecordSensitiveWordRejection(c, info, 1)
-			helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			streamBlockedErr = blockErr
+			// OpenAI 格式的结束标记推迟到用量算完后统一发出，
+			// 保证 include_usage 时用量 chunk 排在 [DONE] 之前。
+			if info.RelayFormat != types.RelayFormatOpenAI {
+				helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			}
 			sr.Stop(blockErr)
 			return
 		}
@@ -260,14 +270,25 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		patchGeminiZeroCompletionUsage(c, info, usage, responseText.String(), imageCount)
 	}
 
+	if streamBlockedErr != nil {
+		if info.RelayFormat == types.RelayFormatOpenAI {
+			if info.ShouldIncludeUsage {
+				response := helper.GenerateFinalUsageResponse(helper.GetResponseID(c), streamCreatedAt, info.UpstreamModelName, *usage)
+				_ = helper.ObjectData(c, response)
+			}
+			helper.EmitSensitiveStreamEnd(c, info, streamBlockedErr)
+		}
+		return usage, true, nil
+	}
+
 	if streamErr != nil {
-		return usage, types.NewOpenAIError(streamErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		return usage, false, types.NewOpenAIError(streamErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 	if info.StreamStatus != nil && !info.StreamStatus.IsNormalEnd() {
 		logger.LogWarn(c, fmt.Sprintf("Gemini stream ended unexpectedly: %s", info.StreamStatus.Summary()))
 	}
 
-	return usage, nil
+	return usage, false, nil
 }
 
 func isGeminiDownstreamStop(c *gin.Context, info *relaycommon.RelayInfo) bool {
@@ -285,7 +306,7 @@ func GeminiChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *
 	toolCallIndexByChoice := make(map[int]map[string]int)
 	nextToolCallIndexByChoice := make(map[int]int)
 
-	usage, err := geminiStreamHandler(c, info, resp, func(data string, geminiResponse *dto.GeminiChatResponse) bool {
+	usage, sensitiveBlocked, err := geminiStreamHandler(c, info, resp, func(data string, geminiResponse *dto.GeminiChatResponse) bool {
 		response, isStop := streamResponseGeminiChat2OpenAI(geminiResponse)
 
 		response.Id = id
@@ -371,6 +392,11 @@ func GeminiChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *
 
 	if err != nil {
 		return usage, err
+	}
+	if sensitiveBlocked {
+		// A-6：截断后只结算用量，不再输出最终响应（结束标记已由
+		// geminiStreamHandler 在用量算完后发出）。
+		return usage, nil
 	}
 
 	response := helper.GenerateFinalUsageResponse(id, createAt, info.UpstreamModelName, *usage)

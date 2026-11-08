@@ -296,6 +296,11 @@ streamLoop:
 				info.SetFirstResponseTime()
 				respErr := claude.HandleStreamResponseData(c, info, claudeInfo, string(v.Value.Bytes))
 				if respErr != nil {
+					if respErr.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected {
+						// 流已开始写，与其他渠道一样返回用量+nil 由外层结算；
+						// 返回错误会在 SSE 之后再拼一段 JSON 错误体。
+						return nil, claude.FinalizeSensitiveStreamEnd(c, info, claudeInfo, respErr)
+					}
 					return respErr, nil
 				}
 			case *bedrockruntimeTypes.UnknownUnionMember:

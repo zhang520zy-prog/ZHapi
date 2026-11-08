@@ -111,7 +111,11 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		if category := service.FeedStreamGuard(c, delta); category != nil {
 			blockErr := service.CheckSensitiveOutputHit(c, info, category)
 			service.RecordSensitiveWordRejection(c, info, 1)
-			helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			// OpenAI 格式的结束标记推迟到用量算完后由 ClaudeStreamHandler
+			// 发出，保证 include_usage 时用量 chunk 排在 [DONE] 之前。
+			if info.RelayFormat != types.RelayFormatOpenAI {
+				helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			}
 			return blockErr
 		}
 	}
@@ -268,7 +272,8 @@ func countClaudeStreamBillableTools(c *gin.Context, info *relaycommon.RelayInfo,
 	}
 }
 
-func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo) {
+// finalizeClaudeStreamUsage 补齐并定稿流式用量；命中截断后同样先算完再结算。
+func finalizeClaudeStreamUsage(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo) {
 	if claudeInfo.Usage.PromptTokens == 0 {
 		//上游出错
 	}
@@ -291,6 +296,10 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 		claudeInfo.Usage.UsageSemantic = "anthropic"
 	}
 	relayconvert.FinalizeClaudeStreamBillingUsage(claudeInfo)
+}
+
+func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo) {
+	finalizeClaudeStreamUsage(c, info, claudeInfo)
 
 	if info.RelayFormat == types.RelayFormatClaude {
 		//
@@ -321,6 +330,22 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 	}
 }
 
+// FinalizeSensitiveStreamEnd 输出命中截断后的统一收尾：补齐并定稿用量，
+// OpenAI 客户端在唯一的 [DONE] 之前补发用量 chunk 与结束标记；
+// 其他客户端格式的结束标记已在命中时发出，这里只算用量。
+// 返回定稿用量，由调用方按已下发部分结算。
+func FinalizeSensitiveStreamEnd(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo, apiErr *types.NewAPIError) *dto.Usage {
+	finalizeClaudeStreamUsage(c, info, claudeInfo)
+	if info.RelayFormat == types.RelayFormatOpenAI {
+		if info.ShouldIncludeUsage {
+			response := helper.GenerateFinalUsageResponse(claudeInfo.ResponseId, claudeInfo.Created, info.UpstreamModelName, buildOpenAIStyleUsageFromClaudeUsage(claudeInfo.Usage))
+			_ = helper.ObjectData(c, response)
+		}
+		helper.EmitSensitiveStreamEnd(c, info, apiErr)
+	}
+	return claudeInfo.Usage
+}
+
 func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
 	claudeInfo := &ClaudeResponseInfo{
 		ResponseId:   helper.GetResponseID(c),
@@ -338,10 +363,10 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	})
 	info.StreamStatus.RequireTerminal()
 	if err != nil {
-		// 输出命中产生的 422：上游已产生费用，补齐 usage 后正常结算。
 		if err.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected {
-			HandleStreamFinalResponse(c, info, claudeInfo)
-			service.PostTextConsumeQuota(c, info, claudeInfo.Usage, nil)
+			// 流已开始写，返回用量+nil 由外层统一结算；返回错误会让
+			// relay defer 在已写出的 SSE 之后再拼一段 JSON 错误体（A-7）。
+			return FinalizeSensitiveStreamEnd(c, info, claudeInfo, err), nil
 		}
 		return nil, err
 	}
