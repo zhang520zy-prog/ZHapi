@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { PricingModel } from '../types'
+import type { PricingModel, PricingRateLimit } from '../types'
 import {
   hashStringToSeed,
   randomInRange,
@@ -315,8 +315,7 @@ export function buildGroupPerformance(model: PricingModel): GroupPerformance[] {
   const spec = PROFILE_SPECS[profile]
   const baseSeed = hashStringToSeed(model.model_name)
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map<GroupPerformance>((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -798,45 +797,26 @@ export function buildSupportedParameters(
   return COMMON_CHAT_PARAMS
 }
 
-export type RateLimit = {
-  group: string
-  rpm: number
-  tpm: number
-  rpd: number
-}
+export type RateLimit = PricingRateLimit
 
-/** Build per-group RPM / TPM / RPD limits for the model. */
+/** Return only rate limits explicitly supplied by the deployment catalog. */
 export function buildRateLimits(model: PricingModel): RateLimit[] {
-  const groups = (model.enable_groups ?? []).filter((g) => g && g !== 'auto')
-  const targets = groups.length > 0 ? groups : ['default']
-  const cat = apiCategoryOf(model)
-  const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
-  const isHeavy = cat === 'image' || cat === 'video'
-  const isLight = cat === 'embedding'
-  const baseRpm = isHeavy ? 60 : isLight ? 5_000 : 500
-  const baseTpm = isHeavy ? 0 : isLight ? 1_000_000 : 200_000
-  const baseRpd = isHeavy ? 1_000 : isLight ? 100_000 : 10_000
-
-  return targets
-    .slice()
-    .sort((a, b) => a.localeCompare(b))
-    .map((group) => {
-      const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
-      const tier = 0.6 + rand() * 1.4
-      return {
-        group,
-        rpm: Math.round((baseRpm * tier) / 10) * 10,
-        tpm: baseTpm === 0 ? 0 : Math.round((baseTpm * tier) / 1_000) * 1_000,
-        rpd: Math.round((baseRpd * tier) / 100) * 100,
-      }
-    })
+  return (model.rate_limits ?? [])
+    .filter((limit) => limit && typeof limit.group === 'string')
+    .map((limit) => ({
+      group: limit.group,
+      rpm: limit.rpm ?? null,
+      tpm: limit.tpm ?? null,
+      rpd: limit.rpd ?? null,
+    }))
 }
 
 /** Format an integer rate-limit value compactly. */
-export function formatRateLimit(value: number): string {
-  if (value <= 0) return '—'
+export function formatRateLimit(value: number | null | undefined): string {
+  if (value == null || value <= 0) return '—'
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000)
+  if (value >= 1_000) {
     return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  }
   return value.toLocaleString()
 }

@@ -1,0 +1,66 @@
+/* Shared chrome continues the H homepage's typography and hairline treatment. */
+[data-slot='app-brand-name'],
+[data-slot='public-brand-name'] {
+  font-family: Silkscreen, var(--font-mono);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.relaydesk-console [data-slot='sidebar-group-label'] {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.relaydesk-console [data-slot='sidebar-menu-button'][data-active] {
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.relaydesk-console [data-slot='card'] {
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .relaydesk-console {
+    animation: relaydesk-console-enter 240ms ease-out;
+  }
+  .relaydesk-console [data-slot='card']:not([data-card-hover='false']):hover,
+  .dark
+    .relaydesk-console
+    [data-slot='card']:not([data-card-hover='false']):hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+@keyframes relaydesk-console-enter {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.relaydesk-public-header {
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.relaydesk-public-header nav {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.relaydesk-public-header nav a,
+[data-slot='app-header'] a {
+  font-family: var(--font-mono);
+}
+
+[data-slot='app-brand-name'] {
+  font-size: 1rem;
+}
+
+[data-slot='public-brand-name'] {
+  font-size: 19px;
+}

@@ -1,0 +1,922 @@
+@font-face {
+  font-family: MobiusInter;
+  src: url('../assets/fonts/relaydesk/inter-400-700.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: MobiusMono;
+  src: url('../assets/fonts/relaydesk/ibm-plex-mono-400.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: MobiusLora;
+  src: url('../../node_modules/@fontsource-variable/lora/files/lora-latin-wght-normal.woff2')
+    format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+:root {
+  color-scheme: dark;
+  font-family:
+    MobiusInter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  background: #090c0b;
+  color: #eeefe7;
+  --mobius-ink: #eeefe7;
+  --mobius-muted: #a0a79f;
+  --mobius-line: #ffffff21;
+  --mobius-accent: #c4f58b;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  font: inherit;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--mobius-accent);
+  outline-offset: 6px;
+}
+::selection {
+  background: #c4f58b;
+  color: #090c0b;
+}
+.mobius-page {
+  overflow: clip;
+}
+.mobius-page svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5;
+  flex-shrink: 0;
+}
+.mobius-skip {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 40;
+  padding: 12px;
+  background: #c4f58b;
+  color: #090c0b;
+  transform: translateY(-150%);
+}
+.mobius-skip:focus {
+  transform: translateY(0);
+}
+.mobius-header {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5%;
+  gap: 32px;
+  background: #090c0bf2;
+}
+.mobius-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 550;
+  letter-spacing: -0.5px;
+}
+.mobius-brand img {
+  width: 52px;
+  height: 30px;
+  object-fit: contain;
+}
+.mobius-brand small {
+  font:
+    8px MobiusMono,
+    monospace;
+  letter-spacing: 2px;
+  display: block;
+  color: #aab0a7;
+  margin-top: 4px;
+}
+.mobius-header nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  font-size: 13px;
+  color: #b5bcb2;
+}
+.mobius-header nav a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+.mobius-header nav a:hover {
+  color: var(--mobius-ink);
+}
+.mobius-nav-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--mobius-accent);
+}
+.mobius-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 12px;
+}
+.mobius-language {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  background: none;
+  border: 0;
+  color: #b6bdb5;
+  cursor: pointer;
+  padding: 8px;
+}
+.mobius-language svg {
+  width: 15px;
+}
+.mobius-login {
+  color: #c0c5bc;
+}
+.mobius-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid var(--mobius-ink);
+  border-radius: 999px;
+  background: var(--mobius-ink);
+  color: #111610;
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.mobius-button:hover {
+  background: var(--mobius-accent);
+  border-color: var(--mobius-accent);
+  transform: translateY(-2px);
+}
+.mobius-header-cta {
+  min-height: 36px;
+  padding: 0 15px;
+  gap: 25px;
+  font-size: 12px;
+}
+.mobius-header-cta svg {
+  width: 14px;
+}
+.mobius-platforms {
+  display: block;
+  font:
+    9px MobiusMono,
+    monospace;
+  margin-top: 18px;
+  color: #8c9984;
+  letter-spacing: 1px;
+}
+.mobius-terminal-wrap {
+  border: 1px solid #a7ba962b;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #182017, #0c100d);
+  box-shadow: 0 25px 110px #0005;
+  transform: perspective(1600px) rotateY(-6deg) rotateX(2deg);
+}
+.mobius-terminal-heading {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 25px;
+  gap: 12px;
+  font-size: 12px;
+  color: #bdcbb3;
+  border-bottom: 1px solid var(--mobius-line);
+}
+.mobius-terminal-heading > span:last-child {
+  margin-left: auto;
+  font:
+    9px MobiusMono,
+    monospace;
+  color: #728368;
+}
+.mobius-terminal-heading svg {
+  color: #b9e78b;
+}
+.mobius-terminal-wrap .relaydesk-mock-bar {
+  font:
+    10px MobiusMono,
+    monospace;
+  color: #809572;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 26px 24px 8px;
+}
+.mobius-terminal-wrap .relaydesk-mock-bar i {
+  width: 5px;
+  height: 5px;
+  border: 1px solid #638055;
+  border-radius: 50%;
+}
+.mobius-terminal-wrap .relaydesk-mock-bar span {
+  margin-left: 8px;
+}
+.mobius-terminal-wrap .relaydesk-mock-body {
+  padding: 10px 24px 30px;
+  min-height: 275px;
+  font:
+    10px MobiusMono,
+    monospace;
+  line-height: 1.8;
+  color: #adbea2;
+}
+.mobius-terminal-wrap .relaydesk-mock-body p {
+  display: flex;
+  gap: 7px;
+  min-height: 18px;
+  margin: 8px 0;
+  transition: opacity 0.2s;
+}
+.mobius-terminal-wrap .relaydesk-mock-body p[data-visible='false'] {
+  opacity: 0;
+}
+.mobius-terminal-wrap .relaydesk-mock-body b {
+  color: #c4f58b;
+}
+.mobius-terminal-wrap .relaydesk-mock-body em {
+  margin-left: auto;
+  font-style: normal;
+  color: #8ebd69;
+}
+.mobius-tool-strip {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid var(--mobius-line);
+  padding: 18px 15px;
+  font:
+    10px MobiusMono,
+    monospace;
+  color: #8a9d7e;
+}
+/* Scheme C: a single, content-led stage with an automatic chapter clock. */
+/* Scroll-driven homepage: one fixed canvas behind a normally scrolling document. */
+.mobius-scroll {
+  position: relative;
+  isolation: isolate;
+  background: #080c0a;
+}
+.mobius-header {
+  height: 84px;
+  background: linear-gradient(#080c0ae6, #080c0a00);
+}
+.mobius-brand {
+  color: var(--mobius-ink);
+}
+.mobius-brand:hover {
+  color: var(--mobius-accent);
+}
+.mobius-sculpture {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.mobius-sculpture canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mobius-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: min(70vw, 55svh);
+  color: #304d35;
+  opacity: 0.3;
+}
+.mobius-flow {
+  position: relative;
+  z-index: 2;
+  outline: none;
+}
+.mobius-section {
+  --reveal: 1;
+  --offset: 0;
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 120px 8% 96px;
+}
+/*
+ * One continuous shot. Each section is only a stretch of scroll (the timeline);
+ * its copy lives in a full-screen layer pinned to the screen, so nothing slides
+ * up past the sculpture. Copy arrives from the depth (small, soft) and leaves
+ * past the camera (large, soft), as if the camera were moving through it.
+ */
+.mobius-shot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: inherit;
+  align-items: inherit;
+  text-align: inherit;
+  gap: inherit;
+  padding: inherit;
+  pointer-events: none;
+}
+.mobius-section[data-active='true'] .mobius-shot {
+  pointer-events: auto;
+}
+.mobius-shot > * {
+  opacity: var(--reveal);
+  scale: calc(1 - clamp(-0.6, var(--offset), 0.6) * 0.3);
+  filter: blur(calc((1 - var(--reveal)) * 8px));
+  will-change: opacity, scale, filter;
+}
+.mobius-shot > .mobius-scroll-cue {
+  opacity: 1;
+  scale: none;
+  filter: none;
+}
+/* The footer belongs to the closing shot instead of scrolling up at the end. */
+.mobius-scroll .mobius-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  opacity: var(--closing, 0);
+  pointer-events: none;
+}
+.mobius-scroll[data-closing='true'] .mobius-footer,
+.mobius-scroll .mobius-footer:focus-within {
+  pointer-events: auto;
+  opacity: 1;
+}
+.mobius-copy {
+  max-width: 560px;
+}
+.section-hero {
+  min-height: 112svh;
+  align-items: center;
+  text-align: center;
+}
+.section-hero .mobius-copy {
+  max-width: 640px;
+}
+.section-hero .mobius-eyebrow,
+.section-hero .mobius-actions {
+  justify-content: center;
+}
+.section-hero .section-description {
+  margin-inline: auto;
+}
+.section-models {
+  min-height: 130svh;
+  align-items: flex-end;
+}
+.section-models .mobius-copy {
+  width: min(460px, 36%);
+  padding: 32px 0;
+}
+.section-desktop {
+  min-height: 130svh;
+}
+.section-desktop .mobius-copy {
+  width: min(480px, 40%);
+}
+.section-tools {
+  min-height: 160svh;
+  gap: 40px;
+}
+.section-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 48px 72px;
+  align-items: start;
+}
+.section-closing {
+  min-height: 140svh;
+  align-items: center;
+  text-align: center;
+}
+.section-closing .mobius-eyebrow {
+  justify-content: center;
+}
+.mobius-section h1,
+.mobius-section h2 {
+  position: relative;
+  font-family: MobiusLora, 'Songti SC', 'Noto Serif CJK SC', serif;
+  font-size: clamp(38px, 4.6vw, 72px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -1.8px;
+  margin: 0 0 26px;
+  text-wrap: balance;
+  color: var(--mobius-ink);
+  text-shadow:
+    0 1px 2px #07100d,
+    0 4px 18px #07100d99;
+}
+/* Editorial accent: the second line is italic serif, a lighter green-grey. */
+.mobius-section h1 em,
+.mobius-section h2 em {
+  display: block;
+  font-style: italic;
+  color: #cfe0c4;
+}
+.mobius-section h1::after,
+.mobius-section h2::after {
+  content: '01011010 01001000';
+  display: block;
+  margin-top: 12px;
+  font:
+    9px/1 MobiusMono,
+    monospace;
+  letter-spacing: 3px;
+  color: #5f7a62;
+}
+.section-hero h1::after,
+.section-closing h2::after {
+  margin-inline: auto;
+}
+.mobius-section [data-decoding='true'] > :not(.mobius-decode) {
+  visibility: hidden;
+}
+.mobius-section [data-decoding='true'] {
+  color: transparent;
+}
+.mobius-decode {
+  position: absolute;
+  inset: 0;
+  color: var(--mobius-accent);
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+.mobius-section [data-decoding='false'] .mobius-decode {
+  display: none;
+}
+.mobius-eyebrow {
+  font:
+    10px/1.6 MobiusMono,
+    monospace;
+  letter-spacing: 2px;
+  color: #a7b59c;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 24px;
+}
+/* A 1px rule leads into each eyebrow, after the DOS prompt. */
+.mobius-eyebrow::before {
+  content: 'C:\\ZH>';
+  color: var(--mobius-accent);
+  letter-spacing: 1px;
+}
+.mobius-eyebrow::after {
+  content: '';
+  width: 7px;
+  height: 11px;
+  background: var(--mobius-accent);
+  animation: mobius-cursor 1.06s steps(1) infinite;
+}
+@keyframes mobius-cursor {
+  50% {
+    opacity: 0;
+  }
+}
+.mobius-eyebrow > span {
+  width: 4px;
+  height: 4px;
+  background: var(--mobius-accent);
+  border-radius: 50%;
+}
+.section-models .mobius-eyebrow,
+.section-desktop .mobius-eyebrow,
+.section-tools .mobius-eyebrow {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #ffffff1f;
+}
+.section-description {
+  font-size: clamp(14px, 1.15vw, 17px);
+  line-height: 1.95;
+  color: #b8c0b4;
+  margin: 0 0 30px;
+  max-width: 34em;
+  text-shadow: 0 1px 3px #07100d;
+}
+.mobius-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.mobius-button {
+  gap: 18px;
+}
+.mobius-button-ghost {
+  background: #080c0a66;
+  color: var(--mobius-ink);
+  border-color: #ffffff38;
+  backdrop-filter: blur(6px);
+}
+.mobius-button-ghost:hover {
+  color: #0b100e;
+}
+.mobius-header-cta {
+  gap: 14px;
+}
+.mobius-scroll-cue {
+  position: fixed;
+  z-index: 4;
+  left: 5%;
+  bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font:
+    10px MobiusMono,
+    monospace;
+  letter-spacing: 2px;
+  color: #a7b59c;
+  text-transform: uppercase;
+  transition: opacity 0.4s;
+}
+.mobius-scroll-cue svg {
+  animation: mobius-cue 1.8s ease-in-out infinite;
+}
+.mobius-scroll-cue[data-hidden='true'] {
+  opacity: 0;
+}
+@keyframes mobius-cue {
+  50% {
+    translate: 0 4px;
+  }
+}
+.section-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
+  margin-top: 40px;
+  padding-top: 26px;
+  border-top: 1px solid #ffffff1a;
+  color: #c4ccbd;
+}
+.section-providers strong {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+.section-providers .mobius-claude {
+  font-family: MobiusLora, serif;
+}
+.section-note {
+  color: #a0aa98;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+}
+.mobius-terminal-wrap {
+  transform: none;
+  background: #0b110ded;
+  box-shadow: 0 30px 120px #0008;
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+.mobius-terminal-heading {
+  height: 45px;
+  padding: 0 20px;
+}
+.mobius-terminal-wrap .relaydesk-mock-body {
+  min-height: 235px;
+  font-size: 11px;
+}
+.section-features {
+  display: grid;
+  gap: 0;
+}
+.section-feature {
+  position: relative;
+  padding: 24px 0 24px 44px;
+  border-top: 1px solid #ffffff1a;
+}
+.section-feature:last-child {
+  border-bottom: 1px solid #ffffff1a;
+}
+.section-feature > span {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  font:
+    10px MobiusMono,
+    monospace;
+  color: #a8c38c;
+}
+.section-feature h3 {
+  margin: 0 0 10px;
+  font-family: MobiusLora, 'Songti SC', serif;
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.4px;
+}
+.section-feature p {
+  margin: 0;
+  color: #b8c0b4;
+  font-size: 14px;
+  line-height: 1.85;
+}
+.mobius-motion-controls {
+  position: fixed;
+  z-index: 5;
+  right: 5%;
+  bottom: 36px;
+}
+.mobius-icon-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #c4ccbd;
+  border: 1px solid #ffffff21;
+  border-radius: 50%;
+  background: #090c0bcc;
+  cursor: pointer;
+}
+.mobius-icon-button:hover {
+  background: #1c261c;
+}
+.mobius-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px 32px;
+  padding: 36px calc(5% + 56px) 40px 5%;
+  border-top: 1px solid #ffffff1a;
+  background: linear-gradient(#080c0a00, #080c0af2 40%);
+  color: #96a18e;
+  font:
+    10px/1.5 MobiusMono,
+    monospace;
+}
+.mobius-footer nav {
+  display: flex;
+  gap: 24px;
+}
+.mobius-footer a:hover {
+  color: var(--mobius-ink);
+}
+@media (max-width: 1000px) {
+  .mobius-header {
+    gap: 20px;
+    padding-inline: 4%;
+  }
+  .mobius-header nav {
+    gap: 18px;
+    font-size: 11px;
+  }
+  .mobius-header-actions {
+    gap: 16px;
+  }
+  .section-models .mobius-copy,
+  .section-desktop .mobius-copy {
+    width: min(460px, 48%);
+  }
+  .section-tools-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .mobius-header {
+    height: 68px;
+    padding-inline: 6%;
+    gap: 12px;
+  }
+  .mobius-header nav,
+  .mobius-login {
+    display: none;
+  }
+  .mobius-brand {
+    font-size: 15px;
+    gap: 8px;
+  }
+  .mobius-brand img {
+    width: 42px;
+    height: 24px;
+  }
+  .mobius-section {
+    padding: 96px 6% 72px;
+    justify-content: flex-end;
+  }
+  .section-hero {
+    justify-content: center;
+  }
+  .section-models,
+  .section-desktop {
+    align-items: stretch;
+  }
+  .section-models .mobius-copy,
+  .section-desktop .mobius-copy {
+    width: 100%;
+    padding: 24px 0 0;
+    background: linear-gradient(#080c0a00, #080c0ad9 30%);
+  }
+  .mobius-section h1,
+  .mobius-section h2 {
+    font-size: 36px;
+    letter-spacing: -1px;
+  }
+  .mobius-motion-controls {
+    bottom: 20px;
+  }
+  .mobius-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .mobius-shot,
+  .mobius-scroll .mobius-footer {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mobius-section {
+    min-height: 100svh;
+  }
+  .mobius-shot > * {
+    opacity: 1;
+    scale: none;
+    filter: none;
+  }
+  .mobius-eyebrow::after,
+  .mobius-scroll-cue svg {
+    animation: none;
+  }
+}
+/* Brand SVGs rendered once for the canvas to rasterise; never shown. */
+.mobius-icon-source {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+/* Section 4 sits over the vortex: heading on top, features along the bottom,
+   the tunnel's core and its agents left clear in the middle. */
+.section-tools {
+  min-height: 150svh;
+  justify-content: center;
+}
+.section-tools .mobius-copy {
+  max-width: 520px;
+}
+.section-tools-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  /* Leaves the vortex core clear between heading and features, within one screen. */
+  margin-top: max(24px, calc(100svh - 620px));
+}
+.mobius-tool-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mobius-tool-strip span {
+  padding: 6px 14px;
+  border: 1px solid #8cf5b440;
+  border-radius: 999px;
+  background: #080c0a8c;
+  color: #c9e9d2;
+  font:
+    10px MobiusMono,
+    monospace;
+  letter-spacing: 1px;
+  backdrop-filter: blur(6px);
+}
+.section-tools .section-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 40px;
+}
+.section-tools .section-feature {
+  padding: 22px 0 0 0;
+  border-top: 1px solid #ffffff2e;
+  border-bottom: 0;
+}
+.section-tools .section-feature > span {
+  position: static;
+  display: block;
+  margin-bottom: 12px;
+}
+.section-tools .section-feature h3 {
+  font-size: 22px;
+  text-shadow: 0 2px 12px #07100d;
+}
+.section-tools .section-feature p {
+  font-size: 13px;
+  text-shadow: 0 1px 4px #07100d;
+}
+@media (max-width: 700px) {
+  .section-tools-grid {
+    margin-top: 24px;
+  }
+  .section-tools .section-features {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+/* The scroll hint breaks into drifting particles as the hero gives way. */
+.mobius-scroll-cue-text {
+  display: inline-flex;
+}
+.mobius-scroll-cue-text > span {
+  display: inline-block;
+  white-space: pre;
+  transition:
+    opacity 0.9s ease,
+    translate 1.1s cubic-bezier(0.2, 0.7, 0.3, 1),
+    filter 0.9s ease;
+  transition-delay: calc(var(--i) * 45ms);
+}
+.mobius-scroll-cue[data-hidden='true'] {
+  opacity: 1;
+  pointer-events: none;
+}
+.mobius-scroll-cue[data-hidden='true'] svg {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.mobius-scroll-cue[data-hidden='true'] .mobius-scroll-cue-text > span {
+  opacity: 0;
+  filter: blur(3px);
+  translate: calc((var(--i) - 3) * 9px) calc(-26px - var(--i) * 7px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobius-scroll-cue-text > span {
+    transition: none;
+  }
+}
+/* Too short to hold a shot on one screen: fall back to an ordinary page. */
+@media (max-height: 540px) {
+  .mobius-shot,
+  .mobius-scroll .mobius-footer {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mobius-shot > * {
+    opacity: 1;
+    scale: none;
+    filter: none;
+  }
+}

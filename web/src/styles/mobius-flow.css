@@ -1,0 +1,426 @@
+/* Scheme E builds on Scheme D's tokens, header and buttons. */
+@import './mobius-scroll.css';
+
+/* The canvas covers the viewport; the sculpture is drawn in viewport space
+   from live element boxes, so it scrolls together with the copy. */
+.flow-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+.flow-main {
+  position: relative;
+  z-index: 2;
+  outline: none;
+}
+.flow-section {
+  position: relative;
+  padding: 0 clamp(20px, 7vw, 112px);
+}
+.flow-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  font:
+    12px/1.6 ScrollMono,
+    monospace;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--s-accent);
+}
+.flow-eyebrow > span {
+  width: 6px;
+  height: 6px;
+  background: var(--s-accent);
+}
+.flow-section h1,
+.flow-section h2 {
+  margin: 0 0 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+.flow-section h1 {
+  font-size: clamp(40px, 5.4vw, 80px);
+}
+.flow-section h2 {
+  font-size: clamp(32px, 3.8vw, 56px);
+}
+.flow-section h2 em {
+  display: block;
+  font-style: normal;
+  color: var(--s-accent);
+}
+html[lang^='zh'] .flow-section h1 {
+  font-size: clamp(36px, 4.6vw, 68px);
+  line-height: 1.2;
+}
+html[lang^='zh'] .flow-section h2 {
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.26;
+}
+.flow-description {
+  max-width: 34em;
+  margin: 0 0 28px;
+  font-size: clamp(16px, 1.2vw, 18px);
+  line-height: 1.8;
+  color: var(--s-muted);
+}
+.flow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.flow-copy {
+  max-width: 520px;
+}
+
+/* 1 · Hero: title above the arch, actions inside the doorway. */
+.flow-hero {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4vh;
+  padding-top: 96px;
+  padding-bottom: 12vh;
+  text-align: center;
+}
+.flow-hero-head .flow-eyebrow,
+.flow-hero-body .flow-actions {
+  justify-content: center;
+}
+.flow-hero-head h1 {
+  max-width: 13em;
+  margin: 0 auto;
+}
+.flow-hero-body {
+  max-width: 560px;
+  padding-top: 4vh;
+}
+.flow-hero-body .flow-description {
+  margin-inline: auto;
+}
+.flow-command {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin: 30px 0 0;
+  font:
+    13px ScrollMono,
+    monospace;
+}
+.flow-command b {
+  color: var(--s-accent);
+}
+.flow-command span {
+  width: 100%;
+  font-size: 12px;
+  color: var(--s-muted);
+}
+
+/* 2 · Models: copy left, the data column on the right, names hanging off it. */
+.flow-models {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 6vw;
+  align-items: start;
+  padding-top: 10vh;
+}
+/* Copy stays beside the column while the names scroll past it. */
+.flow-models .flow-copy,
+.flow-desktop .flow-copy {
+  position: sticky;
+  top: 28vh;
+}
+.flow-pillar-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  min-height: 100svh;
+}
+.flow-pillar {
+  align-self: stretch;
+  width: 80px;
+  flex-shrink: 0;
+}
+.flow-model-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 13vh;
+}
+.flow-model-list li[data-flow='model'] {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 190px;
+  padding: 14px 18px;
+  border: 1px solid var(--s-line);
+  border-radius: 6px;
+  background: var(--s-panel);
+  font-size: 20px;
+  font-weight: 600;
+}
+.flow-model-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--s-accent);
+}
+.flow-model-note {
+  font-size: 13px;
+  color: var(--s-muted);
+}
+
+/* 3 · RelayDesk: the column bends into the terminal. */
+.flow-desktop {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 6vw;
+  min-height: 105svh;
+}
+.flow-terminal {
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  background: var(--s-panel);
+  overflow: hidden;
+}
+.flow-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--s-line);
+  font:
+    13px ScrollMono,
+    monospace;
+}
+.flow-terminal-bar svg {
+  color: var(--s-accent);
+}
+.flow-terminal-bar span:last-child {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--s-muted);
+}
+.flow-terminal-body {
+  padding: 16px 18px 18px;
+  font:
+    13px/1.7 ScrollMono,
+    monospace;
+}
+.flow-terminal-body p {
+  display: flex;
+  gap: 8px;
+  min-height: 24px;
+  margin: 2px 0;
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+}
+.flow-terminal-body p[data-shown='false'] {
+  opacity: 0;
+  transform: translateX(-6px);
+}
+.flow-terminal-body b,
+.flow-terminal-body em {
+  color: var(--s-accent);
+  font-style: normal;
+}
+.flow-terminal-body em {
+  margin-left: auto;
+}
+
+/* 4 · Features: the cable becomes the timeline the nodes hang on. */
+.flow-features {
+  min-height: 125svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6vw;
+  align-items: start;
+  padding-top: 6vh;
+}
+.flow-features-head {
+  position: sticky;
+  top: 30vh;
+}
+.flow-timeline {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 64px;
+  display: grid;
+  gap: 24vh;
+}
+.flow-timeline-rail {
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+.flow-timeline li {
+  position: relative;
+  transition: opacity 0.3s;
+}
+.flow-timeline li[data-active='false'] {
+  opacity: 0.45;
+}
+.flow-node {
+  position: absolute;
+  left: -64px;
+  top: -2px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--s-line);
+  border-radius: 50%;
+  background: var(--s-bg);
+  font:
+    13px ScrollPixel,
+    monospace;
+  color: var(--s-accent);
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+.flow-timeline li[data-active='true'] .flow-node {
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--s-accent) 16%, transparent);
+}
+.flow-timeline h3 {
+  margin: 6px 0 8px;
+  font-size: 22px;
+}
+.flow-timeline p {
+  margin: 0;
+  max-width: 30em;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--s-muted);
+}
+
+/* 5 · Closing: the Möbius ring frames the call to action. */
+.flow-closing {
+  min-height: 115svh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.flow-ring {
+  width: min(560px, 80vw);
+  padding: 12vh 0;
+}
+.flow-ring .flow-eyebrow,
+.flow-ring .flow-actions {
+  justify-content: center;
+}
+.flow-credit {
+  padding-bottom: 28px;
+}
+
+@media (max-width: 1080px) {
+  .flow-models,
+  .flow-desktop,
+  .flow-features {
+    gap: 4vw;
+  }
+}
+
+/* Phones: one column; the sculpture runs beside or between the blocks. */
+@media (max-width: 720px) {
+  .flow-section {
+    padding-inline: 20px;
+  }
+  .flow-hero {
+    text-align: left;
+    align-items: stretch;
+    padding-bottom: 16vh;
+  }
+  .flow-hero-head .flow-eyebrow,
+  .flow-hero-body .flow-actions,
+  .flow-command {
+    justify-content: flex-start;
+  }
+  .flow-hero-head h1 {
+    margin: 0;
+  }
+  .flow-hero-body {
+    padding-top: 2vh;
+  }
+  .flow-actions .scroll-button {
+    flex: 1 1 auto;
+  }
+  .flow-models,
+  .flow-desktop,
+  .flow-features {
+    grid-template-columns: 1fr;
+    gap: 8vh;
+    min-height: 0;
+    padding-block: 12vh;
+  }
+  .flow-pillar-row {
+    gap: 22px;
+    min-height: 90svh;
+  }
+  .flow-pillar {
+    width: 40px;
+  }
+  .flow-model-list {
+    gap: 9vh;
+  }
+  .flow-model-list li[data-flow='model'] {
+    min-width: 0;
+    font-size: 18px;
+  }
+  .flow-terminal {
+    margin-right: 30px;
+  }
+  .flow-terminal-body {
+    font-size: 12px;
+  }
+  .flow-features-head,
+  .flow-models .flow-copy,
+  .flow-desktop .flow-copy {
+    position: static;
+  }
+  .flow-timeline {
+    gap: 14vh;
+    padding-left: 58px;
+  }
+  .flow-node {
+    left: -58px;
+  }
+  .flow-closing {
+    min-height: 110svh;
+  }
+  .flow-credit {
+    padding-right: 76px;
+  }
+}
+@media (max-height: 560px) and (min-aspect-ratio: 1/1) {
+  .flow-hero {
+    padding-top: 80px;
+    gap: 2vh;
+  }
+  .flow-section h1 {
+    font-size: clamp(28px, 5vw, 44px) !important;
+  }
+  .flow-command {
+    display: none;
+  }
+}

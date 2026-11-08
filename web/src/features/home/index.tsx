@@ -16,26 +16,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
 import { RichContent } from '@/components/rich-content'
 import { useTheme } from '@/context/theme-provider'
+import { toIntlLocale } from '@/i18n/languages'
 import { isLikelyHtml } from '@/lib/content-format'
-import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
+import { Capabilities, Hero, RelayDeskSection } from './components'
 import { useHomePageContent } from './hooks'
 
 export function Home() {
   const { i18n, t } = useTranslation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const { resolvedTheme } = useTheme()
-  const { auth } = useAuthStore()
-  const isAuthenticated = !!auth.user
   const { content, isLoaded, isUrl } = useHomePageContent()
+  const [motionPaused, setMotionPaused] = useState(false)
 
   const syncIframePreferences = useCallback(() => {
     try {
@@ -121,13 +120,39 @@ export function Home() {
   }
 
   return (
-    <PublicLayout showMainContainer={false}>
-      <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
-      <HowItWorks />
-      <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
+    <PublicLayout
+      showMainContainer={false}
+      headerProps={{
+        className: 'relaydesk-home-header',
+        transformNavLinks: (links) =>
+          links
+            .filter((link) => link.title !== t('Docs'))
+            .map((link) =>
+              link.title === 'RelayDesk'
+                ? { ...link, href: '/#relaydesk', external: false }
+                : link
+            ),
+      }}
+    >
+      <div
+        className='relaydesk-home'
+        lang={toIntlLocale(i18n.resolvedLanguage || i18n.language)}
+        data-theme={resolvedTheme}
+        data-motion-paused={motionPaused}
+      >
+        <div className='relaydesk-home-thread' aria-hidden='true'>
+          <i />
+        </div>
+        <main id='content' className='relaydesk-home-main'>
+          <Hero
+            paused={motionPaused}
+            onPauseChange={() => setMotionPaused((value) => !value)}
+          />
+          <RelayDeskSection paused={motionPaused} />
+          <Capabilities />
+        </main>
+        <Footer className='relaydesk-home-footer' columns={[]} />
+      </div>
     </PublicLayout>
   )
 }

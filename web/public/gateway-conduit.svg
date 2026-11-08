@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 900" fill="none" role="img" aria-label="">
+  <defs>
+    <radialGradient id="atmosphere" cx="0" cy="0" r="1" gradientTransform="translate(585 430) rotate(90) scale(525 460)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#48D6B0" stop-opacity=".36"/>
+      <stop offset=".42" stop-color="#237B67" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#10201C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="371" y1="92" x2="751" y2="793" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3D5B51"/>
+      <stop offset=".23" stop-color="#172D27"/>
+      <stop offset=".56" stop-color="#0A1815"/>
+      <stop offset=".83" stop-color="#294239"/>
+      <stop offset="1" stop-color="#0B1714"/>
+    </linearGradient>
+    <linearGradient id="facet" x1="421" y1="199" x2="686" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3A5B4D"/>
+      <stop offset=".22" stop-color="#162C25"/>
+      <stop offset=".62" stop-color="#0A1714"/>
+      <stop offset="1" stop-color="#355445"/>
+    </linearGradient>
+    <linearGradient id="aperture" x1="478" y1="279" x2="626" y2="653" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071714"/>
+      <stop offset=".52" stop-color="#112D25"/>
+      <stop offset="1" stop-color="#020E0B"/>
+    </linearGradient>
+    <linearGradient id="light" x1="21" y1="490" x2="903" y2="462" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6CE4C1" stop-opacity="0"/>
+      <stop offset=".26" stop-color="#6CE4C1" stop-opacity=".3"/>
+      <stop offset=".57" stop-color="#C5FFE3"/>
+      <stop offset=".8" stop-color="#68DFBD" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#6CE4C1" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="249" y1="379" x2="750" y2="552" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E4AC62" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#F7BE72"/>
+      <stop offset="1" stop-color="#E4AC62" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientTransform="translate(541 449) rotate(90) scale(210 100)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDFFEE"/>
+      <stop offset=".2" stop-color="#9DF2CF" stop-opacity=".85"/>
+      <stop offset=".52" stop-color="#39AF8E" stop-opacity=".34"/>
+      <stop offset="1" stop-color="#1C6F5C" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft-glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="wide-glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="31"/>
+    </filter>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="25"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="585" cy="430" rx="455" ry="515" fill="url(#atmosphere)"/>
+  <path d="M445 137 660 178 833 414 769 714 609 814 399 754 298 514 333 267Z" fill="#081512" opacity=".52" filter="url(#shadow)"/>
+
+  <!-- Deep architectural fins give the gateway physical scale. -->
+  <path d="M195 157 335 102 385 184 326 310 171 344Z" fill="#0A1714" stroke="#36584B" stroke-opacity=".47" stroke-width="2"/>
+  <path d="M197 172 317 130 344 188 300 288 182 310Z" fill="#173027" opacity=".7"/>
+  <path d="M742 116 851 166 931 366 824 456 740 328Z" fill="#0A1815" stroke="#4B7966" stroke-opacity=".34" stroke-width="2"/>
+  <path d="M764 147 834 179 897 343 829 412 773 322Z" fill="#1A342A" opacity=".72"/>
+  <path d="M96 559 256 510 339 696 230 796 68 727Z" fill="#081512" stroke="#426F5B" stroke-opacity=".37" stroke-width="2"/>
+  <path d="M785 507 942 477 960 731 783 801 713 674Z" fill="#0A1A15" stroke="#416C59" stroke-opacity=".37" stroke-width="2"/>
+
+  <!-- Perspective data conduits; packet streams converge on one gateway. -->
+  <g stroke="url(#light)" stroke-linecap="round">
+    <path d="M-42 250 180 308 411 384 511 432" stroke-width="14" opacity=".5" filter="url(#soft-glow)"/>
+    <path d="M-42 250 180 308 411 384 511 432" stroke-width="2.2" opacity=".82"/>
+    <path d="M-62 493 144 487 353 457 508 444" stroke-width="20" opacity=".44" filter="url(#soft-glow)"/>
+    <path d="M-62 493 144 487 353 457 508 444" stroke-width="3"/>
+    <path d="M-31 741 172 660 382 503 512 456" stroke-width="18" opacity=".42" filter="url(#soft-glow)"/>
+    <path d="M-31 741 172 660 382 503 512 456" stroke-width="2.5" opacity=".9"/>
+    <path d="M578 443 710 364 855 221 1001 140" stroke-width="17" opacity=".4" filter="url(#soft-glow)"/>
+    <path d="M578 443 710 364 855 221 1001 140" stroke-width="2.3" opacity=".86"/>
+    <path d="M586 453 757 454 1001 474" stroke-width="23" opacity=".46" filter="url(#soft-glow)"/>
+    <path d="M586 453 757 454 1001 474" stroke-width="3"/>
+    <path d="M581 463 712 572 858 731 1004 817" stroke-width="17" opacity=".36" filter="url(#soft-glow)"/>
+    <path d="M581 463 712 572 858 731 1004 817" stroke-width="2.2" opacity=".84"/>
+  </g>
+  <path d="M57 481 241 469 422 450" stroke="url(#amber)" stroke-width="2" opacity=".77"/>
+  <path d="M622 453 790 455 942 470" stroke="url(#amber)" stroke-width="2" opacity=".58"/>
+
+  <!-- A heavy, machined portal replaces a generic HUD circle. -->
+  <path d="M439 94 640 139 724 303 727 603 642 769 483 808 356 706 326 458 359 235Z" fill="url(#steel)" stroke="#6EA992" stroke-opacity=".38" stroke-width="3"/>
+  <path d="M439 94 475 123 464 737 483 808 356 706 326 458 359 235Z" fill="#0A1915" opacity=".92"/>
+  <path d="M640 139 724 303 727 603 642 769 621 745 662 595 658 306 608 167Z" fill="#061410"/>
+  <path d="M439 94 640 139 608 167 475 123Z" fill="#4B6D5D"/>
+  <path d="M359 235 439 94 475 123 423 271 395 460 414 657 483 808 356 706 326 458Z" fill="#203C2F" opacity=".65"/>
+  <path d="M475 123 608 167 658 306 662 595 621 745 464 737 414 657 395 460 423 271Z" fill="url(#facet)" stroke="#78B99C" stroke-opacity=".4" stroke-width="2"/>
+  <path d="M464 737 621 745 642 769 483 808Z" fill="#091A15"/>
+
+  <!-- Vents and engineered seams. -->
+  <g stroke="#79B59A" stroke-opacity=".32" stroke-width="3">
+    <path d="M373 296 404 302M362 333 396 338M354 371 391 376M348 410 389 414M347 448 388 449"/>
+    <path d="M361 572 396 561M371 611 404 596M385 649 416 631"/>
+    <path d="M662 307 700 301M665 344 710 339M667 383 716 382M669 423 720 425M668 464 719 470"/>
+    <path d="M667 546 712 560M660 587 700 603M650 627 687 647"/>
+  </g>
+  <path d="M395 460 414 657 464 737" stroke="#8EE1B5" stroke-opacity=".45" stroke-width="3"/>
+  <path d="M658 306 662 595 621 745" stroke="#9DECC4" stroke-opacity=".37" stroke-width="3"/>
+  <path d="M480 165 600 203 634 330 636 575 603 702 477 695 445 608 432 453 444 302Z" fill="#091B16" stroke="#67D7A8" stroke-opacity=".35" stroke-width="3"/>
+  <path d="M500 233 575 258 605 352 610 556 579 649 502 666 472 595 458 453 473 320Z" fill="url(#aperture)" stroke="#9EF0C5" stroke-width="4"/>
+  <path d="M507 264 559 281 585 362 592 539 565 624 510 638 488 582 478 453 491 335Z" fill="#071510" stroke="#B2F5D3" stroke-opacity=".43" stroke-width="2"/>
+  <path d="M535 283 570 307 579 433 573 563 541 611 518 561 508 444 517 336Z" fill="url(#core)" opacity=".9"/>
+  <path d="M542 302 555 361 558 525 543 599" stroke="#C8FFE4" stroke-width="8" opacity=".55" filter="url(#soft-glow)"/>
+  <path d="M542 302 555 361 558 525 543 599" stroke="#C8FFE4" stroke-width="1.7" opacity=".9"/>
+  <ellipse cx="541" cy="449" rx="90" ry="180" fill="url(#core)" opacity=".57" filter="url(#wide-glow)"/>
+
+  <!-- Small physical signal markers, not invented service metrics. -->
+  <g fill="#B9F7D7">
+    <path d="M157 296 170 290 181 306 168 313Z"/>
+    <path d="M283 469 297 461 309 473 295 482Z"/>
+    <path d="M193 649 207 639 221 650 206 662Z"/>
+    <path d="M770 298 780 288 790 298 780 308Z"/>
+    <path d="M840 460 850 450 860 460 850 470Z"/>
+    <path d="M813 680 823 670 833 680 823 690Z"/>
+  </g>
+  <g fill="#EAB56F">
+    <path d="M388 390 398 383 409 392 400 400Z"/>
+    <path d="M676 455 685 447 694 455 685 463Z"/>
+  </g>
+  <circle cx="541" cy="449" r="6" fill="#E7FFF0"/>
+  <circle cx="541" cy="449" r="24" fill="#A8F4C9" opacity=".5" filter="url(#soft-glow)"/>
+</svg>
