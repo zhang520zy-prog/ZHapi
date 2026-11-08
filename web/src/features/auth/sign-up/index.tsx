@@ -17,17 +17,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
 
 import { AuthLayout } from '../auth-layout'
 import { TermsFooter } from '../components/terms-footer'
+import { RegistrationNoticePage } from './components/registration-notice-page'
 import { SignUpForm } from './components/sign-up-form'
 
 export function SignUp() {
   const { t } = useTranslation()
   const { status } = useStatus()
+  const [noticeAccepted, setNoticeAccepted] = useState(false)
+
+  if (!noticeAccepted) {
+    return <RegistrationNoticePage onContinue={() => setNoticeAccepted(true)} />
+  }
 
   return (
     <AuthLayout>
@@ -48,7 +55,7 @@ export function SignUp() {
           </p>
         </div>
 
-        <SignUpForm />
+        <SignUpForm noticeAccepted={noticeAccepted} />
 
         <TermsFooter
           variant='sign-up'

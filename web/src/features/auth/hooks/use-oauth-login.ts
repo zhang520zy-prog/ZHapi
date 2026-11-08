@@ -28,6 +28,7 @@ import { createServerError } from '@/lib/server-error-message'
 import { createOAuthAuthorization, createOAuthFlow, logout } from '../api'
 import {
   buildGitHubOAuthUrl,
+  buildGoogleOAuthUrl,
   buildDiscordOAuthUrl,
   buildOIDCOAuthUrl,
   buildLinuxDOOAuthUrl,
@@ -103,6 +104,26 @@ export function useOAuthLogin(
       setIsLoading(false)
       setGithubButtonText(t('Continue with GitHub'))
       setGithubButtonDisabled(false)
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    if (!status?.google_client_id) return
+
+    setIsLoading(true)
+    try {
+      await resetSession()
+      const state = await createOAuthFlow('google', 'login')
+      rememberOAuthLoginRedirect(state, redirectTo)
+
+      const url = buildGoogleOAuthUrl(status.google_client_id, state)
+      window.open(url, '_self')
+    } catch (error) {
+      handleServerError(
+        AuthOperationError.from(error, t('Failed to start Google login'))
+      )
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -232,6 +253,7 @@ export function useOAuthLogin(
     githubButtonText,
     githubButtonDisabled,
     handleGitHubLogin,
+    handleGoogleLogin,
     handleDiscordLogin,
     handleOIDCLogin,
     handleLinuxDOLogin,

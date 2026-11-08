@@ -39,15 +39,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { register, wechatLoginByCode } from '@/features/auth/api'
-import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
+import { RegistrationNotice } from '@/features/auth/components/registration-notice'
 import { registerFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import {
   getAffiliateCode,
-  saveAffiliateCode,
+  getDistributorCode,
 } from '@/features/auth/lib/storage'
 import { useStatus } from '@/hooks/use-status'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -55,14 +55,20 @@ import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
+interface SignUpFormProps extends React.HTMLAttributes<HTMLFormElement> {
+  noticeAccepted?: boolean
+}
+
 export function SignUpForm({
   className,
+  noticeAccepted = false,
   ...props
-}: React.HTMLAttributes<HTMLFormElement>) {
+}: SignUpFormProps) {
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
-  const [agreedToLegal, setAgreedToLegal] = useState(false)
+  const [agreedToLegal, setAgreedToLegal] = useState(noticeAccepted)
+  const [hasReviewedNotice, setHasReviewedNotice] = useState(noticeAccepted)
   const [wechatCode, setWeChatCode] = useState('')
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
   const [isWeChatSubmitting, setIsWeChatSubmitting] = useState(false)
@@ -125,22 +131,16 @@ export function SignUpForm({
   }, [status])
 
   useEffect(() => {
-    if (requiresLegalConsent) {
-      setAgreedToLegal(false)
-    } else {
+    if (noticeAccepted) {
       setAgreedToLegal(true)
+      setHasReviewedNotice(true)
+      return
     }
-  }, [requiresLegalConsent])
-
-  useEffect(() => {
-    const aff = new URLSearchParams(window.location.search).get('aff')?.trim()
-    if (aff) {
-      saveAffiliateCode(aff)
-    }
-  }, [])
+    setAgreedToLegal(!requiresLegalConsent)
+  }, [requiresLegalConsent, noticeAccepted])
 
   async function onSubmit(data: z.infer<typeof registerFormSchema>) {
-    if (requiresLegalConsent && !agreedToLegal) {
+    if (!hasReviewedNotice || (requiresLegalConsent && !agreedToLegal)) {
       toast.error(legalConsentErrorMessage)
       return
     }
@@ -167,6 +167,7 @@ export function SignUpForm({
         email: data.email || undefined,
         verification_code: verificationCode || undefined,
         aff_code: getAffiliateCode(),
+        dist_code: getDistributorCode() || undefined,
         turnstile: turnstileToken,
       })
 
@@ -186,6 +187,7 @@ export function SignUpForm({
   }
 
   async function handleSendVerificationCode() {
+    if (!hasReviewedNotice || (requiresLegalConsent && !agreedToLegal)) return
     if (await sendCode(emailValue || '')) {
       setTurnstileToken('')
       setTurnstileWidgetKey((current) => current + 1)
@@ -210,6 +212,7 @@ export function SignUpForm({
   }
 
   async function handleWeChatLogin() {
+    if (!hasReviewedNotice || (requiresLegalConsent && !agreedToLegal)) return
     if (!wechatCode.trim()) {
       toast.error(t('Please enter the verification code'))
       return
@@ -244,6 +247,20 @@ export function SignUpForm({
     verificationCodeAction = <Loader2 className='h-4 w-4 animate-spin' />
   }
 
+  if (
+    !noticeAccepted &&
+    (!hasReviewedNotice || (requiresLegalConsent && !agreedToLegal))
+  ) {
+    return (
+      <RegistrationNotice
+        onContinue={() => {
+          setAgreedToLegal(true)
+          setHasReviewedNotice(true)
+        }}
+      />
+    )
+  }
+
   return (
     <Form {...form}>
       <form
@@ -251,6 +268,20 @@ export function SignUpForm({
         className={cn('grid gap-4', className)}
         {...props}
       >
+        <div className='flex justify-end'>
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            className='h-auto p-0 text-xs'
+            onClick={() => {
+              setHasReviewedNotice(false)
+              setAgreedToLegal(false)
+            }}
+          >
+            {t('Review notice')}
+          </Button>
+        </div>
         {/* Username Field */}
         <FormField
           control={form.control}
@@ -259,7 +290,11 @@ export function SignUpForm({
             <FormItem>
               <FormLabel>{t('Username')}</FormLabel>
               <FormControl>
-                <Input placeholder={t('Enter your username')} {...field} />
+                <Input
+                  autoFocus
+                  placeholder={t('Enter your username')}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -360,13 +395,6 @@ export function SignUpForm({
             />
           </div>
         )}
-
-        <LegalConsent
-          status={status}
-          checked={agreedToLegal}
-          onCheckedChange={setAgreedToLegal}
-          className='mt-1'
-        />
 
         {/* Submit Button */}
         <Button

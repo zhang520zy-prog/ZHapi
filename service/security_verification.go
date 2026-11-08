@@ -34,6 +34,7 @@ const (
 	VerificationScopePasswordSet         = "account.password.set"
 	VerificationScopePasswordChange      = "account.password.change"
 	VerificationScopeAccountDelete       = "account.delete"
+	VerificationScopeDistributorWithdraw = "distributor.withdraw"
 )
 
 var (
@@ -64,6 +65,14 @@ type AccountBindingContext struct {
 
 type AccountUnbindingContext struct {
 	ProviderID int `json:"provider_id"`
+}
+
+// DistributorWithdrawContext binds a security proof to the exact payout it
+// authorizes so a proof for one amount/method cannot be replayed for another.
+type DistributorWithdrawContext struct {
+	AmountQuota   int    `json:"amount_quota"`
+	Method        string `json:"method"`
+	PayoutNetwork string `json:"payout_network,omitempty"`
 }
 
 // VerificationBinding contains no original operation parameters. It can safely
@@ -116,6 +125,16 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 		if len(fields) != 1 || common.Unmarshal(fields["provider_id"], &context.ProviderID) != nil || context.ProviderID <= 0 {
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
+		normalized = context
+	case VerificationScopeDistributorWithdraw:
+		var context DistributorWithdrawContext
+		if common.Unmarshal(operation.Context, &context) != nil ||
+			context.AmountQuota <= 0 || len(context.Method) == 0 || len(context.Method) > 16 ||
+			len(context.PayoutNetwork) > 16 || len(fields) < 2 || len(fields) > 3 {
+			return VerificationBinding{}, ErrVerificationContextInvalid
+		}
+		context.Method = strings.TrimSpace(context.Method)
+		context.PayoutNetwork = strings.TrimSpace(context.PayoutNetwork)
 		normalized = context
 	case VerificationScopePasskeyRegister, VerificationScopePasskeyDelete, VerificationScopeTwoFASetup,
 		VerificationScopeTwoFADisable, VerificationScopeTwoFABackupCodes,
@@ -186,7 +205,8 @@ func securityVerificationPolicy(scope string, state model.UserVerificationState)
 	case VerificationScopePasskeyRegister, VerificationScopeTwoFASetup,
 		VerificationScopeAccessTokenGenerate, VerificationScopeAccessTokenRevoke,
 		VerificationScopeAccountBind, VerificationScopeAccountUnbind,
-		VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete:
+		VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
+		VerificationScopeDistributorWithdraw:
 		if scope == VerificationScopeAccountDelete && state.Role == common.RoleRootUser {
 			return nil, ErrVerificationForbidden
 		}

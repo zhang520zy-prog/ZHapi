@@ -27,7 +27,7 @@ import {
   clearPasswordEncryptionCache,
   encryptPassword,
 } from './lib/password-encryption'
-import { getAffiliateCode } from './lib/storage'
+import { getAffiliateCode, getDistributorCode } from './lib/storage'
 import type { TelegramAuthorization } from './lib/telegram-login'
 import type { VerificationOperation } from './secure-verification/types'
 import type {
@@ -175,12 +175,14 @@ export async function createOAuthAuthorization(
   proofToken?: string
 ): Promise<{ state: string; authorizationUrl?: string }> {
   const aff = intent === 'login' ? getAffiliateCode() : ''
+  const dist = intent === 'login' ? getDistributorCode() : ''
   const res = await api.post(
     '/api/oauth/state',
     {
       provider,
       intent,
       aff: aff || undefined,
+      dist: dist || undefined,
       scope: operation?.scope,
       ...(operation?.context ? { context: operation.context } : {}),
     },

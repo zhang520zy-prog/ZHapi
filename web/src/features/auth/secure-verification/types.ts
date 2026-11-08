@@ -38,6 +38,7 @@ export type SecurityProofScope =
   | 'account.password.set'
   | 'account.password.change'
   | 'account.delete'
+  | 'distributor.withdraw'
 
 export type VerificationOperation =
   | { scope: 'channel.key.read'; context: { channel_id: number } }
@@ -47,9 +48,16 @@ export type VerificationOperation =
     }
   | { scope: 'account.binding.unbind'; context: { provider_id: number } }
   | {
+      scope: 'distributor.withdraw'
+      context: { amount_quota: number; method: string; payout_network?: string }
+    }
+  | {
       scope: Exclude<
         SecurityProofScope,
-        'channel.key.read' | 'account.binding.bind' | 'account.binding.unbind'
+        | 'channel.key.read'
+        | 'account.binding.bind'
+        | 'account.binding.unbind'
+        | 'distributor.withdraw'
       >
       context?: Record<string, never>
     }

@@ -26,6 +26,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 const STORAGE_KEYS = {
   AFFILIATE: 'aff',
+  DISTRIBUTOR: 'dist',
   STATUS: 'status',
 } as const
 
@@ -48,14 +49,45 @@ export function getAffiliateCode(): string {
 }
 
 /**
- * Save affiliate code to localStorage
+ * Save affiliate code to localStorage. The last link the visitor clicked wins,
+ * so a stored distributor code is cleared.
  */
 export function saveAffiliateCode(code: string): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(STORAGE_KEYS.AFFILIATE, code)
+    window.localStorage.removeItem(STORAGE_KEYS.DISTRIBUTOR)
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to save affiliate code:', error)
+  }
+}
+
+/**
+ * Get distributor code from localStorage
+ */
+export function getDistributorCode(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem(STORAGE_KEYS.DISTRIBUTOR) ?? ''
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to get distributor code:', error)
+    return ''
+  }
+}
+
+/**
+ * Save distributor code to localStorage. A stored distributor code takes
+ * precedence over the affiliate code during registration.
+ */
+export function saveDistributorCode(code: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.DISTRIBUTOR, code)
+    window.localStorage.removeItem(STORAGE_KEYS.AFFILIATE)
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to save distributor code:', error)
   }
 }

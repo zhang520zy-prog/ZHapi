@@ -16,21 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
   IconDiscord,
   IconGithub,
+  IconGoogle,
   IconLinuxDo,
   IconTelegram,
   IconWeChat,
 } from '@/assets/brand-icons'
+import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import { useOAuthLogin } from '../hooks/use-oauth-login'
 import type { SystemStatus } from '../types'
+import { RegistrationNotice } from './registration-notice'
 
 type OAuthProvidersProps = {
   status: SystemStatus | null
@@ -39,6 +42,7 @@ type OAuthProvidersProps = {
   onWeChatLogin?: () => void
   isWeChatLoading?: boolean
   redirectTo?: string
+  requireRegistrationNotice?: boolean
 }
 
 type ProviderButton = {
@@ -56,13 +60,16 @@ export function OAuthProviders({
   onWeChatLogin,
   isWeChatLoading = false,
   redirectTo,
+  requireRegistrationNotice = false,
 }: OAuthProvidersProps) {
   const { t } = useTranslation()
+  const [pendingProvider, setPendingProvider] = useState<string | null>(null)
   const {
     isLoading,
     githubButtonText,
     githubButtonDisabled,
     handleGitHubLogin,
+    handleGoogleLogin,
     handleDiscordLogin,
     handleOIDCLogin,
     handleLinuxDOLogin,
@@ -89,6 +96,15 @@ export function OAuthProviders({
       onClick: handleGitHubLogin,
       icon: <IconGithub className='h-4 w-4' />,
       disabled: githubButtonDisabled,
+    })
+  }
+
+  if (status?.google_oauth) {
+    providerButtons.push({
+      key: 'google',
+      label: t('Continue with Google'),
+      onClick: handleGoogleLogin,
+      icon: <IconGoogle className='h-4 w-4' />,
     })
   }
 
@@ -165,7 +181,10 @@ export function OAuthProviders({
               variant='outline'
               type='button'
               disabled={disabled || isLoading || extraDisabled}
-              onClick={onClick}
+              onClick={() => {
+                if (requireRegistrationNotice) setPendingProvider(key)
+                else onClick()
+              }}
               className='h-11 w-full justify-center gap-2 rounded-lg'
             >
               {icon}
@@ -174,6 +193,32 @@ export function OAuthProviders({
           )
         )}
       </div>
+      <Dialog
+        open={pendingProvider !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingProvider(null)
+        }}
+        title={t('Before continuing')}
+        description={t(
+          'Third-party sign-in may create an account on your first visit. Please read and confirm the notice first.'
+        )}
+        contentClassName='sm:max-w-lg'
+      >
+        {pendingProvider !== null && (
+          <RegistrationNotice
+            onContinue={() => {
+              const provider = providerButtons.find(
+                (item) => item.key === pendingProvider
+              )
+              if (!provider || disabled || isLoading || provider.disabled) {
+                return
+              }
+              setPendingProvider(null)
+              provider.onClick()
+            }}
+          />
+        )}
+      </Dialog>
     </div>
   )
 }
