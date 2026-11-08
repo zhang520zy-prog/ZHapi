@@ -56,6 +56,31 @@ const defaultOperationsSettings: OperationsSettings = {
   'perf_metrics_setting.flush_interval': 5,
   'perf_metrics_setting.bucket_time': 'hour',
   'perf_metrics_setting.retention_days': 0,
+  ReferralCommissionEnabled: false,
+  ReferralRateBps: 150,
+  DistributorEnabled: false,
+  DistributorApplyEnabled: false,
+  DistributorDefaultRateBps: 1000,
+  DistributorHoldDays: 3,
+  DistributorWithdrawEnabled: false,
+  DistributorWithdrawMinCNY: '10',
+  DistributorWithdrawMethods: '["alipay","wechat","bank","usdt"]',
+  DistributorUsdtNetworks: '[]',
+  ReferralTermsExtra: '',
+  DistributorTermsExtra: '',
+  CommissionTermsVersion: 1,
+  DistributorAgreementVersion: 1,
+  InvoiceEnabled: false,
+  InvoiceMinCNY: '1.00',
+  InvoiceMaxCNY: '1000000.00',
+  InvoiceFeeRateFastBps: 1100,
+  InvoiceFeeRateNormalBps: 1000,
+  InvoiceFeeRateVatBps: 1600,
+  InvoiceTypes: '',
+  InvoiceCategories:
+    'Production & living services\nInformation technology services\nSoftware services',
+  InvoiceItems:
+    'Technical service fee\nInformation service fee\nSoftware service fee',
 }
 
 export function OperationsSettings() {

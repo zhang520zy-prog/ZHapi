@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { SystemBehaviorSection } from '../general/system-behavior-section'
+import { DistributionSettingsSection } from './distribution-settings-section'
+import { InvoiceSettingsSection } from './invoice-settings-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
@@ -74,6 +76,49 @@ const OPERATIONS_SECTIONS = [
           SMTPStartTLSEnabled: settings.SMTPStartTLSEnabled,
           SMTPInsecureSkipVerify: settings.SMTPInsecureSkipVerify,
           SMTPForceAuthLogin: settings.SMTPForceAuthLogin,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'distribution',
+    titleKey: 'Referral & Distribution',
+    build: (settings: OperationsSettings) => (
+      <DistributionSettingsSection
+        defaultValues={{
+          ReferralCommissionEnabled: settings.ReferralCommissionEnabled,
+          ReferralRateBps: settings.ReferralRateBps,
+          DistributorEnabled: settings.DistributorEnabled,
+          DistributorApplyEnabled: settings.DistributorApplyEnabled,
+          DistributorDefaultRateBps: settings.DistributorDefaultRateBps,
+          DistributorHoldDays: settings.DistributorHoldDays,
+          DistributorWithdrawEnabled: settings.DistributorWithdrawEnabled,
+          DistributorWithdrawMinCNY: settings.DistributorWithdrawMinCNY,
+          DistributorWithdrawMethods: settings.DistributorWithdrawMethods,
+          DistributorUsdtNetworks: settings.DistributorUsdtNetworks,
+          ReferralTermsExtra: settings.ReferralTermsExtra,
+          DistributorTermsExtra: settings.DistributorTermsExtra,
+          CommissionTermsVersion: settings.CommissionTermsVersion,
+          DistributorAgreementVersion: settings.DistributorAgreementVersion,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'invoicing',
+    titleKey: 'Invoicing',
+    build: (settings: OperationsSettings) => (
+      <InvoiceSettingsSection
+        defaultValues={{
+          InvoiceEnabled: settings.InvoiceEnabled,
+          InvoiceMinCNY: settings.InvoiceMinCNY,
+          InvoiceMaxCNY: settings.InvoiceMaxCNY,
+          InvoiceFeeRateFastBps: settings.InvoiceFeeRateFastBps,
+          InvoiceFeeRateNormalBps: settings.InvoiceFeeRateNormalBps,
+          InvoiceFeeRateVatBps: settings.InvoiceFeeRateVatBps,
+          InvoiceTypes: settings.InvoiceTypes,
+          InvoiceCategories: settings.InvoiceCategories,
+          InvoiceItems: settings.InvoiceItems,
         }}
       />
     ),

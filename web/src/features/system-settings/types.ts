@@ -168,6 +168,9 @@ export type AuthSettings = {
   GitHubOAuthEnabled: boolean
   GitHubClientId: string
   GitHubClientSecret: string
+  GoogleOAuthEnabled: boolean
+  GoogleClientId: string
+  GoogleClientSecret: string
   'discord.enabled': boolean
   'discord.client_id': string
   'discord.client_secret': string
@@ -387,6 +390,29 @@ export type OperationsSettings = {
   'perf_metrics_setting.flush_interval': number
   'perf_metrics_setting.bucket_time': 'hour' | 'minute' | '5min'
   'perf_metrics_setting.retention_days': number
+  ReferralCommissionEnabled: boolean
+  ReferralRateBps: number
+  DistributorEnabled: boolean
+  DistributorApplyEnabled: boolean
+  DistributorDefaultRateBps: number
+  DistributorHoldDays: number
+  DistributorWithdrawEnabled: boolean
+  DistributorWithdrawMinCNY: string
+  DistributorWithdrawMethods: string
+  DistributorUsdtNetworks: string
+  ReferralTermsExtra: string
+  DistributorTermsExtra: string
+  CommissionTermsVersion: number
+  DistributorAgreementVersion: number
+  InvoiceEnabled: boolean
+  InvoiceMinCNY: string
+  InvoiceMaxCNY: string
+  InvoiceFeeRateFastBps: number
+  InvoiceFeeRateNormalBps: number
+  InvoiceFeeRateVatBps: number
+  InvoiceTypes: string
+  InvoiceCategories: string
+  InvoiceItems: string
 }
 
 export type SecuritySettings = {

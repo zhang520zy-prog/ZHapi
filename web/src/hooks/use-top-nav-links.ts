@@ -86,6 +86,15 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
   }
 
+  // Distribution centre (takes the rankings slot when rankings is off)
+  if (modules?.distribution !== false) {
+    links.push({
+      title: t('Distribution Centre'),
+      href: '/distribution',
+      requiresAuth: !isAuthed,
+    })
+  }
+
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {
@@ -94,6 +103,12 @@ export function useTopNavLinks(): TopNavLink[] {
       links.push({ title: t('Docs'), href: '/docs' })
     }
   }
+
+  links.push({
+    title: 'RelayDesk',
+    href: 'https://github.com/zhang520zy-prog/RelayDesk/releases',
+    external: true,
+  })
 
   // About
   if (modules?.about !== false) {

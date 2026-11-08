@@ -31,14 +31,14 @@ describe('legacy frontend route migration', () => {
       '/console/subscription': '/subscriptions',
       '/console/channel': '/channels',
       '/console/token': '/keys',
-      '/console/playground': '/playground',
+      '/console/playground': '/dashboard/overview',
       '/console/redemption': '/redemption-codes',
       '/console/user': '/users',
       '/console/personal': '/profile',
       '/console/log': '/usage-logs',
       '/console/midjourney': '/usage-logs/drawing',
       '/console/task': '/usage-logs/task',
-      '/console/chat/42': '/chat/42',
+      '/console/chat/42': '/dashboard/overview',
     }
 
     for (const [source, target] of Object.entries(routes)) {
@@ -59,7 +59,7 @@ describe('legacy frontend route migration', () => {
     const settingsTabs = {
       operation: '/system-settings/operations/behavior',
       dashboard: '/system-settings/content/dashboard',
-      chats: '/system-settings/content/chat',
+      chats: '/system-settings/content/dashboard',
       drawing: '/system-settings/content/drawing',
       payment: '/system-settings/billing/payment',
       ratio: '/system-settings/billing/model-pricing',
@@ -89,3 +89,21 @@ describe('legacy frontend route migration', () => {
     expect(resolveLegacyRoute('/api/status')).toBe(null)
   })
 })
+
+test.each([
+  '/playground',
+  '/playground/',
+  '/chat',
+  '/chat/0',
+  '/chat/not-a-preset',
+  '/chat2link',
+])(
+  'retired entry %s returns to the overview without carrying chat parameters',
+  (path) => {
+    expect(
+      resolveLegacyRoute(
+        `${path}?url=https%3A%2F%2Fexample.com&key=retired#chat`
+      )
+    ).toBe('/dashboard/overview')
+  }
+)

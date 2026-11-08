@@ -25,7 +25,6 @@ const legacyConsoleRoutes: Record<string, string> = {
   '/console/subscription': '/subscriptions',
   '/console/channel': '/channels',
   '/console/token': '/keys',
-  '/console/playground': '/playground',
   '/console/redemption': '/redemption-codes',
   '/console/user': '/users',
   '/console/personal': '/profile',
@@ -37,7 +36,7 @@ const legacyConsoleRoutes: Record<string, string> = {
 const legacySettingsTabs: Record<string, string> = {
   operation: '/system-settings/operations/behavior',
   dashboard: '/system-settings/content/dashboard',
-  chats: '/system-settings/content/chat',
+  chats: '/system-settings/content/dashboard',
   drawing: '/system-settings/content/drawing',
   payment: '/system-settings/billing/payment',
   ratio: '/system-settings/billing/model-pricing',
@@ -72,6 +71,10 @@ export function resolveLegacyRoute(rawHref: string): string | null {
   }
 
   const pathname = normalizeLegacyPath(source.pathname)
+  if (/^\/(?:console\/)?(?:playground|chat|chat2link)(?:\/|$)/.test(pathname)) {
+    // Retired tools never forward embedded chat URLs, keys, or stale parameters.
+    return '/dashboard/overview'
+  }
   if (pathname === '/login') {
     return buildTargetHref('/sign-in', source)
   }
@@ -86,14 +89,6 @@ export function resolveLegacyRoute(rawHref: string): string | null {
     const target = legacySettingsTabs[tab] ?? '/system-settings'
     return buildTargetHref(target, source)
   }
-  if (pathname === '/console/chat') {
-    return buildTargetHref('/dashboard', source)
-  }
-  if (pathname.startsWith('/console/chat/')) {
-    const chatID = pathname.slice('/console/chat/'.length)
-    return buildTargetHref(chatID ? `/chat/${chatID}` : '/dashboard', source)
-  }
-
   const target = legacyConsoleRoutes[pathname]
   if (target) return buildTargetHref(target, source)
   if (pathname.startsWith('/console/')) {

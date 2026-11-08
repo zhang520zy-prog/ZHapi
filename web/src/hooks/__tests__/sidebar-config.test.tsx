@@ -83,7 +83,14 @@ describe('security sidebar visibility', () => {
       result.current
         .find((group) => group.id === 'personal')
         ?.items.map((item) => item.title)
-    ).toEqual(['Wallet', 'Profile', 'Security & Access'])
+    ).toEqual([
+      'Wallet',
+      'Invoices',
+      'Referral rewards',
+      'Distribution Centre',
+      'Profile',
+      'Security & Access',
+    ])
     expect(
       result.current
         .flatMap((group) => group.items)
@@ -178,5 +185,27 @@ describe('audit log sidebar entry', () => {
       .map((item) => item.title)
     expect(titles).not.toContain('Usage Logs')
     expect(titles).toContain('Audit Logs')
+  })
+})
+
+describe('removed interactive tools', () => {
+  it('keeps chat and playground out of navigation even when old settings enable them', () => {
+    const enabled = { chat: { enabled: true, playground: true, chat: true } }
+    const { result } = sidebarFor(enabled, enabled)
+    const titles = result.current
+      .flatMap((group) => group.items)
+      .map((item) => item.title)
+    expect(titles).not.toContain('Chat')
+    expect(titles).not.toContain('Playground')
+    expect(titles).toContain('API Keys')
+    expect(titles).toContain('Usage Logs')
+  })
+
+  it('does not restore chat controls from legacy administrator configuration', () => {
+    const parsed = parseSidebarModulesAdmin(
+      '{"chat":{"enabled":true,"chat":true,"playground":true}}'
+    )
+    expect(parsed).not.toHaveProperty('chat')
+    expect(parsed.console.token).toBe(true)
   })
 })

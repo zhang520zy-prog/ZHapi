@@ -92,6 +92,47 @@ export async function getNotice(): Promise<{
 }
 
 // ============================================================================
+// User notification APIs (in-site bell messages)
+// ============================================================================
+
+export interface UserNotificationItem {
+  id: number
+  type: string
+  title: string
+  content: string
+  read_at: number
+  created_at: number
+}
+
+export interface UserNotificationPage {
+  page: number
+  page_size: number
+  total: number
+  items: UserNotificationItem[] | null
+}
+
+export async function getUserNotifications(
+  page = 1,
+  pageSize = 20
+): Promise<{ page: UserNotificationPage; unreadCount: number }> {
+  const res = await api.get('/api/user/notifications', {
+    params: { p: page, page_size: pageSize },
+  })
+  const data = requireServerSuccess(res.data)
+  return {
+    page: (data?.data ?? { page: 1, page_size: pageSize, total: 0, items: [] }) as UserNotificationPage,
+    unreadCount: (data?.unread_count ?? 0) as number,
+  }
+}
+
+export async function markUserNotificationsRead(ids?: number[]) {
+  const res = await api.post('/api/user/notifications/read', {
+    ids: ids && ids.length > 0 ? ids : [],
+  })
+  return requireServerSuccess(res.data)
+}
+
+// ============================================================================
 // 2FA Management APIs
 // ============================================================================
 

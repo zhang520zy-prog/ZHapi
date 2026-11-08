@@ -22,25 +22,29 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
-  FlaskConical,
+  HandCoins,
   Key,
   LayoutDashboard,
   ListTodo,
-  MessageSquare,
   PlugZap,
   Radio,
   ServerCog,
   Settings,
+  Share2,
   ShieldCheck,
   Ticket,
   User,
   Users,
   Wallet,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
+import { adminListApplications } from '@/features/distribution/api'
+import { hasPermission } from '@/lib/admin-permissions'
 import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -50,25 +54,22 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const user = useAuthStore((s) => s.auth.user)
+  const canDistributorAdmin =
+    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'distributor', 'read')
+  const canReferralAdmin =
+    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'referral', 'read')
+  // F4.6 侧栏徽标：待审核分销申请数。
+  const pendingApplications = useQuery({
+    queryKey: ['distribution-admin', 'pending-applications-count'],
+    queryFn: () => adminListApplications({ p: 1, page_size: 1, status: 'pending' }),
+    enabled: canDistributorAdmin,
+    staleTime: 60_000,
+  })
+  const pendingCount = pendingApplications.data?.total ?? 0
 
   return {
     navGroups: [
-      {
-        id: 'chat',
-        title: t('Chat'),
-        items: [
-          {
-            title: t('Playground'),
-            url: '/playground',
-            icon: FlaskConical,
-          },
-          {
-            title: t('Chat'),
-            icon: MessageSquare,
-            type: 'chat-presets',
-          },
-        ],
-      },
       {
         id: 'general',
         title: t('General'),
@@ -99,6 +100,11 @@ export function useSidebarData(): SidebarData {
             icon: ClipboardList,
           },
           {
+            title: t('Risk events'),
+            url: '/risk-events',
+            icon: ShieldCheck,
+          },
+          {
             title: t('Task Logs'),
             url: '/usage-logs/task',
             activeUrls: ['/usage-logs/drawing'],
@@ -117,6 +123,21 @@ export function useSidebarData(): SidebarData {
             icon: Wallet,
           },
           {
+            title: t('Invoices'),
+            url: '/invoice',
+            icon: FileText,
+          },
+          {
+            title: t('Referral rewards'),
+            url: '/referral',
+            icon: Share2,
+          },
+          {
+            title: t('Distribution Centre'),
+            url: '/distribution',
+            icon: HandCoins,
+          },
+          {
             title: t('Profile'),
             url: '/profile',
             icon: User,
@@ -132,6 +153,33 @@ export function useSidebarData(): SidebarData {
         id: 'admin',
         title: t('Admin'),
         items: [
+          {
+            title: t('Payment exceptions'),
+            url: '/payment-events',
+            icon: Wallet,
+            requiredRole: ROLE.ADMIN,
+          },
+          ...(canReferralAdmin
+            ? [
+                {
+                  title: t('Referral admin'),
+                  url: '/referral/admin' as const,
+                  icon: Share2,
+                  requiredRole: ROLE.ADMIN,
+                },
+              ]
+            : []),
+          ...(canDistributorAdmin
+            ? [
+                {
+                  title: t('Distribution'),
+                  url: '/distribution/admin' as const,
+                  icon: HandCoins,
+                  requiredRole: ROLE.ADMIN,
+                  badge: pendingCount > 0 ? String(pendingCount) : undefined,
+                },
+              ]
+            : []),
           {
             title: t('Channels'),
             url: '/channels',
