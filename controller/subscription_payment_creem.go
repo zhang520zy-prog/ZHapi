@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -97,6 +98,12 @@ func SubscriptionRequestCreemPay(c *gin.Context) {
 		currency = "USD"
 	}
 
+	// 快照币种按套餐定价，回调核对以此为依据；支付链接币种仍按站点显示类型。
+	snapshotCurrency := strings.ToUpper(strings.TrimSpace(plan.Currency))
+	if snapshotCurrency == "" {
+		snapshotCurrency = "USD"
+	}
+
 	// Creem 价格已含手续费：fee 恒为 0，credited_money = 套餐价。
 	order := &model.SubscriptionOrder{
 		UserId:          userId,
@@ -110,7 +117,7 @@ func SubscriptionRequestCreemPay(c *gin.Context) {
 		FeeRateBps:      0,
 		FeeMoney:        decimal.Zero,
 		CreditedMoney:   decimal.NewFromFloat(plan.PriceAmount),
-		Currency:        currency,
+		Currency:        snapshotCurrency,
 	}
 	if err := order.Insert(); err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
