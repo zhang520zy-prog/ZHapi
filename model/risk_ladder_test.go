@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -94,10 +95,10 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 				DB = previous
 				common.SetMainDatabaseType(previousType)
 				commonKeyCol = previousKeyCol
-				_ = db.Migrator().DropTable(&RiskWordCategory{}, &RiskUserState{}, &RiskEventChange{}, &RiskAppeal{}, &RiskEvent{}, &Option{}, &User{})
+				_ = db.Migrator().DropTable(&RiskWordCategory{}, &RiskUserState{}, &RiskEventChange{}, &RiskAppeal{}, &RiskEvent{}, &Option{}, &UserSession{}, &User{})
 				_ = sqlDB.Close()
 			})
-			require.NoError(t, db.AutoMigrate(&User{}, &Option{}, &RiskEvent{}, &RiskAppeal{}, &RiskEventChange{}, &RiskWordCategory{}, &RiskUserState{}))
+			require.NoError(t, db.AutoMigrate(&User{}, &Option{}, &RiskEvent{}, &RiskAppeal{}, &RiskEventChange{}, &RiskWordCategory{}, &RiskUserState{}, &UserSession{}))
 			// 二次 AutoMigrate 幂等，不重建列。
 			require.NoError(t, db.AutoMigrate(&RiskWordCategory{}, &RiskUserState{}))
 			owner := User{Username: "ladder-owner", Password: "unchanged", Role: common.RoleCommonUser, AffCode: "ladder-owner", Status: common.UserStatusEnabled}
@@ -220,6 +221,10 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			// 并发 20 次命中：3/6/9/12 次升级，第 12 次停用。
 			parallelUser := User{Username: "ladder-parallel", Password: "x", Role: common.RoleCommonUser, AffCode: "ladder-parallel", Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&parallelUser).Error)
+			authBefore := parallelUser.AuthVersion
+			require.NoError(t, db.Create(&UserSession{SID: "sess-risk-1", UserID: parallelUser.Id,
+				Status: UserSessionStatusActive, RefreshHash: strings.Repeat("a", 64),
+				LoginMethod: "password", LastActiveAt: base, ExpiresAt: time.Now().Unix() + 86400}).Error)
 			fixed := base + 10_000
 			var wg sync.WaitGroup
 			errs := make(chan error, 20)
@@ -243,9 +248,19 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 			var locked User
 			require.NoError(t, db.Take(&locked, parallelUser.Id).Error)
 			assert.Equal(t, common.UserStatusDisabled, locked.Status)
+			// A-3：停用走用户状态变更流程——AuthVersion 提升、提交后会话撤销。
+			assert.Greater(t, locked.AuthVersion, authBefore)
+			FinishRiskDisable(parallelUser.Id, locked.AuthVersion)
+			var session UserSession
+			require.NoError(t, db.Take(&session, "sid = ?", "sess-risk-1").Error)
+			assert.Equal(t, UserSessionStatusRevoked, session.Status)
+			assert.Equal(t, "risk_disabled", session.RevokedReason)
 
 			// 恢复：风控停用可恢复；非风控停用拒绝。
-			require.NoError(t, ReenableRiskUser(parallelUser.Id, 1, "ops reenable"))
+			reenableVersion, err := ReenableRiskUser(parallelUser.Id, 1, "ops reenable")
+			require.NoError(t, err)
+			assert.Greater(t, reenableVersion, int64(0))
+			FinishRiskReenable(parallelUser.Id, reenableVersion)
 			require.NoError(t, db.Take(&locked, parallelUser.Id).Error)
 			assert.Equal(t, common.UserStatusEnabled, locked.Status)
 			state, err = GetRiskUserState(parallelUser.Id)
@@ -254,7 +269,8 @@ func TestRiskLadderAndCategoriesDatabaseMatrix(t *testing.T) {
 
 			manualUser := User{Username: "ladder-manual", Password: "x", Role: common.RoleCommonUser, AffCode: "ladder-manual", Status: common.UserStatusDisabled}
 			require.NoError(t, db.Create(&manualUser).Error)
-			require.ErrorIs(t, ReenableRiskUser(manualUser.Id, 1, "should fail"), ErrRiskInvalid)
+			_, err = ReenableRiskUser(manualUser.Id, 1, "should fail")
+			require.ErrorIs(t, err, ErrRiskInvalid)
 
 			// record 事件不推进阶梯：写 record 事件后状态不变。
 			before, err := GetRiskUserState(owner.Id)

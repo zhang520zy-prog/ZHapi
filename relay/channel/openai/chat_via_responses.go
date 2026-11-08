@@ -46,6 +46,12 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&responsesResp), "\n")); apiErr != nil {
+		service.PostTextConsumeQuota(c, info, usage, nil)
+		return usage, apiErr
+	}
+
 	responseBody, err := common.Marshal(responseValue)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
@@ -138,6 +144,13 @@ func OaiResponsesToChatBufferedStreamHandler(c *gin.Context, info *relaycommon.R
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(finalResponse), "\n")); apiErr != nil {
+		service.PostTextConsumeQuota(c, info, usage, nil)
+		return usage, apiErr
+	}
+
 	responseBody, err := common.Marshal(responseValue)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
@@ -187,6 +200,10 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
 	streamErr := (*types.NewAPIError)(nil)
+	// streamFailed 表示按客户端格式送达了结束标记；
+	// 该路径按已产生的部分用量正常结算，不再发 finalized 事件。
+	streamFailed := false
+	var streamBlockedErr *types.NewAPIError
 
 	if info.RelayFormat == types.RelayFormatClaude && info.ClaudeConvertInfo == nil {
 		info.ClaudeConvertInfo = &relaycommon.ClaudeConvertInfo{LastMessagesType: relaycommon.LastMessageTypeNone}
@@ -280,6 +297,21 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 			return
 		}
 
+		// B2.2 流式输出检查：正文与工具参数增量在转换发送前 Feed。
+		if streamResp.Type == "response.output_text.delta" || streamResp.Type == "response.function_call_arguments.delta" {
+			if category := service.FeedStreamGuard(c, streamResp.Delta); category != nil {
+				blockErr := service.CheckSensitiveOutputHit(c, info, category)
+				service.RecordSensitiveWordRejection(c, info, 1)
+				streamBlockedErr = blockErr
+				// OpenAI 格式的结束标记在用量算完后再发。
+				if info.RelayFormat != types.RelayFormatOpenAI {
+					helper.EmitSensitiveStreamEnd(c, info, blockErr)
+				}
+				streamFailed = true
+				sr.Stop(blockErr)
+				return
+			}
+		}
 		results, err := service.ConvertStreamResponseChunk(c, info, state, &streamResp)
 		if err != nil {
 			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
@@ -302,6 +334,16 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 	if usage == nil || usage.TotalTokens == 0 {
 		usage = service.ResponseText2Usage(c, state.UsageText(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		state.SetUsage(usage)
+	}
+
+	if streamFailed {
+		if info.RelayFormat == types.RelayFormatOpenAI {
+			if info.ShouldIncludeUsage && usage != nil {
+				_ = helper.ObjectData(c, helper.GenerateFinalUsageResponse(responseId, createAt, info.UpstreamModelName, *usage))
+			}
+			helper.EmitSensitiveStreamEnd(c, info, streamBlockedErr)
+		}
+		return usage, nil
 	}
 
 	if info.RelayFormat == types.RelayFormatClaude && info.ClaudeConvertInfo != nil {

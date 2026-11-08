@@ -79,7 +79,7 @@ func applySensitiveHit(c *gin.Context, info *relaycommon.RelayInfo, userID int, 
 		return
 	}
 	if result.Disabled {
-		model.FinishRiskDisable(userID)
+		model.FinishRiskDisable(userID, result.AuthVersion)
 	}
 	if result.Notify {
 		NotifyRiskEscalation(userID, result, category, event)

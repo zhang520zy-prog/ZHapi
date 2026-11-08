@@ -49,7 +49,6 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 
 	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
 	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&geminiResponse), "\n")); apiErr != nil {
-		service.RecordSensitiveWordRejection(c, info, 1)
 		service.PostTextConsumeQuota(c, info, &usage, nil)
 		return &usage, apiErr
 	}

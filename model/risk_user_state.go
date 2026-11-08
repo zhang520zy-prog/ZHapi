@@ -46,8 +46,9 @@ func lockRiskUserStateTx(tx *gorm.DB, userId int, now int64) (*RiskUserState, er
 }
 
 // applyRiskHitTx 四级阶梯状态机（必须在事务内、行已加锁）。
-// 返回新级别、解除时间、是否升级到停用、本次是否发生了升级。
-func applyRiskHitTx(tx *gorm.DB, state *RiskUserState, now int64, immediate bool) (restrictedUntil int64, disabled, escalated bool, err error) {
+// 返回新级别、解除时间、是否升级到停用、本次是否发生了升级，
+// 以及停用时同步提升的用户 AuthVersion（供提交后发布缓存失效）。
+func applyRiskHitTx(tx *gorm.DB, state *RiskUserState, now int64, immediate bool) (restrictedUntil int64, disabled, escalated bool, authVersion int64, err error) {
 	setting := operation_setting.GetRiskSetting()
 	threshold := setting.HitThreshold
 
@@ -88,25 +89,33 @@ func applyRiskHitTx(tx *gorm.DB, state *RiskUserState, now int64, immediate bool
 	state.LastHitAt = now
 	state.Version++
 	if err := tx.Save(state).Error; err != nil {
-		return 0, false, false, err
+		return 0, false, false, 0, err
 	}
 	if disabled {
 		result := tx.Model(&User{}).Where("id = ? AND status != ?", state.UserId, common.UserStatusDisabled).
 			Update("status", common.UserStatusDisabled)
 		if result.Error != nil {
-			return 0, false, false, result.Error
+			return 0, false, false, 0, result.Error
+		}
+		if result.RowsAffected == 1 {
+			authVersion, err = IncrementUserAuthVersionWithTx(tx, state.UserId)
+			if err != nil {
+				return 0, false, false, 0, err
+			}
 		}
 	}
-	return restrictedUntil, disabled, escalated, nil
+	return restrictedUntil, disabled, escalated, authVersion, nil
 }
 
-// RiskHitResult 给调用方回传：新级别、解除时间、是否停用、是否升级、是否该通知管理员。
+// RiskHitResult 给调用方回传：新级别、解除时间、是否停用、是否升级、是否该通知管理员，
+// 以及停用时提升的 AuthVersion（0 表示本次未停用）。
 type RiskHitResult struct {
 	Level           int
 	RestrictedUntil int64
 	Disabled        bool
 	Escalated       bool
 	Notify          bool
+	AuthVersion     int64
 }
 
 // ApplyRiskHit 记录一次计数的命中并推进阶梯；风险事件由调用方在同一事务里写。
@@ -118,7 +127,7 @@ func ApplyRiskHit(tx *gorm.DB, userId int, now int64, immediate bool) (*RiskHitR
 	if err != nil {
 		return nil, err
 	}
-	until, disabled, escalated, err := applyRiskHitTx(tx, state, now, immediate)
+	until, disabled, escalated, authVersion, err := applyRiskHitTx(tx, state, now, immediate)
 	if err != nil {
 		return nil, err
 	}
@@ -127,16 +136,39 @@ func ApplyRiskHit(tx *gorm.DB, userId int, now int64, immediate bool) (*RiskHitR
 		RestrictedUntil: until,
 		Disabled:        disabled,
 		Escalated:       escalated,
+		AuthVersion:     authVersion,
 		Notify:          escalated && operation_setting.GetRiskSetting().ShouldNotifyLevel(state.Level),
 	}
 	return result, nil
 }
 
-// FinishRiskDisable 在第 4 级停用或管理员恢复后清理用户态缓存；在事务提交后调用。
-func FinishRiskDisable(userId int) {
-	if err := InvalidateUserTokensCache(userId); err != nil {
-		common.SysError("failed to invalidate tokens cache for risk-disabled user: " + err.Error())
+// publishRiskUserStatusChange 停用/恢复事务提交后统一处理：
+// 发布已提交的 AuthVersion 下限，失效用户缓存与令牌缓存。
+func publishRiskUserStatusChange(userId int, authVersion int64) {
+	if authVersion > 0 {
+		if err := publishCommittedUserAuthVersion(userId, authVersion); err != nil {
+			common.SysError("failed to publish auth version for risk status change: " + err.Error())
+		}
 	}
+	if err := invalidateUserCache(userId); err != nil {
+		common.SysError("failed to invalidate user cache for risk status change: " + err.Error())
+	}
+	if err := InvalidateUserTokensCache(userId); err != nil {
+		common.SysError("failed to invalidate tokens cache for risk status change: " + err.Error())
+	}
+}
+
+// FinishRiskDisable 第 4 级停用提交后调用：失效缓存并撤销全部登录会话。
+func FinishRiskDisable(userId int, authVersion int64) {
+	publishRiskUserStatusChange(userId, authVersion)
+	if _, err := RevokeAllUserSessions(userId, "risk_disabled"); err != nil {
+		common.SysError("failed to revoke sessions for risk-disabled user: " + err.Error())
+	}
+}
+
+// FinishRiskReenable 管理员恢复提交后调用：失效缓存与令牌。
+func FinishRiskReenable(userId int, authVersion int64) {
+	publishRiskUserStatusChange(userId, authVersion)
 }
 
 // RevokeRiskRestriction 撤销自动与人工限制：state 归零，生效中的人工
@@ -182,13 +214,15 @@ func RevokeRiskRestriction(userId, actorID int, reason string) error {
 }
 
 // ReenableRiskUser 恢复第 4 级停用的用户；非风控停用的返回 ErrRiskInvalid。
-func ReenableRiskUser(userId, actorID int, reason string) error {
+// 返回提升后的 AuthVersion（0 表示状态未变化），供提交后发布缓存失效。
+func ReenableRiskUser(userId, actorID int, reason string) (int64, error) {
 	reason = strings.TrimSpace(reason)
 	if userId <= 0 || actorID <= 0 || reason == "" || utf8.RuneCountInString(reason) > 500 {
-		return ErrRiskInvalid
+		return 0, ErrRiskInvalid
 	}
+	var authVersion int64
 	now := common.GetTimestamp()
-	return DB.Transaction(func(tx *gorm.DB) error {
+	err := DB.Transaction(func(tx *gorm.DB) error {
 		state, err := lockRiskUserStateTx(tx, userId, now)
 		if err != nil {
 			return err
@@ -207,8 +241,18 @@ func ReenableRiskUser(userId, actorID int, reason string) error {
 		if err := tx.Save(state).Error; err != nil {
 			return err
 		}
-		return tx.Model(&User{}).Where("id = ?", userId).Update("status", common.UserStatusEnabled).Error
+		result := tx.Model(&User{}).Where("id = ? AND status != ?", userId, common.UserStatusEnabled).
+			Update("status", common.UserStatusEnabled)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 1 {
+			authVersion, err = IncrementUserAuthVersionWithTx(tx, userId)
+			return err
+		}
+		return nil
 	})
+	return authVersion, err
 }
 
 // RiskUserStateDTO 管理员/用户查看阶梯状态；不含任何词或原文。

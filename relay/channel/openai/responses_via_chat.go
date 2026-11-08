@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -54,6 +55,12 @@ func OaiChatToResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		responsesResp.Usage = relayconvert.UsageFromChatUsage(usage)
 	}
 
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(responsesResp), "\n")); apiErr != nil {
+		service.PostTextConsumeQuota(c, info, usage, nil)
+		return usage, apiErr
+	}
+
 	responseBody, err := common.Marshal(responsesResp)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
@@ -79,6 +86,9 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
 	streamErr := (*types.NewAPIError)(nil)
+	// streamFailed 表示按 Responses 协议的错误事件已送达；
+	// 该路径按已产生的部分用量正常结算，不再发 finalized 事件。
+	streamFailed := false
 
 	sendEvent := func(event relayconvert.ChatToResponsesStreamEvent) bool {
 		data, err := common.Marshal(event.Payload)
@@ -142,6 +152,15 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		}
 
 		info.ObserveResponseModel(chunk.Model)
+		// B2.2 流式输出检查：本 chunk 转换发送前 Feed。
+		if category := service.FeedStreamGuard(c, streamChunkSensitiveDelta(info, data, &chunk)); category != nil {
+			blockErr := service.CheckSensitiveOutputHit(c, info, category)
+			service.RecordSensitiveWordRejection(c, info, 1)
+			helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			streamFailed = true
+			sr.Stop(blockErr)
+			return
+		}
 		results, err := service.ConvertStreamResponseChunk(c, info, state, &chunk)
 		if err != nil {
 			if failResponsesStream(err) {
@@ -174,6 +193,9 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 	if usage == nil || usage.TotalTokens == 0 {
 		usage = service.ResponseText2Usage(c, state.UsageText(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		state.SetUsage(usage)
+	}
+	if streamFailed {
+		return usage, nil
 	}
 
 	finalResults, err := service.FinalizeStreamResponse(c, info, state)

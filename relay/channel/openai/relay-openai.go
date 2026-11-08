@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel/openrouter"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -122,8 +123,8 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var streamFunctionCallNames []string
 
 	outputGuard := service.NewStreamGuard()
-	guardedRunes := 0
 	streamBlocked := false
+	var streamBlockedErr *types.NewAPIError
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		if lastStreamData != "" {
@@ -141,24 +142,24 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 
 			lastStreamData = data
-			observeStreamChoices(info, data, seenStreamToolCalls, &streamFunctionCallNames)
+			chunk := observeStreamChoices(info, data, seenStreamToolCalls, &streamFunctionCallNames)
 			if err := processTokenData(info, data, &responseTextBuilder, &toolCount); err != nil {
 				logger.LogError(c, "error processing stream token data: "+err.Error())
 				sr.Error(err)
 			}
 			if outputGuard != nil && !streamBlocked {
-				full := []rune(responseTextBuilder.String())
-				if len(full) > guardedRunes {
-					delta := string(full[guardedRunes:])
-					guardedRunes = len(full)
-					if category := outputGuard.Feed(delta); category != nil {
-						streamBlocked = true
-						blockErr := service.CheckSensitiveOutputHit(c, info, category)
-						service.RecordSensitiveWordRejection(c, info, 1)
+				if category := outputGuard.Feed(streamChunkSensitiveDelta(info, data, chunk)); category != nil {
+					streamBlocked = true
+					blockErr := service.CheckSensitiveOutputHit(c, info, category)
+					service.RecordSensitiveWordRejection(c, info, 1)
+					streamBlockedErr = blockErr
+					// OpenAI 格式的结束标记在用量算完后再发，保证
+					// include_usage 时用量 chunk 排在 [DONE] 之前。
+					if info.RelayFormat != types.RelayFormatOpenAI {
 						helper.EmitSensitiveStreamEnd(c, info, blockErr)
-						sr.Stop(blockErr)
-						return
 					}
+					sr.Stop(blockErr)
+					return
 				}
 			}
 		}
@@ -213,17 +214,60 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		info.CountBillableToolCall(dto.BuildInCallFunctionCall, name)
 	}
 
+	if streamBlocked {
+		if info.RelayFormat == types.RelayFormatOpenAI {
+			if info.ShouldIncludeUsage && !containStreamUsage {
+				response := helper.GenerateFinalUsageResponse(responseId, createAt, model, *usage)
+				response.SetSystemFingerprint(systemFingerprint)
+				_ = helper.ObjectData(c, response)
+			}
+			helper.EmitSensitiveStreamEnd(c, info, streamBlockedErr)
+		}
+		return usage, nil
+	}
+
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
 	return usage, nil
 }
 
+// streamChunkSensitiveDelta 取本 chunk 的可见文字与工具调用参数增量，
+// 不依赖 responseTextBuilder（Claude/Gemini 客户端格式时 builder 为空），
+// 也不检查 reasoning/thinking 内容。chunk 为 observeStreamChoices 已解析
+// 的结果，避免同一 chunk 重复解析；非 ChatCompletions chunk 返回空串。
+func streamChunkSensitiveDelta(info *relaycommon.RelayInfo, data string, chunk *dto.ChatCompletionsStreamResponse) string {
+	if info.RelayMode == relayconstant.RelayModeCompletions {
+		var completionChunk dto.CompletionsStreamResponse
+		if err := common.UnmarshalJsonStr(data, &completionChunk); err != nil {
+			return ""
+		}
+		var delta strings.Builder
+		for _, choice := range completionChunk.Choices {
+			delta.WriteString(choice.Text)
+		}
+		return delta.String()
+	}
+	if chunk == nil {
+		return ""
+	}
+	var delta strings.Builder
+	for _, choice := range chunk.Choices {
+		delta.WriteString(choice.Delta.GetContentString())
+		for _, tool := range choice.Delta.ToolCalls {
+			delta.WriteString(tool.Function.Name)
+			delta.WriteString(tool.Function.Arguments)
+		}
+	}
+	return delta.String()
+}
+
 // observeStreamChoices collects billable function call names and records the
-// finish reason facts used by health sampling from one parsed chunk.
-func observeStreamChoices(info *relaycommon.RelayInfo, data string, seen map[string]struct{}, names *[]string) {
+// finish reason facts used by health sampling from one parsed chunk. It
+// returns the parsed chunk so callers can reuse it without re-parsing.
+func observeStreamChoices(info *relaycommon.RelayInfo, data string, seen map[string]struct{}, names *[]string) *dto.ChatCompletionsStreamResponse {
 	var streamResponse dto.ChatCompletionsStreamResponse
 	if err := common.UnmarshalJsonStr(data, &streamResponse); err != nil {
-		return
+		return nil
 	}
 	for _, choice := range streamResponse.Choices {
 		if choice.FinishReason != nil && *choice.FinishReason != "" {
@@ -268,6 +312,7 @@ func observeStreamChoices(info *relaycommon.RelayInfo, data string, seen map[str
 			*names = append(*names, name)
 		}
 	}
+	return &streamResponse
 }
 
 func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
@@ -387,7 +432,6 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
 	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&simpleResponse), "\n")); apiErr != nil {
-		service.RecordSensitiveWordRejection(c, info, 1)
 		service.PostTextConsumeQuota(c, info, &simpleResponse.Usage, nil)
 		return &simpleResponse.Usage, apiErr
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
@@ -169,15 +170,43 @@ func joinLines(words []string) string {
 	return out + "\n"
 }
 
-// PreviewRiskWordImport 上传文本（一行一个词，最大 2 MB）做导入预览，不回显词。
+// riskImportMaxBytes 词库文件大小上限 2 MB；multipart 信封另加边界开销余量。
+const riskImportMaxBytes = 2 * 1024 * 1024
+
+// readRiskImportBody 按 Content-Type 取词表文本：multipart/form-data 读取
+// file 字段内容（浏览器 FormData / curl -F），其余按裸文本处理
+// （curl --data-binary、fetch 直传）。2 MB 上限对词表字节生效。
+func readRiskImportBody(c *gin.Context) ([]byte, error) {
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, riskImportMaxBytes+64*1024)
+		file, err := c.FormFile("file")
+		if err != nil {
+			return nil, err
+		}
+		src, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer src.Close()
+		body, err := io.ReadAll(io.LimitReader(src, riskImportMaxBytes+1))
+		if err != nil || int64(len(body)) > riskImportMaxBytes {
+			return nil, model.ErrRiskInvalid
+		}
+		return body, nil
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, riskImportMaxBytes)
+	return io.ReadAll(c.Request.Body)
+}
+
+// PreviewRiskWordImport 上传词表（multipart file 字段或裸文本，一行一个词，
+// 最大 2 MB）做导入预览，不回显词。
 func PreviewRiskWordImport(c *gin.Context) {
 	id, err := riskParamID(c, "id")
 	if err != nil {
 		riskError(c, err)
 		return
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2*1024*1024)
-	body, err := io.ReadAll(c.Request.Body)
+	body, err := readRiskImportBody(c)
 	if err != nil {
 		riskError(c, model.ErrRiskInvalid)
 		return
@@ -324,11 +353,12 @@ func ReenableRiskUser(c *gin.Context) {
 		riskError(c, model.ErrRiskInvalid)
 		return
 	}
-	if err := model.ReenableRiskUser(id, c.GetInt("id"), request.Reason); err != nil {
+	authVersion, err := model.ReenableRiskUser(id, c.GetInt("id"), request.Reason)
+	if err != nil {
 		riskError(c, err)
 		return
 	}
-	model.FinishRiskDisable(id)
+	model.FinishRiskReenable(id, authVersion)
 	recordRiskAudit(c, "risk.user.reenable", map[string]any{
 		"user_id": id, "reason": request.Reason,
 	})
