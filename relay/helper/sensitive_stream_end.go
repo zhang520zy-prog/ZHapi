@@ -26,7 +26,8 @@ func EmitSensitiveStreamEnd(c *gin.Context, info *relaycommon.RelayInfo, apiErr 
 		if err != nil {
 			return
 		}
-		c.Render(-1, common.CustomEvent{Data: "event: error\ndata: " + string(payload)})
+		c.Render(-1, common.CustomEvent{Data: "event: error\n"})
+		c.Render(-1, common.CustomEvent{Data: "data: " + string(payload)})
 		_ = FlushWriter(c)
 	case types.RelayFormatGemini:
 		finishReason := "SAFETY"

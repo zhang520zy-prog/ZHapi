@@ -114,6 +114,8 @@ func TestOaiStreamSensitiveOutputClaudeFormat(t *testing.T) {
 	assert.Contains(t, body, "sensitive_words_detected")
 	assert.NotContains(t, body, "kedzz")
 	assert.NotContains(t, body, "tail end")
+	// A-9：最后一个 SSE 事件必须以空行收尾，否则规范客户端会丢弃。
+	assert.True(t, strings.HasSuffix(body, "\n\n"), "final SSE event must end with a blank line: %q", body)
 	assert.EqualValues(t, 1, countOutputStageEvents(t, user.Id))
 }
 
@@ -293,6 +295,8 @@ func TestClaudeNativeStreamSensitiveOutputNoTrailingJSON(t *testing.T) {
 	last := strings.TrimSpace(events[len(events)-1])
 	assert.True(t, strings.HasPrefix(last, "event: error"), "last SSE event must be the error event: %q", last)
 	assert.True(t, strings.HasSuffix(last, "}"), "error event must end the stream cleanly: %q", last)
+	// A-9：最后一个 SSE 事件必须以空行收尾，否则规范客户端会丢弃。
+	assert.True(t, strings.HasSuffix(body, "\n\n"), "final SSE event must end with a blank line: %q", body)
 	assert.EqualValues(t, 1, countOutputStageEvents(t, user.Id))
 }
 
