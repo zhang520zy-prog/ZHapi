@@ -2,6 +2,7 @@ package openai
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -10,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -24,6 +26,8 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 	info.IsStream = true
 	clientConn := info.ClientWs
 	targetConn := info.TargetWs
+	// Upstream responses and local policy errors share a single client writer.
+	var clientWriteMu sync.Mutex
 
 	clientClosed := make(chan struct{})
 	targetClosed := make(chan struct{})
@@ -60,6 +64,21 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 				if err != nil {
 					errChan <- fmt.Errorf("error unmarshalling message: %v", err)
 					return
+				}
+				var texts []string
+				if setting.ShouldCheckPromptSensitive() {
+					var extractErr error
+					texts, extractErr = dto.SensitiveRealtimeTexts(message)
+					if extractErr != nil {
+						errChan <- fmt.Errorf("invalid realtime input")
+						return
+					}
+				}
+				if apiErr := service.CheckSensitiveInput(c, info, texts); apiErr != nil {
+					clientWriteMu.Lock()
+					helper.WssError(c, clientConn, apiErr.ToOpenAIError())
+					clientWriteMu.Unlock()
+					continue
 				}
 
 				if realtimeEvent.Type == dto.RealtimeEventTypeSessionUpdate {
@@ -187,7 +206,9 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 					localUsage.OutputTokenDetails.AudioTokens += audioToken
 				}
 
+				clientWriteMu.Lock()
 				err = helper.WssString(c, clientConn, string(message))
+				clientWriteMu.Unlock()
 				if err != nil {
 					errChan <- fmt.Errorf("error writing to client: %v", err)
 					return

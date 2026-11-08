@@ -784,6 +784,9 @@ func taskSubmissionAPIError(taskErr *taskdto.TaskError) *types.NewAPIError {
 	if err == nil {
 		err = errors.New(taskErr.Message)
 	}
+	if taskErr.LocalError && taskErr.Code == string(types.ErrorCodeSensitiveWordsDetected) {
+		return types.NewErrorWithStatusCode(err, types.ErrorCodeSensitiveWordsDetected, taskErr.StatusCode, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+	}
 	return types.NewOpenAIError(err, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode)
 }
 
@@ -795,6 +798,8 @@ func decideTaskRetry(c *gin.Context, taskErr *taskdto.TaskError, retryTimes int)
 	switch {
 	case taskErr == nil:
 		stop.Reason = "request_completed"
+	case taskErr.LocalError && taskErr.Code == string(types.ErrorCodeSensitiveWordsDetected):
+		stop.Reason, stop.Source = "sensitive_keyword", "local"
 	case taskErr.NoRetry:
 		stop.Reason = "task_accepted"
 	case service.ShouldSkipRetryAfterChannelAffinityFailure(c):

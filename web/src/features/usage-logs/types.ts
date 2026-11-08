@@ -117,6 +117,7 @@ export interface ToolSurchargeItem {
 export interface LogOtherData {
   admin_info?: {
     request_policy?: PolicyEvent[]
+    policy_rule_count?: number
     is_multi_key?: boolean
     multi_key_index?: number
     use_channel?: number[]
@@ -172,6 +173,14 @@ export interface LogOtherData {
   login_method?: string
   user_agent?: string
   request_path?: string
+  error_type?: string
+  error_code?: string
+  status_code?: number
+  policy_event?: string
+  policy_reason?: string
+  policy_action?: string
+  policy_upstream_called?: boolean
+  policy_retryable?: boolean
   request_conversion?: string[]
   ws?: boolean
   audio?: boolean

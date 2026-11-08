@@ -445,6 +445,7 @@ type Message struct {
 	ReasoningContent *string         `json:"reasoning_content,omitempty"`
 	Reasoning        *string         `json:"reasoning,omitempty"`
 	ToolCalls        json.RawMessage `json:"tool_calls,omitempty"`
+	FunctionCall     json.RawMessage `json:"function_call,omitempty"`
 	ToolCallId       string          `json:"tool_call_id,omitempty"`
 	// Tools carries Kimi K3 dynamic tool loading declarations on a system message.
 	// Same shape as the top-level tools array; passthrough-only for OpenAI-compatible upstreams.

@@ -10,9 +10,13 @@ type Notify struct {
 const ContentValueParam = "{{value}}"
 
 const (
-	NotifyTypeQuotaExceed   = "quota_exceed"
-	NotifyTypeChannelUpdate = "channel_update"
-	NotifyTypeChannelTest   = "channel_test"
+	NotifyTypeQuotaExceed                = "quota_exceed"
+	NotifyTypeChannelUpdate              = "channel_update"
+	NotifyTypeChannelTest                = "channel_test"
+	NotifyTypeDistributorCommissionDue   = "distributor_commission_due"
+	NotifyTypeDistributorWithdrawRequest = "distributor_withdraw_request"
+	NotifyTypeDistributorLifecycle       = "distributor_lifecycle"
+	NotifyTypeDistributorNewApplication  = "distributor_new_application"
 )
 
 func NewNotify(t string, title string, content string, values []any) Notify {

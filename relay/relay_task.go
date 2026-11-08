@@ -21,7 +21,9 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -230,6 +232,17 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	}
 	if taskErr := adaptor.ValidateRequestAndSetAction(c, info); taskErr != nil {
 		return nil, taskErr
+	}
+	var texts []string
+	if setting.ShouldCheckPromptSensitive() {
+		request, _ := c.Get("task_request")
+		texts = kitdto.SensitiveTaskTexts(request)
+		if provider, ok := adaptor.(channel.TaskSensitiveTextProvider); ok {
+			texts = append(texts, provider.SensitiveTexts()...)
+		}
+	}
+	if apiErr := service.CheckSensitiveInput(c, info, texts); apiErr != nil {
+		return nil, service.TaskErrorWrapperLocal(apiErr.Err, string(apiErr.GetErrorCode()), apiErr.StatusCode)
 	}
 
 	// 2. 确定模型名称

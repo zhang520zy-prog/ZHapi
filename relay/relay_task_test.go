@@ -15,6 +15,7 @@ import (
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/gin-gonic/gin"
@@ -23,6 +24,64 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestRelayTaskSubmitSensitiveTextPrecedesBilling(t *testing.T) {
+	database := setupRelayChannelDB(t)
+	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Log{}))
+	user := model.User{Username: "task-policy-user"}
+	require.NoError(t, database.Create(&user).Error)
+	previousLogDB := model.LOG_DB
+	previousRedis := common.RedisEnabled
+	common.RedisEnabled = false
+	previousCheck, previousPrompt, previousWords := setting.CheckSensitiveEnabled, setting.CheckSensitiveOnPromptEnabled, setting.SensitiveWords
+	model.LOG_DB = database
+	setting.CheckSensitiveEnabled, setting.CheckSensitiveOnPromptEnabled = true, true
+	setting.SensitiveWords = []string{"blocked_fixture"}
+	t.Cleanup(func() {
+		common.RedisEnabled = previousRedis
+		model.LOG_DB = previousLogDB
+		setting.CheckSensitiveEnabled, setting.CheckSensitiveOnPromptEnabled, setting.SensitiveWords = previousCheck, previousPrompt, previousWords
+	})
+	for _, tc := range []struct {
+		name    string
+		body    map[string]any
+		source  string
+		enabled bool
+		allowed bool
+	}{
+		{name: "normalized prompt", body: map[string]any{"prompt": "blocked_fixture"}, source: mappingOrderSubmitPlugin, enabled: true},
+		{name: "nested metadata", body: map[string]any{"metadata": map[string]any{"content": []any{map[string]any{"type": "text", "text": "blocked_fixture"}}}}, source: mappingOrderSubmitPlugin, enabled: true},
+		{name: "upstream descriptor", body: map[string]any{"prompt": "safe"}, source: strings.Replace(mappingOrderSubmitPlugin, "upstreamModel: ctx.upstreamModel", `prompt: "blocked_fixture", upstreamModel: ctx.upstreamModel`, 1), enabled: true},
+		{name: "filter disabled", body: map[string]any{"prompt": "blocked_fixture"}, source: mappingOrderSubmitPlugin, enabled: false},
+		{name: "JSON descriptor metadata", body: map[string]any{"prompt": "safe"}, source: strings.Replace(mappingOrderSubmitPlugin, "body:{upstreamModel: ctx.upstreamModel, model: ctx.model}", `body: JSON.stringify({prompt:"safe",api_key:"blocked_fixture",image:"data:image/png;base64,blocked_fixture"})`, 1), enabled: true, allowed: true},
+		{name: "JSON descriptor content", body: map[string]any{"prompt": "safe"}, source: strings.Replace(mappingOrderSubmitPlugin, "body:{upstreamModel: ctx.upstreamModel, model: ctx.model}", `body: '{"prompt":"blocked_\\u0066ixture"}'`, 1), enabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setting.CheckSensitiveEnabled = tc.enabled
+			c, info := newTaskSubmitContext(t, "declared-model", "")
+			c.Set("task_request", tc.body)
+			c.Set("id", user.Id)
+			c.Set("username", user.Username)
+			info.UserId, info.OriginModelName = user.Id, "declared-model"
+			pinMappingOrderPlugin(t, c, tc.source)
+			result, taskErr := RelayTaskSubmit(c, info)
+			require.NotNil(t, taskErr)
+			assert.Nil(t, result)
+			assert.Nil(t, info.Billing)
+			if !tc.enabled || tc.allowed {
+				assert.Equal(t, "model_price_error", taskErr.Code)
+				return
+			}
+			assert.Equal(t, "sensitive_words_detected", taskErr.Code)
+			assert.Equal(t, http.StatusUnprocessableEntity, taskErr.StatusCode)
+			assert.True(t, taskErr.LocalError)
+			assert.NotContains(t, taskErr.Message, "blocked_fixture")
+		})
+	}
+	var count int64
+	require.NoError(t, database.Model(&model.Log{}).Count(&count).Error)
+	assert.EqualValues(t, 4, count)
+}
 
 func setupRelayChannelDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -34,7 +93,7 @@ func setupRelayChannelDB(t *testing.T) *gorm.DB {
 	sqlDB, err := database.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, database.AutoMigrate(&model.Channel{}))
+	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.RiskEvent{}, &model.RiskEventChange{}))
 	model.DB = database
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.MemoryCacheEnabled = false

@@ -133,3 +133,9 @@ type TaskValidatedBillingProvider interface {
 type TaskValidatedUsageFactsProvider interface {
 	ExtractUsageFactsValidated(c *gin.Context, info *relaycommon.RelayInfo) (map[string]any, error)
 }
+
+// TaskSensitiveTextProvider exposes the actual validated upstream content when
+// an adaptor transforms the normalized task request before submission.
+type TaskSensitiveTextProvider interface {
+	SensitiveTexts() []string
+}

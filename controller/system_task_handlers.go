@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,27 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(paymentEventRetryHandler{})
+	service.RegisterSystemTaskHandler(auditDeliveryRetryHandler{})
+	service.RegisterSystemTaskHandler(distributorDueReminderHandler{})
+	service.RegisterSystemTaskHandler(distributorDueDigestHandler{})
+}
+
+type auditDeliveryRetryHandler struct{}
+
+func (auditDeliveryRetryHandler) Type() string { return "audit_delivery_retry" }
+func (auditDeliveryRetryHandler) Enabled() bool {
+	return model.HasDueAuditDeliveries(common.GetTimestamp())
+}
+func (auditDeliveryRetryHandler) Interval() time.Duration { return 30 * time.Second }
+func (auditDeliveryRetryHandler) NewPayload() any         { return nil }
+func (auditDeliveryRetryHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	err := model.RetryAuditDelivery(ctx, common.GetTimestamp(), 50)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, errors.New("Audit delivery persistence unavailable"))
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, model.CheckDatabaseHealth(ctx), nil)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and

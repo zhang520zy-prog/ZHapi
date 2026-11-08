@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -112,16 +114,64 @@ func RecordAuditLog(c *gin.Context, entry AuditLog) {
 	if len(ua) > 512 {
 		entry.UserAgent = string(ua[:512])
 	}
-	if LOG_DB == nil {
-		logger.LogError(ctx, fmt.Sprintf("audit log write failed (request_id=%s): log database unavailable", entry.RequestId))
+	independent := LOG_DB != DB
+	writeContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var delivery *AuditDelivery
+	if independent {
+		var claimed bool
+		var err error
+		delivery, claimed, err = persistAuditDelivery(writeContext, entry)
+		if err != nil {
+			auditWriteFailures.Add(1)
+			logger.LogError(ctx, "audit recovery persistence unavailable")
+			delivery = nil
+		} else if !claimed {
+			return
+		}
+	}
+	if err := writeAuditEntry(writeContext, entry); err != nil {
+		auditWriteFailures.Add(1)
+		logger.LogError(ctx, fmt.Sprintf("audit log write unavailable (request_id=%s)", entry.RequestId))
+		if delivery != nil {
+			ackContext, ackCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer ackCancel()
+			if err := DB.WithContext(ackContext).Model(&AuditDelivery{}).Where("event_id = ? AND lease_token = ?", delivery.EventID, delivery.LeaseToken).Updates(map[string]any{"state": "retry", "lease_token": "", "lease_until": 0, "next_attempt_at": common.GetTimestamp() + 30, "last_error_code": "log_write_unavailable"}).Error; err != nil {
+				auditWriteFailures.Add(1)
+				logger.LogError(ctx, "audit retry persistence unavailable")
+			}
+		}
 		return
+	}
+	if delivery != nil {
+		if err := DB.WithContext(writeContext).Where("event_id = ? AND lease_token = ?", entry.EventId, delivery.LeaseToken).Delete(&AuditDelivery{}).Error; err != nil {
+			auditWriteFailures.Add(1)
+			logger.LogError(ctx, "audit delivery acknowledgement persistence unavailable")
+		}
+	}
+}
+
+func writeAuditEntry(ctx context.Context, entry AuditLog) error {
+	if LOG_DB == nil {
+		return errors.New("log database unavailable")
+	}
+	query := LOG_DB.WithContext(ctx)
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		var count int64
+		if err := query.Table("audit_logs").Where("event_id = ?", entry.EventId).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+	} else {
+		query = query.Clauses(clause.OnConflict{DoNothing: true})
 	}
 	var row any = &entry
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		encoded, err := common.Marshal(entry.Other)
 		if err != nil {
-			logger.LogError(ctx, fmt.Sprintf("audit log write failed (request_id=%s): %v", entry.RequestId, err))
-			return
+			return err
 		}
 		// The ClickHouse GORM insert callback passes structs to the native
 		// driver without resolving their Valuer. Bind this column's JSON
@@ -131,9 +181,7 @@ func RecordAuditLog(c *gin.Context, entry AuditLog) {
 			EncodedOther string `gorm:"column:other;type:json"`
 		}{AuditLog: entry, EncodedOther: string(encoded)}
 	}
-	if err := LOG_DB.Table("audit_logs").Create(row).Error; err != nil {
-		logger.LogError(ctx, fmt.Sprintf("audit log write failed (request_id=%s): %v", entry.RequestId, err))
-	}
+	return query.Table("audit_logs").Create(row).Error
 }
 
 func GetAuditLogs(filter AuditLogFilter, start, limit, viewerRole int) ([]*AuditLog, int64, error) {

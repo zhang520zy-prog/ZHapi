@@ -52,6 +52,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CopyButton } from '@/components/copy-button'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
@@ -503,6 +504,20 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const showAdminIp =
     !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
   const adminInfo = other?.admin_info
+  const isPolicyBlocked = other?.policy_event === 'request_blocked'
+  const policyReason =
+    other?.policy_reason === 'sensitive_keyword'
+      ? t('Blocked by a sensitive keyword rule')
+      : other?.policy_reason || t('Request policy')
+  const supportSummary = isPolicyBlocked
+    ? [
+        `${t('Request ID')}: ${props.log.request_id || '-'}`,
+        `${t('Model')}: ${props.log.model_name || '-'}`,
+        `${t('Status')}: ${other?.status_code ?? '-'}`,
+        `${t('Error code')}: ${other?.error_code || '-'}`,
+        `${t('Policy')}: ${policyReason}`,
+      ].join('\n')
+    : ''
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
       ? ([
@@ -748,6 +763,58 @@ export function DetailsDialog(props: DetailsDialogProps) {
             />
           )}
         </div>
+
+        {isPolicyBlocked && other && (
+          <DetailSection
+            icon={<ShieldCheck className='size-3.5' aria-hidden='true' />}
+            label={t('Policy block')}
+            variant='danger'
+          >
+            <p className='text-xs leading-relaxed'>
+              {t(
+                'Request was blocked before upstream processing. No model call or charge was made.'
+              )}
+            </p>
+            <DetailRow label={t('Reason')} value={policyReason} />
+            <DetailRow
+              label={t('Action')}
+              value={
+                other.policy_action === 'block'
+                  ? t('Blocked')
+                  : other.policy_action || t('Blocked')
+              }
+            />
+            <DetailRow
+              label={t('Retry')}
+              value={other.policy_retryable ? t('Allowed') : t('Disabled')}
+            />
+            {props.isAdmin && adminInfo?.policy_rule_count != null && (
+              <>
+                <DetailRow
+                  label={t('Detected matches')}
+                  value={String(adminInfo.policy_rule_count)}
+                  mono
+                />
+                <p className='text-muted-foreground text-xs leading-relaxed'>
+                  {t(
+                    'Detection stops at the first match; this is not a count of all matching rules.'
+                  )}
+                </p>
+              </>
+            )}
+            <CopyButton
+              value={supportSummary}
+              aria-label={t('Copy support summary')}
+              tooltip={t('Copy support summary')}
+              successTooltip={t('Support summary copied')}
+              variant='outline'
+              size='sm'
+              className='mt-1 h-7 text-xs'
+            >
+              {t('Copy support summary')}
+            </CopyButton>
+          </DetailSection>
+        )}
 
         {/* Request conversion (admin only, not for refund) */}
         {showConversion && (

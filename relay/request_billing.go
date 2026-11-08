@@ -1,10 +1,8 @@
 package relay
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
@@ -40,13 +38,12 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 		}
 	}
 
+	var sensitiveTexts []string
 	if needSensitiveCheck && meta != nil {
-		if contains, words := service.CheckSensitiveText(meta.CombineText); contains {
-			service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodeSensitiveWordsDetected), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: "local_rejection", Source: "global"}, Health: "unchanged"})
-			message := fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", "))
-			logger.LogWarn(c, message)
-			return types.NewError(errors.New(message), types.ErrorCodeSensitiveWordsDetected)
-		}
+		sensitiveTexts = dto.SensitiveTexts(info.Request)
+	}
+	if apiErr := service.CheckSensitiveInput(c, info, sensitiveTexts); apiErr != nil {
+		return apiErr
 	}
 
 	tokens, err := service.EstimateRequestToken(c, meta, info)

@@ -226,6 +226,26 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 	return a.submit.URL, pluginruntime.ValidateRequestURL(a.submit.URL, info.ChannelBaseUrl, a.plugin.Meta.AllowedHosts)
 }
 
+func (a *TaskAdaptor) SensitiveTexts() []string {
+	if a.submit == nil {
+		return nil
+	}
+	body := a.submit.Body
+	if encoded, ok := body.(string); ok {
+		var decoded any
+		if common.Unmarshal([]byte(encoded), &decoded) == nil {
+			body = decoded
+		}
+	}
+	texts := kitdto.SensitiveTaskTexts(body)
+	for _, part := range a.submit.Parts {
+		if part.FileRef == "" {
+			texts = append(texts, kitdto.SensitiveTaskTexts(map[string]any{part.Name: part.Value})...)
+		}
+	}
+	return texts
+}
+
 func (a *TaskAdaptor) BuildRequestHeader(_ *gin.Context, req *http.Request, _ *relaycommon.RelayInfo) error {
 	if a.submit == nil {
 		return fmt.Errorf("plugin submit request was not built")

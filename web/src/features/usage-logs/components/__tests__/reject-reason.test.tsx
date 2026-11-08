@@ -18,7 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, test } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import type { UsageLog } from '../../data/schema'
 import type { LogOtherData } from '../../types'
@@ -52,7 +53,12 @@ function makeLog(other: LogOtherData): UsageLog {
   }
 }
 
-function renderDetails(isAdmin: boolean): void {
+function renderDetails(
+  isAdmin: boolean,
+  log = makeLog({
+    admin_info: { reject_reason: 'blocked by channel policy' },
+  })
+): void {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -63,11 +69,7 @@ function renderDetails(isAdmin: boolean): void {
   render(
     <QueryClientProvider client={queryClient}>
       <DetailsDialog
-        log={makeLog({
-          admin_info: {
-            reject_reason: 'blocked by channel policy',
-          },
-        })}
+        log={log}
         isAdmin={isAdmin}
         isRoot={false}
         open
@@ -78,10 +80,82 @@ function renderDetails(isAdmin: boolean): void {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   for (const queryClient of queryClients) {
     queryClient.clear()
   }
   queryClients.length = 0
+})
+
+describe('content policy rejection details', () => {
+  function blockedLog(): UsageLog {
+    return {
+      ...makeLog({
+        policy_event: 'request_blocked',
+        policy_reason: 'sensitive_keyword',
+        policy_action: 'block',
+        policy_retryable: false,
+        policy_upstream_called: false,
+        status_code: 422,
+        error_code: 'sensitive_words_detected',
+        admin_info: {
+          policy_rule_count: 1,
+          reject_reason: 'private moderation diagnostic',
+        },
+      }),
+      content: 'private request content',
+      ip: '192.0.2.10',
+      token_name: 'private-token-label',
+    }
+  }
+
+  test('explains that detection stops at the first match to admins', () => {
+    renderDetails(true, blockedLog())
+
+    expect(screen.getByText('Detected matches')).toBeVisible()
+    expect(
+      screen.getByText(
+        'Detection stops at the first match; this is not a count of all matching rules.'
+      )
+    ).toBeVisible()
+  })
+
+  test('gives users the rejection outcome without admin diagnostics', () => {
+    renderDetails(false, blockedLog())
+
+    expect(screen.getByText('Policy block')).toBeVisible()
+    expect(
+      screen.getByText(
+        'Request was blocked before upstream processing. No model call or charge was made.'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByText('Blocked by a sensitive keyword rule')
+    ).toBeVisible()
+    expect(screen.queryByText('Detected matches')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('private moderation diagnostic')
+    ).not.toBeInTheDocument()
+  })
+
+  test.each([false, true])(
+    'copies only the support fields regardless of admin access (%s)',
+    async (isAdmin) => {
+      const user = userEvent.setup()
+      const copy = vi
+        .spyOn(navigator.clipboard, 'writeText')
+        .mockResolvedValue()
+      renderDetails(isAdmin, blockedLog())
+
+      await user.click(
+        screen.getByRole('button', { name: 'Copy support summary' })
+      )
+
+      expect(copy).toHaveBeenCalledExactlyOnceWith(
+        'Request ID: req-1\nModel: gpt-test\nStatus: 422\nError code: sensitive_words_detected\nPolicy: Blocked by a sensitive keyword rule'
+      )
+    }
+  )
 })
 
 describe('usage log reject reason', () => {

@@ -135,6 +135,13 @@ function buildTypeDetailSegments(
   language: string,
   usageSchema?: BillingUsageSchema
 ): DetailSegment[] {
+  if (other?.policy_event === 'request_blocked') {
+    return [
+      { text: t('Blocked by request policy'), danger: true },
+      { text: t('No upstream call or charge'), muted: true },
+    ]
+  }
+
   // Top-up, audit, and login logs can carry a localized operation descriptor.
   if (log.type === 1 || log.type === 3 || log.type === 7) {
     const text = renderAuditContent(other, t)

@@ -17,6 +17,8 @@ type ClaudeMetadata struct {
 type ClaudeMediaMessage struct {
 	Type         string               `json:"type,omitempty"`
 	Text         *string              `json:"text,omitempty"`
+	Title        string               `json:"title,omitempty"`
+	Context      string               `json:"context,omitempty"`
 	Model        string               `json:"model,omitempty"`
 	Source       *ClaudeMessageSource `json:"source,omitempty"`
 	Usage        *ClaudeUsage         `json:"usage,omitempty"`
