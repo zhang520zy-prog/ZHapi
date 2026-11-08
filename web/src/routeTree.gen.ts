@@ -39,10 +39,9 @@ import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_authenticated/dashboard/$section'
-import { Route as AuthenticatedDistributionIndexRouteImport } from './routes/_authenticated/distribution/index'
-import { Route as AuthenticatedDistributionAdminRouteImport } from './routes/_authenticated/distribution/admin'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedInvoiceIndexRouteImport } from './routes/_authenticated/invoice/index'
+import { Route as AuthenticatedInvoiceAdminRouteImport } from './routes/_authenticated/invoice/admin'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
@@ -233,18 +232,6 @@ const AuthenticatedDashboardSectionRoute =
     path: '/dashboard/$section',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDistributionIndexRoute =
-  AuthenticatedDistributionIndexRouteImport.update({
-    id: '/distribution/',
-    path: '/distribution/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDistributionAdminRoute =
-  AuthenticatedDistributionAdminRouteImport.update({
-    id: '/distribution/admin',
-    path: '/distribution/admin',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -255,6 +242,12 @@ const AuthenticatedInvoiceIndexRoute =
   AuthenticatedInvoiceIndexRouteImport.update({
     id: '/invoice/',
     path: '/invoice/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedInvoiceAdminRoute =
+  AuthenticatedInvoiceAdminRouteImport.update({
+    id: '/invoice/admin',
+    path: '/invoice/admin',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
@@ -504,15 +497,14 @@ export interface FileRoutesByFullPath {
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
-  '/distribution/admin': typeof AuthenticatedDistributionAdminRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/invoice/admin': typeof AuthenticatedInvoiceAdminRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/referral/admin': typeof AuthenticatedReferralAdminRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
-  '/distribution/': typeof AuthenticatedDistributionIndexRoute
   '/invoice/': typeof AuthenticatedInvoiceIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
@@ -574,15 +566,14 @@ export interface FileRoutesByTo {
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
-  '/distribution/admin': typeof AuthenticatedDistributionAdminRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/invoice/admin': typeof AuthenticatedInvoiceAdminRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/referral/admin': typeof AuthenticatedReferralAdminRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
-  '/distribution': typeof AuthenticatedDistributionIndexRoute
   '/invoice': typeof AuthenticatedInvoiceIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
@@ -648,15 +639,14 @@ export interface FileRoutesById {
   '/(auth)/user/reset': typeof authUserResetRoute
   '/_authenticated/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/_authenticated/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
-  '/_authenticated/distribution/admin': typeof AuthenticatedDistributionAdminRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/invoice/admin': typeof AuthenticatedInvoiceAdminRoute
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/referral/admin': typeof AuthenticatedReferralAdminRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/_authenticated/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
-  '/_authenticated/distribution/': typeof AuthenticatedDistributionIndexRoute
   '/_authenticated/invoice/': typeof AuthenticatedInvoiceIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
@@ -721,15 +711,14 @@ export interface FileRouteTypes {
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
-    | '/distribution/admin'
     | '/errors/$error'
+    | '/invoice/admin'
     | '/models/$section'
     | '/referral/admin'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
     | '/channels/'
     | '/dashboard/'
-    | '/distribution/'
     | '/invoice/'
     | '/keys/'
     | '/models/'
@@ -791,15 +780,14 @@ export interface FileRouteTypes {
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
-    | '/distribution/admin'
     | '/errors/$error'
+    | '/invoice/admin'
     | '/models/$section'
     | '/referral/admin'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
     | '/channels'
     | '/dashboard'
-    | '/distribution'
     | '/invoice'
     | '/keys'
     | '/models'
@@ -864,15 +852,14 @@ export interface FileRouteTypes {
     | '/(auth)/user/reset'
     | '/_authenticated/chat/$chatId'
     | '/_authenticated/dashboard/$section'
-    | '/_authenticated/distribution/admin'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/invoice/admin'
     | '/_authenticated/models/$section'
     | '/_authenticated/referral/admin'
     | '/_authenticated/usage-logs/$section'
     | '/_authenticated/usage-logs/audit'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
-    | '/_authenticated/distribution/'
     | '/_authenticated/invoice/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
@@ -1141,20 +1128,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardSectionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/distribution/': {
-      id: '/_authenticated/distribution/'
-      path: '/distribution'
-      fullPath: '/distribution/'
-      preLoaderRoute: typeof AuthenticatedDistributionIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/distribution/admin': {
-      id: '/_authenticated/distribution/admin'
-      path: '/distribution/admin'
-      fullPath: '/distribution/admin'
-      preLoaderRoute: typeof AuthenticatedDistributionAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/errors/$error': {
       id: '/_authenticated/errors/$error'
       path: '/errors/$error'
@@ -1167,6 +1140,13 @@ declare module '@tanstack/react-router' {
       path: '/invoice'
       fullPath: '/invoice/'
       preLoaderRoute: typeof AuthenticatedInvoiceIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/invoice/admin': {
+      id: '/_authenticated/invoice/admin'
+      path: '/invoice/admin'
+      fullPath: '/invoice/admin'
+      preLoaderRoute: typeof AuthenticatedInvoiceAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/keys/': {
@@ -1525,15 +1505,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChat2linkRoute: typeof AuthenticatedChat2linkRoute
   AuthenticatedChatChatIdRoute: typeof AuthenticatedChatChatIdRoute
   AuthenticatedDashboardSectionRoute: typeof AuthenticatedDashboardSectionRoute
-  AuthenticatedDistributionAdminRoute: typeof AuthenticatedDistributionAdminRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedInvoiceAdminRoute: typeof AuthenticatedInvoiceAdminRoute
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedReferralAdminRoute: typeof AuthenticatedReferralAdminRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
   AuthenticatedUsageLogsAuditRoute: typeof AuthenticatedUsageLogsAuditRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
-  AuthenticatedDistributionIndexRoute: typeof AuthenticatedDistributionIndexRoute
   AuthenticatedInvoiceIndexRoute: typeof AuthenticatedInvoiceIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
@@ -1558,15 +1537,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChat2linkRoute: AuthenticatedChat2linkRoute,
   AuthenticatedChatChatIdRoute: AuthenticatedChatChatIdRoute,
   AuthenticatedDashboardSectionRoute: AuthenticatedDashboardSectionRoute,
-  AuthenticatedDistributionAdminRoute: AuthenticatedDistributionAdminRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedInvoiceAdminRoute: AuthenticatedInvoiceAdminRoute,
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedReferralAdminRoute: AuthenticatedReferralAdminRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
   AuthenticatedUsageLogsAuditRoute: AuthenticatedUsageLogsAuditRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
-  AuthenticatedDistributionIndexRoute: AuthenticatedDistributionIndexRoute,
   AuthenticatedInvoiceIndexRoute: AuthenticatedInvoiceIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,

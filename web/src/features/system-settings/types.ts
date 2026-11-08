@@ -392,18 +392,8 @@ export type OperationsSettings = {
   'perf_metrics_setting.retention_days': number
   ReferralCommissionEnabled: boolean
   ReferralRateBps: number
-  DistributorEnabled: boolean
-  DistributorApplyEnabled: boolean
-  DistributorDefaultRateBps: number
-  DistributorHoldDays: number
-  DistributorWithdrawEnabled: boolean
-  DistributorWithdrawMinCNY: string
-  DistributorWithdrawMethods: string
-  DistributorUsdtNetworks: string
   ReferralTermsExtra: string
-  DistributorTermsExtra: string
   CommissionTermsVersion: number
-  DistributorAgreementVersion: number
   InvoiceEnabled: boolean
   InvoiceMinCNY: string
   InvoiceMaxCNY: string

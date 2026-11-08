@@ -55,7 +55,7 @@ export function TransferDialog(props: TransferDialogProps) {
       toast.success(t('Transferred to account balance'))
       setAmountUsd('')
       props.onOpenChange(false)
-      queryClient.invalidateQueries({ queryKey: ['distribution'] })
+      queryClient.invalidateQueries({ queryKey: ['referral'] })
     },
     onError: (e) => handleServerError(e, t('Transfer failed')),
   })

@@ -18,14 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { DistributionAdmin } from '@/features/distribution/admin'
+import { InvoiceAdmin } from '@/features/invoice/admin'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
-export const Route = createFileRoute('/_authenticated/distribution/admin')({
+export const Route = createFileRoute('/_authenticated/invoice/admin')({
   beforeLoad: () => {
     const user = useAuthStore.getState().auth.user
     if (!user || user.role < ROLE.ADMIN) throw redirect({ to: '/403' })
   },
-  component: DistributionAdmin,
+  component: InvoiceAdmin,
 })

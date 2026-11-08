@@ -98,7 +98,7 @@ export function useNotifications() {
     )
   }, [announcementsEnabled, status?.announcements])
 
-  // Fetch in-site user notifications (distributor lifecycle etc.)
+  // Fetch in-site user notifications
   const { data: userNotificationData } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: () => getUserNotifications(1, 20),

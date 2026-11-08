@@ -56,6 +56,7 @@ export interface InvoiceOptions {
 
 export interface InvoiceRequest {
   id: number
+  user_id: number
   buyer_name: string
   tax_no: string
   amount_cny: string

@@ -22,7 +22,6 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
-  HandCoins,
   Key,
   LayoutDashboard,
   ListTodo,
@@ -37,11 +36,9 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
-import { adminListApplications } from '@/features/distribution/api'
 import { hasPermission } from '@/lib/admin-permissions'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
@@ -55,18 +52,10 @@ import { useAuthStore } from '@/stores/auth-store'
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
-  const canDistributorAdmin =
-    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'distributor', 'read')
   const canReferralAdmin =
     (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'referral', 'read')
-  // F4.6 侧栏徽标：待审核分销申请数。
-  const pendingApplications = useQuery({
-    queryKey: ['distribution-admin', 'pending-applications-count'],
-    queryFn: () => adminListApplications({ p: 1, page_size: 1, status: 'pending' }),
-    enabled: canDistributorAdmin,
-    staleTime: 60_000,
-  })
-  const pendingCount = pendingApplications.data?.total ?? 0
+  const canInvoiceAdmin =
+    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'invoice', 'read')
 
   return {
     navGroups: [
@@ -133,11 +122,6 @@ export function useSidebarData(): SidebarData {
             icon: Share2,
           },
           {
-            title: t('Distribution Centre'),
-            url: '/distribution',
-            icon: HandCoins,
-          },
-          {
             title: t('Profile'),
             url: '/profile',
             icon: User,
@@ -169,14 +153,13 @@ export function useSidebarData(): SidebarData {
                 },
               ]
             : []),
-          ...(canDistributorAdmin
+          ...(canInvoiceAdmin
             ? [
                 {
-                  title: t('Distribution'),
-                  url: '/distribution/admin' as const,
-                  icon: HandCoins,
+                  title: t('Invoice review'),
+                  url: '/invoice/admin' as const,
+                  icon: FileText,
                   requiredRole: ROLE.ADMIN,
-                  badge: pendingCount > 0 ? String(pendingCount) : undefined,
                 },
               ]
             : []),

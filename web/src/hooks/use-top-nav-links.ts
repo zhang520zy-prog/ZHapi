@@ -86,15 +86,6 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
   }
 
-  // Distribution centre (takes the rankings slot when rankings is off)
-  if (modules?.distribution !== false) {
-    links.push({
-      title: t('Distribution Centre'),
-      href: '/distribution',
-      requiresAuth: !isAuthed,
-    })
-  }
-
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {

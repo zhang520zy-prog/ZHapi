@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { SystemBehaviorSection } from '../general/system-behavior-section'
-import { DistributionSettingsSection } from './distribution-settings-section'
+import { ReferralSettingsSection } from './referral-settings-section'
 import { InvoiceSettingsSection } from './invoice-settings-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
@@ -81,25 +81,15 @@ const OPERATIONS_SECTIONS = [
     ),
   },
   {
-    id: 'distribution',
-    titleKey: 'Referral & Distribution',
+    id: 'referral',
+    titleKey: 'Referral rewards',
     build: (settings: OperationsSettings) => (
-      <DistributionSettingsSection
+      <ReferralSettingsSection
         defaultValues={{
           ReferralCommissionEnabled: settings.ReferralCommissionEnabled,
           ReferralRateBps: settings.ReferralRateBps,
-          DistributorEnabled: settings.DistributorEnabled,
-          DistributorApplyEnabled: settings.DistributorApplyEnabled,
-          DistributorDefaultRateBps: settings.DistributorDefaultRateBps,
-          DistributorHoldDays: settings.DistributorHoldDays,
-          DistributorWithdrawEnabled: settings.DistributorWithdrawEnabled,
-          DistributorWithdrawMinCNY: settings.DistributorWithdrawMinCNY,
-          DistributorWithdrawMethods: settings.DistributorWithdrawMethods,
-          DistributorUsdtNetworks: settings.DistributorUsdtNetworks,
           ReferralTermsExtra: settings.ReferralTermsExtra,
-          DistributorTermsExtra: settings.DistributorTermsExtra,
           CommissionTermsVersion: settings.CommissionTermsVersion,
-          DistributorAgreementVersion: settings.DistributorAgreementVersion,
         }}
       />
     ),

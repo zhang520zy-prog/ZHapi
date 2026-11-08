@@ -33,23 +33,20 @@ import { getCommissionTerms } from '../api'
 interface TermsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  doc: 'referral' | 'distributor'
 }
 
+// 《推广返现规则》首次弹出并记录已读；只展示推广补充条款。
 export function TermsDialog(props: TermsDialogProps) {
   const { t } = useTranslation()
   const terms = useQuery({
-    queryKey: ['distribution', 'terms'],
+    queryKey: ['referral', 'terms'],
     queryFn: getCommissionTerms,
     enabled: props.open,
   })
 
   let description = ' '
   if (terms.data) {
-    description =
-      props.doc === 'distributor'
-        ? `${t('Version')} v${terms.data.distributor_agreement_version} · ${t('Distributor rate')} ${(terms.data.distributor_default_rate / 100).toFixed(2)}% · ${t('Hold period')} ${terms.data.distributor_hold_days} ${t('days')}`
-        : `${t('Version')} v${terms.data.referral_rules_version} · ${t('Referral rate')} ${(terms.data.referral_rate_bps / 100).toFixed(2)}%`
+    description = `${t('Version')} v${terms.data.referral_rules_version} · ${t('Referral rate')} ${(terms.data.referral_rate_bps / 100).toFixed(2)}%`
   }
 
   return (
@@ -68,9 +65,7 @@ export function TermsDialog(props: TermsDialogProps) {
             </div>
           ) : (
             <p className='text-muted-foreground text-sm whitespace-pre-wrap'>
-              {(props.doc === 'distributor'
-                ? terms.data?.distributor_extra
-                : terms.data?.referral_extra) ||
+              {terms.data?.referral_extra ||
                 t('No additional terms published.')}
             </p>
           )}

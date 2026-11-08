@@ -18,30 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  getAffiliateCode,
-  getDistributorCode,
-  saveAffiliateCode,
-  saveDistributorCode,
-} from '../storage'
+import { getAffiliateCode, saveAffiliateCode } from '../storage'
 
 describe('invite code storage', () => {
   beforeEach(() => {
     window.localStorage.clear()
   })
 
-  it('keeps whichever link the visitor clicked last (R2)', () => {
-    saveDistributorCode('Dabc123')
-    expect(getDistributorCode()).toBe('Dabc123')
+  it('stores and returns the affiliate code', () => {
+    expect(getAffiliateCode()).toBe('')
 
-    // 后点推广链接：分销码被清掉
     saveAffiliateCode('AFF1')
     expect(getAffiliateCode()).toBe('AFF1')
-    expect(getDistributorCode()).toBe('')
 
-    // 再后点分销链接：推广码被清掉
-    saveDistributorCode('Dxyz999')
-    expect(getDistributorCode()).toBe('Dxyz999')
-    expect(getAffiliateCode()).toBe('')
+    // 后点的推广链接覆盖前一个
+    saveAffiliateCode('AFF2')
+    expect(getAffiliateCode()).toBe('AFF2')
   })
 })

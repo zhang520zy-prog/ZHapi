@@ -45,10 +45,7 @@ import { registerFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
-import {
-  getAffiliateCode,
-  getDistributorCode,
-} from '@/features/auth/lib/storage'
+import { getAffiliateCode } from '@/features/auth/lib/storage'
 import { useStatus } from '@/hooks/use-status'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
@@ -166,8 +163,7 @@ export function SignUpForm({
         password: data.password,
         email: data.email || undefined,
         verification_code: verificationCode || undefined,
-        aff_code: getAffiliateCode(),
-        dist_code: getDistributorCode() || undefined,
+        aff_code: getAffiliateCode() || undefined,
         turnstile: turnstileToken,
       })
 

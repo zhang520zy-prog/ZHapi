@@ -27,16 +27,11 @@ import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 
 import {
-  getDistributorCommissions,
-  getDistributorInvitees,
-  getDistributorSettlements,
-  getDistributorWithdrawals,
   getReferralInvitees,
   getReferralRecords,
   getReferralSettlements,
   type CommissionRecord,
   type CommissionSettlement,
-  type DistributorWithdrawal,
   type InviteeRow,
 } from '../api'
 
@@ -48,12 +43,6 @@ const RECORD_STATUS_LABELS: Record<string, string> = {
   settled: 'Settled',
   reversed: 'Reversed',
   due: 'Due',
-}
-const WITHDRAWAL_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending review',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  paid: 'Paid',
 }
 
 function quotaCell(v: number) {
@@ -130,10 +119,9 @@ function recordColumns(t: (k: string) => string): ColumnDef<CommissionRecord>[] 
   ]
 }
 
-export function RecordsTable(props: { program: 'referral' | 'distributor' }) {
+export function RecordsTable() {
   const { t } = useTranslation()
-  const fetcher = props.program === 'referral' ? getReferralRecords : getDistributorCommissions
-  const { page, setPage, query } = usePagedQuery(['distribution', 'records', props.program], fetcher)
+  const { page, setPage, query } = usePagedQuery(['referral', 'records'], getReferralRecords)
   const columns = useMemo(() => recordColumns(t), [t])
   const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
   return (
@@ -174,10 +162,9 @@ function settlementColumns(t: (k: string) => string): ColumnDef<CommissionSettle
   ]
 }
 
-export function SettlementsTable(props: { program: 'referral' | 'distributor' }) {
+export function SettlementsTable() {
   const { t } = useTranslation()
-  const fetcher = props.program === 'referral' ? getReferralSettlements : getDistributorSettlements
-  const { page, setPage, query } = usePagedQuery(['distribution', 'settlements', props.program], fetcher)
+  const { page, setPage, query } = usePagedQuery(['referral', 'settlements'], getReferralSettlements)
   const columns = useMemo(() => settlementColumns(t), [t])
   const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
   return (
@@ -191,10 +178,9 @@ export function SettlementsTable(props: { program: 'referral' | 'distributor' })
   )
 }
 
-export function InviteesTable(props: { program: 'referral' | 'distributor' }) {
+export function InviteesTable() {
   const { t } = useTranslation()
-  const fetcher = props.program === 'referral' ? getReferralInvitees : getDistributorInvitees
-  const { page, setPage, query } = usePagedQuery(['distribution', 'invitees', props.program], fetcher)
+  const { page, setPage, query } = usePagedQuery(['referral', 'invitees'], getReferralInvitees)
   const columns = useMemo<ColumnDef<InviteeRow>[]>(
     () => [
       { accessorKey: 'username', header: t('Username') },
@@ -218,46 +204,6 @@ export function InviteesTable(props: { program: 'referral' | 'distributor' }) {
       columns={columns}
       isLoading={query.isPending}
       emptyTitle={t('No invitees yet')}
-      paginationInFooter
-    />
-  )
-}
-
-export function WithdrawalsTable() {
-  const { t } = useTranslation()
-  const { page, setPage, query } = usePagedQuery(['distribution', 'withdrawals'], getDistributorWithdrawals)
-  const columns = useMemo<ColumnDef<DistributorWithdrawal>[]>(
-    () => [
-      {
-        accessorKey: 'created_at',
-        header: t('Applied'),
-        cell: ({ row }) => dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm'),
-      },
-      {
-        accessorKey: 'payout_amount',
-        header: t('Payout'),
-        cell: ({ row }) => `${row.original.payout_amount} ${row.original.payout_currency}`,
-      },
-      { accessorKey: 'method', header: t('Method') },
-      { accessorKey: 'usdt_network', header: t('Network'), cell: ({ row }) => row.original.usdt_network || '—' },
-      {
-        accessorKey: 'status',
-        header: t('Status'),
-        cell: ({ row }) => (
-          <Badge variant='outline'>{t(WITHDRAWAL_STATUS_LABELS[row.original.status] ?? row.original.status)}</Badge>
-        ),
-      },
-      { accessorKey: 'review_note', header: t('Note'), cell: ({ row }) => row.original.review_note || '—' },
-    ],
-    [t]
-  )
-  const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
-  return (
-    <DataTablePage
-      table={table}
-      columns={columns}
-      isLoading={query.isPending}
-      emptyTitle={t('No withdrawals')}
       paginationInFooter
     />
   )

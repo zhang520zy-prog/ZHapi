@@ -87,7 +87,6 @@ describe('security sidebar visibility', () => {
       'Wallet',
       'Invoices',
       'Referral rewards',
-      'Distribution Centre',
       'Profile',
       'Security & Access',
     ])
