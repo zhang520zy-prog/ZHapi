@@ -121,6 +121,19 @@ func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *rel
 		}
 		FormatClaudeResponseInfo(&claudeResponse, nil, claudeInfo)
 		countClaudeStreamBillableTools(c, info, &claudeResponse)
+		// B2.2 流式输出检查：本 chunk 转换为 Responses 事件前 Feed。
+		if delta := claudeStreamDeltaText(&claudeResponse); delta != "" {
+			if category := service.FeedStreamGuard(c, delta); category != nil {
+				blockErr := service.CheckSensitiveOutputHit(c, info, category)
+				service.RecordSensitiveWordRejection(c, info, 1)
+				helper.EmitSensitiveStreamEnd(c, info, blockErr)
+				// 错误事件已按 Responses 协议送达，按部分用量正常结算，
+				// 不再发送 finalized 事件。
+				streamFailed = true
+				sr.Stop(blockErr)
+				return
+			}
+		}
 		hostedEvents, consumed, err := hostedBridge.Convert(&claudeResponse, state)
 		if err != nil {
 			if failResponsesStream(err) {

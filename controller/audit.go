@@ -71,6 +71,16 @@ var auditContentTemplates = map[string]string{
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
 	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
 
+	"risk.category.create":    "Created risk word category ${key}",
+	"risk.category.update":    "Updated risk word category ${key}",
+	"risk.category.delete":    "Deleted risk word category ${key}",
+	"risk.category.import":    "Imported words into risk category ${key} (added ${added}, duplicate ${duplicate}, invalid ${invalid})",
+	"risk.category.export":    "Exported risk word category ${key} (${word_count} words)",
+	"risk.setting.update":     "Updated risk setting ${key}",
+	"risk.restriction.revoke": "Revoked risk restriction for user ${user_id}",
+	"risk.user.reenable":      "Re-enabled risk-disabled user ${user_id}",
+	"risk.event.review":       "Reviewed risk event ${event_id} (${status})",
+
 	"distributor.application_review":      "Reviewed distributor application ${application_id} (${action})",
 	"distributor.application_submit":      "Submitted a distributor application",
 	"distributor.profile_update":          "Updated distributor profile for user ${target_user_id} (${status})",
@@ -169,6 +179,16 @@ func recordManageAuditFor(c *gin.Context, targetUserId int, action string, param
 		params["target_user_id"] = targetUserId
 	}
 	model.RecordOperationAuditLog(operatorUserId, c.GetInt("role"), auditContentEN(action, params), c.ClientIP(), action, params, auditOperatorInfo(c), nil, c)
+	markAuditLogged(c)
+}
+
+// recordRiskAudit 记录风控类审计（category=risk），日志归属于操作者。
+// params 只允许类别 Key、计数、级别、理由等，绝不带词或请求/输出原文。
+func recordRiskAudit(c *gin.Context, action string, params map[string]any) {
+	if params == nil {
+		params = map[string]any{}
+	}
+	model.RecordRiskAuditLog(c.GetInt("id"), c.GetInt("role"), auditContentEN(action, params), c.ClientIP(), action, params, auditOperatorInfo(c), c)
 	markAuditLogged(c)
 }
 

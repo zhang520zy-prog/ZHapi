@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,18 @@ func TestRelayTaskSubmitSensitiveTextPrecedesBilling(t *testing.T) {
 	model.LOG_DB = database
 	setting.CheckSensitiveEnabled, setting.CheckSensitiveOnPromptEnabled = true, true
 	setting.SensitiveWords = []string{"blocked_fixture"}
+	require.NoError(t, database.Create(&model.RiskWordCategory{
+		Key: model.RiskGeneralCategoryKey, Name: "通用", Action: model.RiskWordActionBlock,
+		Words: "blocked_fixture", WordCount: 1,
+		Status: model.RiskWordCategoryStatusEnabled, Version: 1,
+	}).Error)
+	service.InvalidateRiskMatcher()
+	t.Cleanup(service.InvalidateRiskMatcher)
+	// 本用例会累计 4 次 block 命中，提高阈值避免升级成限制干扰断言。
+	riskSetting := operation_setting.GetRiskSetting()
+	previousThreshold := riskSetting.HitThreshold
+	riskSetting.HitThreshold = 100
+	t.Cleanup(func() { riskSetting.HitThreshold = previousThreshold })
 	t.Cleanup(func() {
 		common.RedisEnabled = previousRedis
 		model.LOG_DB = previousLogDB
@@ -93,7 +106,7 @@ func setupRelayChannelDB(t *testing.T) *gorm.DB {
 	sqlDB, err := database.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.RiskEvent{}, &model.RiskEventChange{}))
+	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskUserState{}, &model.RiskWordCategory{}))
 	model.DB = database
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.MemoryCacheEnabled = false

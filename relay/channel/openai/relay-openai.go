@@ -121,8 +121,15 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	seenStreamToolCalls := make(map[string]struct{})
 	var streamFunctionCallNames []string
 
+	outputGuard := service.NewStreamGuard()
+	guardedRunes := 0
+	streamBlocked := false
+
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		if lastStreamData != "" {
+			if streamBlocked {
+				return
+			}
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
 				sr.Error(err)
@@ -138,6 +145,21 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			if err := processTokenData(info, data, &responseTextBuilder, &toolCount); err != nil {
 				logger.LogError(c, "error processing stream token data: "+err.Error())
 				sr.Error(err)
+			}
+			if outputGuard != nil && !streamBlocked {
+				full := []rune(responseTextBuilder.String())
+				if len(full) > guardedRunes {
+					delta := string(full[guardedRunes:])
+					guardedRunes = len(full)
+					if category := outputGuard.Feed(delta); category != nil {
+						streamBlocked = true
+						blockErr := service.CheckSensitiveOutputHit(c, info, category)
+						service.RecordSensitiveWordRejection(c, info, 1)
+						helper.EmitSensitiveStreamEnd(c, info, blockErr)
+						sr.Stop(blockErr)
+						return
+					}
+				}
 			}
 		}
 	})
@@ -175,7 +197,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI {
-		if shouldSendLastResp {
+		if shouldSendLastResp && !streamBlocked {
 			_ = sendStreamData(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 		}
 	}
@@ -361,6 +383,13 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 			return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 		}
 		responseBody = geminiRespStr
+	}
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&simpleResponse), "\n")); apiErr != nil {
+		service.RecordSensitiveWordRejection(c, info, 1)
+		service.PostTextConsumeQuota(c, info, &simpleResponse.Usage, nil)
+		return &simpleResponse.Usage, apiErr
 	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)

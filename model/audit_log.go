@@ -21,6 +21,7 @@ const (
 	AuditCategorySecurity    = "security"
 	AuditCategoryOperation   = "operation"
 	AuditCategoryAccessToken = "access_token"
+	AuditCategoryRisk        = "risk"
 )
 
 // AuditLog is retained independently of usage logs and their cleanup/TTL policy.
@@ -303,7 +304,7 @@ func MigrateAuditLogs() error {
 }
 
 func ValidAuditCategory(category string) bool {
-	return category == "" || category == AuditCategoryLogin || category == AuditCategorySecurity || category == AuditCategoryOperation || category == AuditCategoryAccessToken
+	return category == "" || category == AuditCategoryLogin || category == AuditCategorySecurity || category == AuditCategoryOperation || category == AuditCategoryAccessToken || category == AuditCategoryRisk
 }
 
 func ValidTokenFingerprint(value string) bool {

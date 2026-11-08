@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -18,14 +16,112 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CheckSensitiveInput applies the same automatic input policy to HTTP requests,
-// task submissions and individual Realtime frames, before forwarding their text.
-// It does not estimate usage or reserve quota.
-func CheckSensitiveInput(c *gin.Context, info *relaycommon.RelayInfo, texts []string) *types.NewAPIError {
+func sensitiveUserID(c *gin.Context, info *relaycommon.RelayInfo) int {
 	userID := c.GetInt("id")
 	if userID == 0 && info != nil {
 		userID = info.UserId
 	}
+	return userID
+}
+
+func sensitiveRequestID(c *gin.Context, info *relaycommon.RelayInfo) string {
+	requestID := c.GetString(common.RequestIdKey)
+	if requestID == "" && info != nil {
+		requestID = info.RequestId
+	}
+	return requestID
+}
+
+func riskEventInputFor(c *gin.Context, info *relaycommon.RelayInfo, userID int, category *RiskMatchCategory, stage string) model.RiskEventInput {
+	input := model.RiskEventInput{
+		UserID:      userID,
+		Category:    category.Key,
+		Stage:       stage,
+		RequestID:   sensitiveRequestID(c, info),
+		RuleID:      "sensitive_words",
+		RuleVersion: riskMatcherSignatureNow(),
+	}
+	if info != nil {
+		input.TokenID = info.TokenId
+		input.Model = info.OriginModelName
+	}
+	return input
+}
+
+func riskMatcherSignatureNow() string {
+	if m := currentRiskMatcher(); m != nil {
+		return m.signature
+	}
+	return ""
+}
+
+func sensitiveBlockedError(category *RiskMatchCategory) *types.NewAPIError {
+	return types.NewErrorWithStatusCode(
+		fmt.Errorf("request blocked by content policy (category: %s); view risk events or submit an appeal", category.Key),
+		types.ErrorCodeSensitiveWordsDetected,
+		http.StatusUnprocessableEntity,
+		types.ErrOptionWithSkipRetry(),
+		types.ErrOptionWithNoRecordErrorLog(),
+	)
+}
+
+// applySensitiveHit 对 block / block_restrict 命中：同一事务里计数、升级、写
+// 事件；事务提交后再发管理员通知与停用清理，失败只记日志。
+func applySensitiveHit(c *gin.Context, info *relaycommon.RelayInfo, userID int, category *RiskMatchCategory, stage string) {
+	if info == nil || userID <= 0 {
+		return
+	}
+	input := riskEventInputFor(c, info, userID, category, stage)
+	input.Action = "block"
+	event, result, err := model.RecordRiskHit(input, category.Action == model.RiskWordActionBlockRestrict)
+	if err != nil {
+		logger.LogError(c, "risk hit persistence failed")
+		return
+	}
+	if result.Disabled {
+		model.FinishRiskDisable(userID)
+	}
+	if result.Notify {
+		NotifyRiskEscalation(userID, result, category, event)
+	}
+}
+
+// checkSensitiveStage 输入/输出共用的命中处理：record 只写事件放行；
+// block / block_restrict 返回 422 并计入阶梯。
+func checkSensitiveStage(c *gin.Context, info *relaycommon.RelayInfo, userID int, texts []string, stage string) *types.NewAPIError {
+	recordLogged := false
+	for _, text := range texts {
+		category := MatchRisk(text)
+		if category == nil {
+			continue
+		}
+		if category.Action == model.RiskWordActionRecord {
+			if recordLogged || info == nil || userID <= 0 {
+				continue
+			}
+			recordLogged = true
+			input := riskEventInputFor(c, info, userID, category, stage)
+			input.Action = "record"
+			if state, err := model.GetRiskUserState(userID); err == nil {
+				input.Level = state.Level
+			}
+			if _, err := model.RecordRiskEvent(input); err != nil {
+				logger.LogError(c, "risk event persistence failed")
+			}
+			continue
+		}
+		RecordSensitiveWordRejection(c, info, 1)
+		applySensitiveHit(c, info, userID, category, stage)
+		return sensitiveBlockedError(category)
+	}
+	return nil
+}
+
+// CheckSensitiveInput applies the same automatic input policy to HTTP requests,
+// task submissions and individual Realtime frames, before forwarding their text.
+// It does not estimate usage or reserve quota.
+func CheckSensitiveInput(c *gin.Context, info *relaycommon.RelayInfo, texts []string) *types.NewAPIError {
+	userID := sensitiveUserID(c, info)
 	if userID > 0 {
 		until, err := model.RiskRestrictionUntil(userID, common.GetTimestamp())
 		if err != nil {
@@ -33,39 +129,31 @@ func CheckSensitiveInput(c *gin.Context, info *relaycommon.RelayInfo, texts []st
 			return types.NewErrorWithStatusCode(errors.New("risk access check unavailable; retry later"), types.ErrorCode("risk_unavailable"), http.StatusServiceUnavailable, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		if until > 0 {
-			return types.NewErrorWithStatusCode(errors.New("API access temporarily restricted; view risk events or submit an appeal"), types.ErrorCode("risk_restricted"), http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			message := fmt.Sprintf("API access restricted until %s; view risk events or submit an appeal", time.Unix(until, 0).UTC().Format(time.RFC3339))
+			return types.NewErrorWithStatusCode(errors.New(message), types.ErrorCode("risk_restricted"), http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 	}
 	if !setting.ShouldCheckPromptSensitive() {
 		return nil
 	}
-	for _, text := range texts {
-		if contains, words := CheckSensitiveText(text); contains {
-			RecordSensitiveWordRejection(c, info, len(words))
-			if info != nil && userID > 0 {
-				requestID := c.GetString(common.RequestIdKey)
-				if requestID == "" {
-					requestID = info.RequestId
-				}
-				wordsSnapshot := slices.Clone(setting.SensitiveWords)
-				slices.Sort(wordsSnapshot)
-				if _, err := model.RecordRiskEvent(model.RiskEventInput{
-					UserID: userID, TokenID: info.TokenId, Model: info.OriginModelName,
-					RequestID: requestID, RuleID: "sensitive_words", RuleVersion: strings.Join(wordsSnapshot, "\x00"),
-				}); err != nil {
-					logger.LogError(c, "risk event persistence failed")
-				}
-			}
-			return types.NewErrorWithStatusCode(
-				errors.New("request blocked by content policy"),
-				types.ErrorCodeSensitiveWordsDetected,
-				http.StatusUnprocessableEntity,
-				types.ErrOptionWithSkipRetry(),
-				types.ErrOptionWithNoRecordErrorLog(),
-			)
-		}
+	return checkSensitiveStage(c, info, userID, texts, "input")
+}
+
+// CheckSensitiveOutput 对一次完整回复文本做输出检查（非流式写回前调用）。
+// 命中时写风险事件（Stage=output）、计入阶梯，返回与输入检查同格式的 422。
+func CheckSensitiveOutput(c *gin.Context, info *relaycommon.RelayInfo, text string) *types.NewAPIError {
+	if !setting.ShouldCheckCompletionSensitive() {
+		return nil
 	}
-	return nil
+	return checkSensitiveStage(c, info, sensitiveUserID(c, info), []string{text}, "output")
+}
+
+// CheckSensitiveOutputHit 流式 StreamGuard 命中后调用：写事件、计阶梯、发通知。
+// 返回错误供结束标记复用同一条目。
+func CheckSensitiveOutputHit(c *gin.Context, info *relaycommon.RelayInfo, category *RiskMatchCategory) *types.NewAPIError {
+	userID := sensitiveUserID(c, info)
+	applySensitiveHit(c, info, userID, category, "output")
+	return sensitiveBlockedError(category)
 }
 
 // RecordSensitiveWordRejection stores a safe, queryable error log for a local

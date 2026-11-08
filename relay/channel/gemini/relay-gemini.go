@@ -201,6 +201,7 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		countGeminiBillableFunctionCalls(info, &geminiResponse)
 
 		// 统计图片数量
+		var chunkText strings.Builder
 		for _, candidate := range geminiResponse.Candidates {
 			for _, part := range candidate.Content.Parts {
 				if part.InlineData != nil && part.InlineData.MimeType != "" {
@@ -208,8 +209,20 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 				}
 				if part.Text != "" {
 					responseText.WriteString(part.Text)
+					if !part.Thought {
+						chunkText.WriteString(part.Text)
+					}
 				}
 			}
+		}
+
+		// B2.2 流式输出检查：本 chunk 写给客户端前 Feed，命中即截断。
+		if category := service.FeedStreamGuard(c, chunkText.String()); category != nil {
+			blockErr := service.CheckSensitiveOutputHit(c, info, category)
+			service.RecordSensitiveWordRejection(c, info, 1)
+			helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			sr.Stop(blockErr)
+			return
 		}
 
 		// 更新使用量统计
@@ -447,6 +460,13 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		responseBody = claudeRespStr
 	case types.RelayFormatGemini:
 		break
+	}
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&geminiResponse), "\n")); apiErr != nil {
+		service.RecordSensitiveWordRejection(c, info, 1)
+		service.PostTextConsumeQuota(c, info, &usage, nil)
+		return &usage, apiErr
 	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)

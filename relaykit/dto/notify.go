@@ -17,6 +17,7 @@ const (
 	NotifyTypeDistributorWithdrawRequest = "distributor_withdraw_request"
 	NotifyTypeDistributorLifecycle       = "distributor_lifecycle"
 	NotifyTypeDistributorNewApplication  = "distributor_new_application"
+	NotifyTypeRiskEscalation             = "risk_escalation"
 )
 
 func NewNotify(t string, title string, content string, values []any) Notify {

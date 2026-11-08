@@ -158,7 +158,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 			ActionBind: false,
 		},
 		ResourceAudit:   {ActionRead: false},
-		ResourceRisk:    {"read": false, "review": false},
+		ResourceRisk:    {"read": false, "review": false, "manage": false},
 		ResourcePayment: {"read": false, "operate": false, "review": false},
 		ResourceDistributor: {
 			"read":   true,
@@ -207,7 +207,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 			ActionBind: false,
 		},
 		ResourceAudit:   {ActionRead: false},
-		ResourceRisk:    {"read": false, "review": false},
+		ResourceRisk:    {"read": false, "review": false, "manage": false},
 		ResourcePayment: {"read": false, "operate": false, "review": false},
 		ResourceDistributor: {
 			"read":   true,

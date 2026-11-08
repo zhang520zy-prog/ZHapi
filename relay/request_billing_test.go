@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/gorilla/websocket"
@@ -58,8 +59,16 @@ func TestPrepareRequestBillingSensitiveRejection(t *testing.T) {
 					common.RedisEnabled, common.AutomaticDisableChannelEnabled = previousRedis, previousDisable
 					setting.CheckSensitiveEnabled, setting.CheckSensitiveOnPromptEnabled, setting.SensitiveWords = previousCheck, previousPrompt, previousWords
 				})
-				require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.RiskEvent{}, &model.RiskEventChange{}))
+				require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskUserState{}, &model.RiskWordCategory{}))
 				require.NoError(t, logDB.AutoMigrate(&model.Log{}))
+				// 词表迁移为分类词库；扁平 SensitiveWords 不再参与匹配。
+				require.NoError(t, db.Create(&model.RiskWordCategory{
+					Key: model.RiskGeneralCategoryKey, Name: "通用", Action: model.RiskWordActionBlock,
+					Words: "blocked_fixture\nanother_fixture", WordCount: 2,
+					Status: model.RiskWordCategoryStatusEnabled, Version: 1,
+				}).Error)
+				service.InvalidateRiskMatcher()
+				t.Cleanup(service.InvalidateRiskMatcher)
 				var sqliteVersion string
 				require.NoError(t, db.Raw("select sqlite_version()").Scan(&sqliteVersion).Error)
 				t.Logf("SQLite %s, isolated primary and log databases", sqliteVersion)
@@ -105,7 +114,7 @@ func TestPrepareRequestBillingSensitiveRejection(t *testing.T) {
 				require.NotNil(t, apiErr)
 				assert.Equal(t, http.StatusUnprocessableEntity, apiErr.StatusCode)
 				assert.Equal(t, types.ErrorCodeSensitiveWordsDetected, apiErr.GetErrorCode())
-				assert.Equal(t, "request blocked by content policy", apiErr.ToOpenAIError().Message)
+				assert.Contains(t, apiErr.ToOpenAIError().Message, "request blocked by content policy")
 				assert.True(t, types.IsSkipRetryError(apiErr))
 				assert.False(t, types.IsRecordErrorLog(apiErr), "the rejection already has its own log")
 				assert.False(t, service.ShouldDisableChannel(apiErr))
@@ -176,13 +185,13 @@ func TestPrepareRequestBillingSensitiveRejection(t *testing.T) {
 
 func TestConfirmedRiskRestrictionPrecedesBillingEvenWhenKeywordCheckDisabled(t *testing.T) {
 	db := setupRelayChannelDB(t)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.RiskEvent{}, &model.RiskEventChange{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskUserState{}))
 	previous := setting.CheckSensitiveEnabled
 	setting.CheckSensitiveEnabled = false
 	t.Cleanup(func() { setting.CheckSensitiveEnabled = previous })
 	user := model.User{Username: "restricted-user", Quota: 1000000, Status: common.UserStatusEnabled}
 	require.NoError(t, db.Create(&user).Error)
-	event, err := model.RecordRiskEvent(model.RiskEventInput{UserID: user.Id, Model: "risk-test"})
+	event, err := model.RecordRiskEvent(model.RiskEventInput{UserID: user.Id, Model: "risk-test", Action: "record", Stage: "input"})
 	require.NoError(t, err)
 	event, err = model.ReviewRiskEvent(model.RiskReviewInput{EventID: event.EventID, ExpectedVersion: 1, Status: "confirmed", Reason: "confirmed temporary decision", ReviewerID: 10, RestrictionSeconds: 60})
 	require.NoError(t, err)
@@ -211,9 +220,21 @@ func TestConfirmedRiskRestrictionPrecedesBillingEvenWhenKeywordCheckDisabled(t *
 
 func TestRealtimeSensitiveFramesAreRejectedWithoutForwarding(t *testing.T) {
 	database := setupRelayChannelDB(t)
-	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Log{}))
+	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Log{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskUserState{}, &model.RiskWordCategory{}))
 	user := model.User{Username: "realtime-policy-user"}
 	require.NoError(t, database.Create(&user).Error)
+	require.NoError(t, database.Create(&model.RiskWordCategory{
+		Key: model.RiskGeneralCategoryKey, Name: "通用", Action: model.RiskWordActionBlock,
+		Words: "blocked_fixture", WordCount: 1,
+		Status: model.RiskWordCategoryStatusEnabled, Version: 1,
+	}).Error)
+	service.InvalidateRiskMatcher()
+	t.Cleanup(service.InvalidateRiskMatcher)
+	// 提高阶梯阈值，三次拦截不触发限制，后面的放行帧才走得通。
+	riskSetting := operation_setting.GetRiskSetting()
+	previousThreshold := riskSetting.HitThreshold
+	riskSetting.HitThreshold = 100
+	t.Cleanup(func() { riskSetting.HitThreshold = previousThreshold })
 	previousLogDB := model.LOG_DB
 	previousRedis := common.RedisEnabled
 	common.RedisEnabled = false

@@ -249,6 +249,21 @@ func RecordOperationAuditLog(logUserId, actorRole int, content string, ip string
 	RecordAuditLog(c, AuditLog{UserId: logUserId, Username: username, ActorRole: actorRole, Category: category, Action: action, Content: content, Ip: ip, Status: status, Success: success, Other: other})
 }
 
+// RecordRiskAuditLog 写风控类审计（category=risk），语义同
+// RecordOperationAuditLog；params 只允许类别 Key、计数、理由等，绝不带词或原文。
+func RecordRiskAuditLog(logUserId, actorRole int, content string, ip string, action string, params map[string]any, adminInfo *AuditAdminInfo, request ...*gin.Context) {
+	username, _ := GetUsernameById(logUserId, false)
+	other := AuditOther{
+		Op:        &AuditOperation{Action: action, Params: params},
+		AdminInfo: adminInfo,
+	}
+	var c *gin.Context
+	if len(request) > 0 {
+		c = request[0]
+	}
+	RecordAuditLog(c, AuditLog{UserId: logUserId, Username: username, ActorRole: actorRole, Category: AuditCategoryRisk, Action: action, Content: content, Ip: ip, Status: 200, Success: true, Other: other})
+}
+
 func RecordTopupLog(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
 	username, _ := GetUsernameById(userId, false)
 	other := NewLogOther()

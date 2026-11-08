@@ -400,3 +400,110 @@ func (texts *sensitiveTextCollector) taskMetadata(value map[string]any) {
 		texts.task(value[key])
 	}
 }
+
+// SensitiveOutputTexts extracts only model output text (content/text) for the
+// output sensitive check. Reasoning and thinking are not checked; tool call
+// arguments count as output content, other structural fields do not.
+func SensitiveOutputTexts(response any) []string {
+	if response == nil {
+		return nil
+	}
+	var texts sensitiveTextCollector
+	switch r := response.(type) {
+	case *TextResponse:
+		for i := range r.Choices {
+			texts.outputMessage(&r.Choices[i].Message)
+		}
+	case *OpenAITextResponse:
+		for i := range r.Choices {
+			texts.outputMessage(&r.Choices[i].Message)
+		}
+	case *OpenAIResponsesResponse:
+		for i := range r.Output {
+			texts.outputBlock(sensitiveValue(r.Output[i]))
+		}
+	case *ClaudeResponse:
+		texts.outputClaude(r)
+	case *GeminiChatResponse:
+		for i := range r.Candidates {
+			for _, part := range r.Candidates[i].Content.Parts {
+				if !part.Thought {
+					texts.add(part.Text)
+				}
+				if call := part.FunctionCall; call != nil {
+					texts.payload(call.Arguments)
+				}
+			}
+		}
+	default:
+		texts.outputBlock(sensitiveValue(response))
+	}
+	return texts
+}
+
+func (texts *sensitiveTextCollector) outputMessage(message *Message) {
+	texts.outputBlock(sensitiveValue(message.Content))
+	for _, call := range message.ParseToolCalls() {
+		texts.payload(call.Function.Arguments)
+		texts.payload(message.FunctionCall)
+	}
+}
+
+func (texts *sensitiveTextCollector) outputClaude(r *ClaudeResponse) {
+	texts.add(r.Completion)
+	for i := range r.Content {
+		texts.outputClaudeBlock(&r.Content[i])
+	}
+	if r.Delta != nil {
+		texts.outputClaudeBlock(r.Delta)
+	}
+	if r.ContentBlock != nil {
+		texts.outputClaudeBlock(r.ContentBlock)
+	}
+}
+
+func (texts *sensitiveTextCollector) outputClaudeBlock(message *ClaudeMediaMessage) {
+	switch message.Type {
+	case "text":
+		if message.Text != nil {
+			texts.add(*message.Text)
+		}
+	case "tool_use":
+		texts.data(sensitiveValue(message.Input))
+	default:
+		if message.Text != nil {
+			texts.add(*message.Text)
+		}
+	}
+}
+
+// outputBlock traverses output content blocks; only text-bearing blocks and
+// tool call arguments are content. Reasoning, signatures and metadata are not.
+func (texts *sensitiveTextCollector) outputBlock(value any) {
+	switch v := value.(type) {
+	case string:
+		texts.add(v)
+	case []any:
+		for _, item := range v {
+			texts.outputBlock(item)
+		}
+	case map[string]any:
+		kind, _ := v["type"].(string)
+		switch kind {
+		case "text", "output_text", "summary_text":
+			texts.outputBlock(v["text"])
+		case "message", "":
+			texts.outputBlock(v["content"])
+		case "tool_use", "server_tool_use", "function_call", "custom_tool_call":
+			if args, ok := v["arguments"]; ok {
+				texts.payload(args)
+			}
+			if input, ok := v["input"]; ok {
+				texts.payload(input)
+			}
+			if args, ok := v["partial_json"]; ok {
+				texts.payload(args)
+			}
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -45,6 +46,13 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 
 	// 计算使用量（优先上游 UsageMetadata，缺失时本地估算并保留 Gemini 计费语义）
 	usage := buildUsageFromGeminiResponse(c, info, &geminiResponse)
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&geminiResponse), "\n")); apiErr != nil {
+		service.RecordSensitiveWordRejection(c, info, 1)
+		service.PostTextConsumeQuota(c, info, &usage, nil)
+		return &usage, apiErr
+	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 

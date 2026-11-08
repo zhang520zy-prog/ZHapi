@@ -58,19 +58,19 @@ func TestRiskAPIIsolationAndReviewPermissionsDatabaseMatrix(t *testing.T) {
 			if dialect == "sqlite" {
 				sqlDB.SetMaxOpenConns(1)
 			}
-			oldDB, oldMaster := model.DB, common.IsMasterNode
-			model.DB, common.IsMasterNode = db, true
+			oldDB, oldMaster, oldRedis := model.DB, common.IsMasterNode, common.RedisEnabled
+			model.DB, common.IsMasterNode, common.RedisEnabled = db, true, false
 			t.Cleanup(func() {
-				model.DB, common.IsMasterNode = oldDB, oldMaster
+				model.DB, common.IsMasterNode, common.RedisEnabled = oldDB, oldMaster, oldRedis
 				_ = db.Migrator().DropTable(&model.RiskEventChange{}, &model.RiskAppeal{}, &model.RiskEvent{}, &model.CasbinRule{}, &model.AuthzRole{})
 				_ = sqlDB.Close()
 			})
 			require.NoError(t, model.MigrateRiskEvents())
 			require.NoError(t, db.AutoMigrate(&model.CasbinRule{}, &model.AuthzRole{}))
 			require.NoError(t, authz.Init(db))
-			event, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 1, TokenID: 2, Model: "private-model", RequestID: "private-request", RuleID: "secret-rule", RuleVersion: "secret-version"})
+			event, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 1, TokenID: 2, Model: "private-model", RequestID: "private-request", RuleID: "secret-rule", RuleVersion: "secret-version", Action: "record", Stage: "input"})
 			require.NoError(t, err)
-			other, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 2, Model: "other-model"})
+			other, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 2, Model: "other-model", Action: "record", Stage: "input"})
 			require.NoError(t, err)
 			router := gin.New()
 			router.Use(func(c *gin.Context) {

@@ -252,7 +252,7 @@ func TestExecuteTaskSubmissionHonorsRouteRetainResult(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			events := make([]string, 0, 3)
-			database, _ := openTaskDialectDatabase(t, &model.Task{}, &model.User{}, &model.Channel{})
+			database, _ := openTaskDialectDatabase(t, &model.Task{}, &model.User{}, &model.Channel{}, &model.RiskUserState{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskWordCategory{})
 			previousDB := model.DB
 			model.DB = database
 			t.Cleanup(func() { model.DB = previousDB })
@@ -513,7 +513,7 @@ func openTaskDialectDatabase(t *testing.T, models ...any) (*gorm.DB, common.Data
 }
 
 func TestImmediateTaskSettlementDatabase(t *testing.T) {
-	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}, &model.RiskEvent{}, &model.RiskEventChange{})
+	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}, &model.RiskEvent{}, &model.RiskEventChange{}, &model.RiskUserState{}, &model.RiskWordCategory{})
 	oldDB, oldLogDB := model.DB, model.LOG_DB
 	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
 	oldRedis, oldMemory, oldBatch, oldConsume, oldExport := common.RedisEnabled, common.MemoryCacheEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.DataExportEnabled

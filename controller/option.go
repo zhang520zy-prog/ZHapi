@@ -39,6 +39,18 @@ func isPaymentComplianceOptionKey(key string) bool {
 	return strings.HasPrefix(key, "payment_setting.compliance_")
 }
 
+// isRiskOptionKey 风控相关键：敏感词开关与 risk_setting.*，更新时追加风控审计。
+func isRiskOptionKey(key string) bool {
+	if strings.HasPrefix(key, "risk_setting.") {
+		return true
+	}
+	switch key {
+	case "CheckSensitiveEnabled", "CheckSensitiveOnPromptEnabled", "CheckSensitiveOnCompletionEnabled":
+		return true
+	}
+	return false
+}
+
 // bumpCommissionTermsVersion 两份规则文本各自版本号（B1.8）：
 // 推广参数变更只升《推广返现规则》版本，分销参数变更只升《分销协议》版本，
 // 补充条款两边都升。
@@ -527,6 +539,7 @@ func UpdateOption(c *gin.Context) {
 		common.ApiSuccess(c, change)
 		return
 	}
+	oldValue := common.OptionMap[option.Key]
 	err = model.UpdateOption(option.Key, option.Value.(string))
 	if err != nil {
 		if errors.Is(err, system_setting.ErrPasskeyRPIDInvalid) {
@@ -543,6 +556,12 @@ func UpdateOption(c *gin.Context) {
 	recordManageAudit(c, "option.update", map[string]any{
 		"key": option.Key,
 	})
+	if isRiskOptionKey(option.Key) {
+		// 风控键值不是密钥，按 B2.6 记录旧值/新值。
+		recordRiskAudit(c, "risk.setting.update", map[string]any{
+			"key": option.Key, "old_value": oldValue, "new_value": option.Value.(string),
+		})
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

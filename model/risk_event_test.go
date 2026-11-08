@@ -64,7 +64,7 @@ func TestRiskEventLedgerDatabaseMatrix(t *testing.T) {
 			var kept User
 			require.NoError(t, db.First(&kept, owner.Id).Error)
 			assert.Equal(t, "unchanged", kept.Password)
-			event, err := RecordRiskEvent(RiskEventInput{UserID: owner.Id, TokenID: 3, Model: "test-model", RequestID: "request-one", RuleID: "word must not persist", RuleVersion: "version-one"})
+			event, err := RecordRiskEvent(RiskEventInput{UserID: owner.Id, TokenID: 3, Model: "test-model", RequestID: "request-one", Action: "record", Stage: "input", RuleID: "word must not persist", RuleVersion: "version-one"})
 			require.NoError(t, err)
 			assert.NotEmpty(t, event.EventID)
 			assert.Equal(t, "pending", event.ReviewStatus)
@@ -72,7 +72,7 @@ func TestRiskEventLedgerDatabaseMatrix(t *testing.T) {
 			assert.Len(t, event.RuleID, 64)
 			assert.Len(t, event.RuleVersion, 64)
 			assert.NotContains(t, event.RuleID, "word")
-			_, err = RecordRiskEvent(RiskEventInput{UserID: owner.Id + 1, Model: "other-model", RequestID: "request-two"})
+			_, err = RecordRiskEvent(RiskEventInput{UserID: owner.Id + 1, Model: "other-model", RequestID: "request-two", Action: "record", Stage: "input"})
 			require.NoError(t, err)
 			rows, total, err := ListRiskEvents(RiskEventFilter{UserID: owner.Id, Model: "test-model", Status: "pending", RequestID: "request-one", StartTimestamp: event.CreatedAt, EndTimestamp: event.CreatedAt}, 0, 20)
 			require.NoError(t, err)

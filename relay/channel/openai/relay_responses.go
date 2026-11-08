@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -39,12 +40,19 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	info.ObserveResponseModel(responsesResponse.Model)
 	responseBody = rewriteSGLangResponsesCreatedAt(info, responseBody, "created_at", responsesResponse.CreatedAt)
 
-	// 写入新的 response body
-	service.IOCopyBytesGracefully(c, resp, responseBody)
-
 	// compute usage
 	usage := &dto.Usage{}
 	service.ApplyResponsesUsage(usage, responsesResponse.Usage)
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&responsesResponse), "\n")); apiErr != nil {
+		service.RecordSensitiveWordRejection(c, info, 1)
+		service.PostTextConsumeQuota(c, info, usage, nil)
+		return usage, apiErr
+	}
+
+	// 写入新的 response body
+	service.IOCopyBytesGracefully(c, resp, responseBody)
 	// Count actual tool invocations from Output (not tool declarations).
 	for _, output := range responsesResponse.Output {
 		switch output.Type {
@@ -90,6 +98,16 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		}
 		if streamResponse.Response != nil {
 			data = string(rewriteSGLangResponsesCreatedAt(info, []byte(data), "response.created_at", streamResponse.Response.CreatedAt))
+		}
+		// B2.2 流式输出检查：正文与工具参数增量在写给客户端前 Feed。
+		if streamResponse.Type == "response.output_text.delta" || streamResponse.Type == "response.function_call_arguments.delta" {
+			if category := service.FeedStreamGuard(c, streamResponse.Delta); category != nil {
+				blockErr := service.CheckSensitiveOutputHit(c, info, category)
+				service.RecordSensitiveWordRejection(c, info, 1)
+				helper.EmitSensitiveStreamEnd(c, info, blockErr)
+				sr.Stop(blockErr)
+				return
+			}
 		}
 		sendResponsesStreamData(c, streamResponse, data)
 		accumulator.Observe(&streamResponse)

@@ -19,13 +19,14 @@ import (
 	"gorm.io/gorm"
 )
 
-var commonGroupCol string
-var commonKeyCol string
-var commonTrueVal string
-var commonFalseVal string
+// 列名/布尔字面量默认值与非 PG 方言一致；InitDB 里的 initCol 按实际方言覆盖。
+var commonGroupCol = "`group`"
+var commonKeyCol = "`key`"
+var commonTrueVal = "1"
+var commonFalseVal = "0"
 
-var logKeyCol string
-var logGroupCol string
+var logKeyCol = "`key`"
+var logGroupCol = "`group`"
 
 // jsonScanBytes 归一化 json 列的驱动返回值:不同驱动/协议模式下同一列可能
 // 以 []byte 或 string 返回,静默丢弃 string 会导致字段被清零而不报错。
@@ -373,6 +374,8 @@ func migrateDB() error {
 		&RiskEvent{},
 		&RiskAppeal{},
 		&RiskEventChange{},
+		&RiskWordCategory{},
+		&RiskUserState{},
 		&PaymentEvent{},
 		&PaymentEventAction{},
 		&PaymentReceipt{},
@@ -390,6 +393,9 @@ func migrateDB() error {
 		&UserNotification{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := migrateLegacySensitiveWords(); err != nil {
 		return err
 	}
 	if _, err := backfillInviteAttributions(); err != nil {

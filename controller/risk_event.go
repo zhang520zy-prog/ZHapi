@@ -163,5 +163,8 @@ func ReviewRiskEvent(c *gin.Context) {
 		riskError(c, err)
 		return
 	}
+	recordRiskAudit(c, "risk.event.review", map[string]any{
+		"event_id": event.EventID, "status": event.ReviewStatus, "reason": request.Reason,
+	})
 	common.ApiSuccess(c, event.SafeDTO())
 }

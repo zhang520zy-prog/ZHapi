@@ -107,6 +107,14 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 	if claudeResponse.Type == "message_stop" {
 		info.StreamStatus.MarkCompleted()
 	}
+	if delta := claudeStreamDeltaText(&claudeResponse); delta != "" {
+		if category := service.FeedStreamGuard(c, delta); category != nil {
+			blockErr := service.CheckSensitiveOutputHit(c, info, category)
+			service.RecordSensitiveWordRejection(c, info, 1)
+			helper.EmitSensitiveStreamEnd(c, info, blockErr)
+			return blockErr
+		}
+	}
 	if info.RelayFormat == types.RelayFormatClaude {
 		FormatClaudeResponseInfo(&claudeResponse, nil, claudeInfo)
 
@@ -165,6 +173,28 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		}
 	}
 	return nil
+}
+
+// claudeStreamDeltaText 提取本 chunk 的输出增量文本：正文 delta、
+// content_block_start 的初始文本和工具参数 partial_json（属输出内容）。
+// thinking/signature 不算文字内容，不检查。
+func claudeStreamDeltaText(claudeResponse *dto.ClaudeResponse) string {
+	if claudeResponse == nil {
+		return ""
+	}
+	var delta strings.Builder
+	if claudeResponse.ContentBlock != nil && claudeResponse.ContentBlock.Text != nil {
+		delta.WriteString(*claudeResponse.ContentBlock.Text)
+	}
+	if claudeResponse.Delta != nil {
+		if claudeResponse.Delta.Text != nil {
+			delta.WriteString(*claudeResponse.Delta.Text)
+		}
+		if claudeResponse.Delta.PartialJson != nil {
+			delta.WriteString(*claudeResponse.Delta.PartialJson)
+		}
+	}
+	return delta.String()
 }
 
 func claudeToChatStreamState(info *relaycommon.RelayInfo) (*relayconvert.ClaudeToChatStreamState, error) {
@@ -308,6 +338,11 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	})
 	info.StreamStatus.RequireTerminal()
 	if err != nil {
+		// 输出命中产生的 422：上游已产生费用，补齐 usage 后正常结算。
+		if err.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected {
+			HandleStreamFinalResponse(c, info, claudeInfo)
+			service.PostTextConsumeQuota(c, info, claudeInfo.Usage, nil)
+		}
 		return nil, err
 	}
 
@@ -395,6 +430,13 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		if block.Type == "tool_use" {
 			info.CountBillableToolCall(dto.BuildInCallToolUse, block.Name)
 		}
+	}
+
+	// B2.2 非流式输出检查：命中不写回原回复；已产生用量正常结算。
+	if apiErr := service.CheckSensitiveOutput(c, info, strings.Join(dto.SensitiveOutputTexts(&claudeResponse), "\n")); apiErr != nil {
+		service.RecordSensitiveWordRejection(c, info, 1)
+		service.PostTextConsumeQuota(c, info, claudeInfo.Usage, nil)
+		return apiErr
 	}
 
 	service.IOCopyBytesGracefully(c, httpResp, responseData)

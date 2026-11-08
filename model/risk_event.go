@@ -37,11 +37,19 @@ type RiskEvent struct {
 	ReviewReason     string `json:"review_reason" gorm:"type:text"`
 	Version          int    `json:"version"`
 	RestrictionUntil int64  `json:"restriction_until" gorm:"type:bigint;index"`
+	Stage            string `json:"stage" gorm:"type:varchar(16);not null;default:''"`
+	Level            int    `json:"level" gorm:"not null;default:0"`
 }
 
+// RiskEventInput 只带分类与处置信息，绝不带命中的词或请求原文。
+// Category 为类别 Key；Action 为 record/block/restrict/disable；
+// Stage 为 input/output；Level 为命中后用户所在阶梯级别。
 type RiskEventInput struct {
 	UserID, TokenID                       int
 	Model, RequestID, RuleID, RuleVersion string
+	Category, Action, Stage               string
+	Level                                 int
+	RestrictionUntil                      int64
 }
 
 type RiskEventDTO struct {
@@ -55,10 +63,12 @@ type RiskEventDTO struct {
 	ReviewedAt       int64  `json:"reviewed_at"`
 	Version          int    `json:"version"`
 	RestrictionUntil int64  `json:"restriction_until"`
+	Stage            string `json:"stage"`
+	Level            int    `json:"level"`
 }
 
 func (event RiskEvent) SafeDTO() RiskEventDTO {
-	return RiskEventDTO{EventID: event.EventID, Model: event.Model, RequestID: event.RequestID, Category: event.Category, Action: event.Action, CreatedAt: event.CreatedAt, ReviewStatus: event.ReviewStatus, ReviewedAt: event.ReviewedAt, Version: event.Version, RestrictionUntil: event.RestrictionUntil}
+	return RiskEventDTO{EventID: event.EventID, Model: event.Model, RequestID: event.RequestID, Category: event.Category, Action: event.Action, CreatedAt: event.CreatedAt, ReviewStatus: event.ReviewStatus, ReviewedAt: event.ReviewedAt, Version: event.Version, RestrictionUntil: event.RestrictionUntil, Stage: event.Stage, Level: event.Level}
 }
 
 type RiskAppeal struct {
@@ -105,30 +115,72 @@ type RiskEventChange struct {
 }
 
 func MigrateRiskEvents() error {
-	return DB.AutoMigrate(&RiskEvent{}, &RiskAppeal{}, &RiskEventChange{})
+	return DB.AutoMigrate(&RiskEvent{}, &RiskAppeal{}, &RiskEventChange{}, &RiskWordCategory{}, &RiskUserState{})
 }
 
-func RecordRiskEvent(input RiskEventInput) (*RiskEvent, error) {
-	if input.UserID <= 0 || input.TokenID < 0 || utf8.RuneCountInString(input.Model) > 200 || len(input.RequestID) > 64 {
+var validRiskEventActions = map[string]bool{
+	"record": true, "block": true, "restrict": true, "disable": true,
+}
+
+func recordRiskEventTx(tx *gorm.DB, input RiskEventInput) (*RiskEvent, error) {
+	if input.UserID <= 0 || input.TokenID < 0 || utf8.RuneCountInString(input.Model) > 200 || len(input.RequestID) > 64 ||
+		utf8.RuneCountInString(input.Category) > 32 || !validRiskEventActions[input.Action] ||
+		(input.Stage != "input" && input.Stage != "output") || input.Level < 0 || input.Level > RiskMaxLevel {
 		return nil, ErrRiskInvalid
 	}
 	if input.RequestID == "" {
 		input.RequestID = common.NewRequestId()
 	}
-	event := &RiskEvent{EventID: common.NewRequestId(), UserID: input.UserID, TokenID: input.TokenID, Model: input.Model, RequestID: input.RequestID, Category: "sensitive_keyword", Action: "block", CreatedAt: common.GetTimestamp(), ReviewStatus: "pending", Version: 1}
+	event := &RiskEvent{EventID: common.NewRequestId(), UserID: input.UserID, TokenID: input.TokenID, Model: input.Model, RequestID: input.RequestID, Category: input.Category, Action: input.Action, CreatedAt: common.GetTimestamp(), ReviewStatus: "pending", Version: 1, Stage: input.Stage, Level: input.Level, RestrictionUntil: input.RestrictionUntil}
 	if input.RuleID != "" {
 		event.RuleID = fmt.Sprintf("%x", sha256.Sum256([]byte(input.RuleID)))
 	}
 	if input.RuleVersion != "" {
 		event.RuleVersion = fmt.Sprintf("%x", sha256.Sum256([]byte(input.RuleVersion)))
 	}
+	if err := tx.Create(event).Error; err != nil {
+		return nil, err
+	}
+	return event, tx.Create(&RiskEventChange{EventID: event.EventID, Action: "record", Status: "pending", Reason: "sensitive keyword request blocked", CreatedAt: event.CreatedAt, EventVersion: 1}).Error
+}
+
+// RecordRiskEvent 记录一次只写档的命中（record 类别），不计入阶梯。
+func RecordRiskEvent(input RiskEventInput) (*RiskEvent, error) {
+	var event *RiskEvent
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(event).Error; err != nil {
-			return err
-		}
-		return tx.Create(&RiskEventChange{EventID: event.EventID, Action: "record", Status: "pending", Reason: "sensitive keyword request blocked", CreatedAt: event.CreatedAt, EventVersion: 1}).Error
+		var err error
+		event, err = recordRiskEventTx(tx, input)
+		return err
 	})
 	return event, err
+}
+
+// RecordRiskHit 对 block/block_restrict 命中计数并推进阶梯，在同一事务里
+// 写风险事件：升级时事件 Action 为 restrict/disable，否则为 block。
+// 返回事件、阶梯结果（升级、解除时间、停用、是否需通知管理员）。
+func RecordRiskHit(input RiskEventInput, immediate bool) (*RiskEvent, *RiskHitResult, error) {
+	var event *RiskEvent
+	var result *RiskHitResult
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = ApplyRiskHit(tx, input.UserID, common.GetTimestamp(), immediate)
+		if err != nil {
+			return err
+		}
+		input.Level = result.Level
+		input.RestrictionUntil = result.RestrictedUntil
+		switch {
+		case result.Disabled:
+			input.Action = "disable"
+		case result.Escalated:
+			input.Action = "restrict"
+		default:
+			input.Action = "block"
+		}
+		event, err = recordRiskEventTx(tx, input)
+		return err
+	})
+	return event, result, err
 }
 
 type RiskEventFilter struct {
@@ -267,19 +319,35 @@ func ReviewRiskEvent(input RiskReviewInput) (*RiskEvent, error) {
 	return &event, err
 }
 
-// RiskRestrictionUntil enforces only confirmed, unexpired decisions. It does
-// not mutate account status, so expiry/false-positive review cannot reactivate
-// an account that was independently disabled by an administrator.
+// RiskRestrictionUntil 取自动阶梯与人工确认事件两处限制的最大值。
+// It does not mutate account status, so expiry/false-positive review cannot
+// reactivate an account that was independently disabled by an administrator.
 func RiskRestrictionUntil(userID int, now int64) (int64, error) {
 	if userID <= 0 || now < 0 {
 		return 0, ErrRiskInvalid
 	}
-	var events []RiskEvent
-	err := DB.Select("restriction_until").Where("user_id = ? AND review_status = ? AND restriction_until > ?", userID, "confirmed", now).Order("restriction_until DESC").Limit(1).Find(&events).Error
-	if err != nil || len(events) == 0 {
+	// 未接库的环境（单测）按未受限处理。
+	if DB == nil {
+		return 0, nil
+	}
+	var until int64
+	var state RiskUserState
+	err := DB.Select("restricted_until").Where("user_id = ? AND restricted_until > ?", userID, now).Take(&state).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, err
 	}
-	return events[0].RestrictionUntil, nil
+	if state.RestrictedUntil > now {
+		until = state.RestrictedUntil
+	}
+	var events []RiskEvent
+	err = DB.Select("restriction_until").Where("user_id = ? AND review_status = ? AND restriction_until > ?", userID, "confirmed", now).Order("restriction_until DESC").Limit(1).Find(&events).Error
+	if err != nil {
+		return 0, err
+	}
+	if len(events) > 0 && events[0].RestrictionUntil > until {
+		until = events[0].RestrictionUntil
+	}
+	return until, nil
 }
 
 func ListRiskEventChanges(eventID string) ([]RiskEventChange, error) {
