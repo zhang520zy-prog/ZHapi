@@ -187,6 +187,58 @@ afterEach(() => {
 })
 
 describe('request policy settings', () => {
+  it.each(['Enable filtering', 'Inspect user prompts'])(
+    'rule preview stops claiming a block when %s is disabled',
+    async (label) => {
+      await renderPolicies('/system-settings/request-policies/filtering')
+      fireEvent.change(
+        await screen.findByRole('textbox', { name: 'Rule test input' }),
+        {
+          target: { value: 'BLOCKED text' },
+        }
+      )
+      expect(
+        screen.getByText(/current rule\(s\) would block this request/)
+      ).toBeVisible()
+      await userEvent.click(screen.getByRole('switch', { name: label }))
+      expect(
+        screen.queryByText(/current rule\(s\) would block this request/)
+      ).not.toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Prompt text filtering is disabled in the current form values. This text would not be blocked by this filter.'
+        )
+      ).toBeVisible()
+      expect(api.patch).not.toHaveBeenCalled()
+      expect(api.put).not.toHaveBeenCalled()
+    }
+  )
+
+  it('rule preview updates from unsaved keywords without a server request', async () => {
+    await renderPolicies('/system-settings/request-policies/filtering')
+    const input = await screen.findByRole('textbox', {
+      name: 'Rule test input',
+    })
+    const requestsBefore = vi.mocked(api.get).mock.calls.length
+    fireEvent.change(input, { target: { value: 'Harmless sample' } })
+    expect(screen.getByText('No current rule matches this text.')).toBeVisible()
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Blocked keywords' }),
+      {
+        target: { value: 'SAMPLE' },
+      }
+    )
+    expect(
+      screen.getByText(/current rule\(s\) would block this request/)
+    ).toBeVisible()
+    expect(api.get).toHaveBeenCalledTimes(requestsBefore)
+    expect(api.patch).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: '' } })
+    expect(
+      screen.queryByText(/current rule\(s\) would block this request/)
+    ).not.toBeInTheDocument()
+  })
+
   it.each([
     ['retry', 'Save Changes'],
     ['health', 'Save Changes'],

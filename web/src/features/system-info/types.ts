@@ -18,6 +18,22 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export type SystemInstanceStatus = 'online' | 'stale'
 
+export type DatabaseHealthResponse = {
+  success: boolean
+  message: string
+  data?: {
+    main_healthy: boolean
+    log_healthy: boolean
+    independent_log: boolean
+    main_engine: string
+    log_engine: string
+    recovery_healthy: boolean
+    audit_pending: number
+    audit_needs_review: number
+    audit_write_failures: number
+  }
+}
+
 export type SystemInstanceInfo = {
   schema_version?: number
   node?: {

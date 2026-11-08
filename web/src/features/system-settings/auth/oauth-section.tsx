@@ -66,6 +66,9 @@ const oauthSchema = z.object({
   GitHubOAuthEnabled: z.boolean(),
   GitHubClientId: z.string(),
   GitHubClientSecret: z.string(),
+  GoogleOAuthEnabled: z.boolean(),
+  GoogleClientId: z.string(),
+  GoogleClientSecret: z.string(),
   discord: z.object({
     enabled: z.boolean(),
     client_id: z.string(),
@@ -99,6 +102,9 @@ type FlatOAuthDefaults = {
   GitHubOAuthEnabled: boolean
   GitHubClientId: string
   GitHubClientSecret: string
+  GoogleOAuthEnabled: boolean
+  GoogleClientId: string
+  GoogleClientSecret: string
   'discord.enabled': boolean
   'discord.client_id': string
   'discord.client_secret': string
@@ -179,6 +185,9 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   GitHubOAuthEnabled: defaults.GitHubOAuthEnabled,
   GitHubClientId: defaults.GitHubClientId ?? '',
   GitHubClientSecret: defaults.GitHubClientSecret ?? '',
+  GoogleOAuthEnabled: defaults.GoogleOAuthEnabled,
+  GoogleClientId: defaults.GoogleClientId ?? '',
+  GoogleClientSecret: defaults.GoogleClientSecret ?? '',
   discord: {
     enabled: defaults['discord.enabled'],
     client_id: defaults['discord.client_id'] ?? '',
@@ -213,6 +222,9 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   GitHubOAuthEnabled: values.GitHubOAuthEnabled,
   GitHubClientId: values.GitHubClientId,
   GitHubClientSecret: values.GitHubClientSecret,
+  GoogleOAuthEnabled: values.GoogleOAuthEnabled,
+  GoogleClientId: values.GoogleClientId,
+  GoogleClientSecret: values.GoogleClientSecret,
   'discord.enabled': values.discord.enabled,
   'discord.client_id': values.discord.client_id,
   'discord.client_secret': values.discord.client_secret,
@@ -250,6 +262,11 @@ export function OAuthSection(props: OAuthSectionProps) {
   const githubCallbackUrl = buildOAuthCallbackUrl(
     props.serverAddress,
     'github',
+    t('Site URL')
+  )
+  const googleCallbackUrl = buildOAuthCallbackUrl(
+    props.serverAddress,
+    'google',
     t('Site URL')
   )
   const discordCallbackUrl = buildOAuthCallbackUrl(
@@ -394,8 +411,9 @@ export function OAuthSection(props: OAuthSectionProps) {
             <FormDirtyIndicator isDirty={form.formState.isDirty} />
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className='grid w-full grid-cols-6'>
+              <TabsList className='grid w-full grid-cols-7'>
                 <TabsTrigger value='github'>{t('GitHub')}</TabsTrigger>
+                <TabsTrigger value='google'>{t('Google')}</TabsTrigger>
                 <TabsTrigger value='discord'>{t('Discord')}</TabsTrigger>
                 <TabsTrigger value='oidc'>{t('OIDC')}</TabsTrigger>
                 <TabsTrigger value='telegram'>{t('Telegram')}</TabsTrigger>
@@ -478,6 +496,97 @@ export function OAuthSection(props: OAuthSectionProps) {
                         <Input
                           type='password'
                           placeholder={t('Your GitHub OAuth Client Secret')}
+                          autoComplete='new-password'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              <TabsContent value='google' className={oauthTabContentClassName}>
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={t(
+                    'Set these values in the provider application before enabling login.'
+                  )}
+                  rows={[
+                    {
+                      label: t('Homepage URL'),
+                      value: siteUrl,
+                      copyLabel: t('Copy homepage URL'),
+                    },
+                    {
+                      label: t('Authorized redirect URI'),
+                      value: googleCallbackUrl,
+                      copyLabel: t('Copy callback URL'),
+                    },
+                  ]}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='GoogleOAuthEnabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Enable Google OAuth')}</FormLabel>
+                        <FormDescription>
+                          {t('Allow users to sign in with Google')}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='GoogleClientId'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Client ID')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t('Your Google OAuth Client ID')}
+                          autoComplete='off'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='GoogleClientSecret'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Client Secret')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='password'
+                          placeholder={t('Your Google OAuth Client Secret')}
                           autoComplete='new-password'
                           value={field.value ?? ''}
                           onChange={(event) =>

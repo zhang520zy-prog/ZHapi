@@ -525,3 +525,23 @@ it('keeps mobile quota readable and opens complete model and IP restrictions by 
   expect(within(details).getByText('192.0.2.1')).toBeVisible()
   expect(within(details).getByText('2001:db8::1')).toBeVisible()
 })
+
+it('does not offer chat clients from cached presets in the API key menu', async () => {
+  localStorage.setItem(
+    'status',
+    JSON.stringify({
+      chats: '[{"Legacy chat":"https://example.com/chat?key={key}"}]',
+    })
+  )
+  await renderKeysPage()
+  await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+  expect(
+    await screen.findByRole('menuitem', { name: 'Copy Key' })
+  ).toBeVisible()
+  expect(
+    screen.getByRole('menuitem', { name: 'Copy Connection Info' })
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('menuitem', { name: /^Chat$/ })
+  ).not.toBeInTheDocument()
+})

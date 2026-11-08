@@ -89,6 +89,8 @@ export type PricingModel = {
   billing_usage_examples?: BillingUsageExample[]
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
+  /** Limits explicitly supplied by the deployment catalog. */
+  rate_limits?: PricingRateLimit[]
   /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.
@@ -120,6 +122,13 @@ export type ModelCapability =
   | 'code_interpreter'
   | 'caching'
   | 'embeddings'
+
+export type PricingRateLimit = {
+  group: string
+  rpm?: number | null
+  tpm?: number | null
+  rpd?: number | null
+}
 
 export type PricingData = {
   success: boolean

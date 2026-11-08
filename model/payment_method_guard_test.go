@@ -353,3 +353,19 @@ func TestRechargeEpayEnforcesFinalWalletQuotaLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestManualCreemCompletionUsesQuotaUnitsAndDoesNotReplayCredit(t *testing.T) {
+	truncateTables(t)
+	useUserCacheMiniRedis(t)
+	user := insertUserForPaymentGuardTest(t, 507, 7)
+	require.NoError(t, populateUserCache(*user))
+	order := createEpayTestOrder(t, user.Id, "CREEMMANUALONCE", PaymentProviderCreem, common.TopUpStatusPending)
+	order.Amount = 250000
+	require.NoError(t, DB.Save(&order).Error)
+	require.NoError(t, ManualCompleteTopUp(order.TradeNo, "127.0.0.1"))
+	assert.Equal(t, 250007, getUserQuotaForPaymentGuardTest(t, user.Id))
+	require.NoError(t, ManualCompleteTopUp(order.TradeNo, "127.0.0.1"))
+	cached, err := cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, 250007, cached.Quota)
+}

@@ -25,6 +25,8 @@ export function policyLabel(t: TFunction, value: string): string {
       return t('Fixed channel constraint')
     case 'local_rejection':
       return t('Request rejected locally')
+    case 'sensitive_keyword':
+      return t('Blocked by a sensitive keyword rule')
     case 'non_retryable_error':
     case 'system_retry_exclusion':
       return t('System retry exclusion')

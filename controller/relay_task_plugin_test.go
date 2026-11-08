@@ -18,6 +18,7 @@ import (
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relay"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	kittypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -433,7 +434,7 @@ func TestExecuteTaskSubmissionDisconnectAfterDurableInsertDoesNotRefund(t *testi
 func setupTaskSubmissionDatabase(t *testing.T, migrate bool, events *[]string) *gorm.DB {
 	t.Helper()
 	previousDB := model.DB
-	var models []any
+	models := []any{&model.RiskEvent{}, &model.RiskEventChange{}}
 	if migrate {
 		models = append(models, &model.Task{})
 	}
@@ -512,7 +513,7 @@ func openTaskDialectDatabase(t *testing.T, models ...any) (*gorm.DB, common.Data
 }
 
 func TestImmediateTaskSettlementDatabase(t *testing.T) {
-	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{})
+	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}, &model.RiskEvent{}, &model.RiskEventChange{})
 	oldDB, oldLogDB := model.DB, model.LOG_DB
 	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
 	oldRedis, oldMemory, oldBatch, oldConsume, oldExport := common.RedisEnabled, common.MemoryCacheEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.DataExportEnabled
@@ -623,6 +624,23 @@ export function buildQueryRequest(){throw new Error("completed submissions must 
 func TestAcceptedSubmitStreamNeverRetries(t *testing.T) {
 	c := taskSubmissionTestContext()
 	assert.Equal(t, service.PolicyDecision{Action: "stop", Reason: "task_accepted", Source: "system"}, decideTaskRetry(c, &dto.TaskError{StatusCode: 502, LocalError: true, NoRetry: true}, 3))
+}
+
+func TestSensitiveTaskRejectionRetainsLocalPolicyReason(t *testing.T) {
+	c := taskSubmissionTestContext()
+	taskErr := &dto.TaskError{Code: string(kittypes.ErrorCodeSensitiveWordsDetected), Message: "request blocked by content policy", StatusCode: http.StatusUnprocessableEntity, LocalError: true}
+	apiErr := taskSubmissionAPIError(taskErr)
+	assert.Equal(t, kittypes.ErrorCodeSensitiveWordsDetected, apiErr.GetErrorCode())
+	assert.Equal(t, kittypes.ErrorTypeNewAPIError, apiErr.GetErrorType())
+	assert.True(t, kittypes.IsSkipRetryError(apiErr))
+	assert.False(t, kittypes.IsRecordErrorLog(apiErr))
+	decision := decideTaskRetry(c, taskErr, 3)
+	assert.Equal(t, service.PolicyDecision{Action: "stop", Reason: "sensitive_keyword", Source: "local"}, decision)
+	service.RecordPolicyFailure(c, 1, apiErr, decision)
+	events := service.RequestPolicy(c).Events()
+	require.Len(t, events, 2)
+	assert.Equal(t, "local", events[0].ErrorSource)
+	assert.Equal(t, "unchanged", events[1].Health)
 }
 
 // Local task rejections carry a message but no cause; the response and the

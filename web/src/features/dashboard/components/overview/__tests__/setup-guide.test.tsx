@@ -127,6 +127,27 @@ describe('overview setup guide', () => {
     expect(panel).not.toBeVisible()
   })
 
+  it('offers client verification through usage logs instead of the playground', async () => {
+    window.localStorage.setItem(storageKey, 'expanded')
+    await renderOverview()
+    const link = await screen.findByRole('link', { name: /Verify requests/ })
+    expect(link).toHaveAttribute('href', '/usage-logs')
+    expect(
+      screen.queryByRole('link', { name: /Playground/ })
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps the request preview keyboard-focusable and horizontally scrollable', async () => {
+    window.localStorage.setItem(storageKey, 'expanded')
+    await renderOverview()
+    const preview = await screen.findByRole('region', {
+      name: 'First API request',
+    })
+    expect(preview).toHaveAttribute('tabindex', '0')
+    expect(preview).toHaveClass('overflow-x-auto')
+    expect(preview).toHaveTextContent('Authorization: Bearer')
+  })
+
   it('toggles the completed guide with the keyboard and restores focus after hiding it', async () => {
     const user = userEvent.setup()
     await renderOverview()

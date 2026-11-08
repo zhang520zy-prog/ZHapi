@@ -20,10 +20,18 @@ import type { SystemTaskFilters } from '@/features/system-settings/types'
 import { api } from '@/lib/api'
 
 import type {
+  DatabaseHealthResponse,
   SystemInstanceDeleteResponse,
   SystemInstanceListResponse,
   SystemTaskHistoryDeleteResponse,
 } from './types'
+
+export async function getDatabaseHealth(): Promise<DatabaseHealthResponse> {
+  const res = await api.get<DatabaseHealthResponse>(
+    '/api/system-info/database-health'
+  )
+  return res.data
+}
 
 export async function listSystemInstances() {
   const res = await api.get<SystemInstanceListResponse>(

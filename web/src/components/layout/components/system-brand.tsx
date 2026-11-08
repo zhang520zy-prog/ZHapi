@@ -51,7 +51,7 @@ export function SystemBrand(props: SystemBrandProps) {
   const { logo } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const name = status?.system_name || props.defaultName || 'ZH Api'
   const version =
     status?.version || props.defaultVersion || t('Unknown version')
 
@@ -72,7 +72,9 @@ export function SystemBrand(props: SystemBrandProps) {
             className='size-full rounded-md object-cover'
           />
         </div>
-        <span className='max-w-[12rem] truncate'>{name}</span>
+        <span data-slot='app-brand-name' className='max-w-[12rem] truncate'>
+          {name}
+        </span>
       </Link>
     )
   }

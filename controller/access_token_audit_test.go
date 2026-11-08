@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,208 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
+
+func TestRiskAPIIsolationAndReviewPermissionsDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(":memory:")
+			case "mysql":
+				if os.Getenv("TEST_MYSQL_DSN") == "" {
+					t.Skip("TEST_MYSQL_DSN not configured")
+				}
+				driver = mysql.Open(os.Getenv("TEST_MYSQL_DSN"))
+			case "postgres":
+				if os.Getenv("TEST_POSTGRES_DSN") == "" {
+					t.Skip("TEST_POSTGRES_DSN not configured")
+				}
+				driver = postgres.Open(os.Getenv("TEST_POSTGRES_DSN"))
+			}
+			db, err := gorm.Open(driver, &gorm.Config{NamingStrategy: schema.NamingStrategy{TablePrefix: fmt.Sprintf("risk_api_%d_", time.Now().UnixNano())}, Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			if dialect == "sqlite" {
+				sqlDB.SetMaxOpenConns(1)
+			}
+			oldDB, oldMaster := model.DB, common.IsMasterNode
+			model.DB, common.IsMasterNode = db, true
+			t.Cleanup(func() {
+				model.DB, common.IsMasterNode = oldDB, oldMaster
+				_ = db.Migrator().DropTable(&model.RiskEventChange{}, &model.RiskAppeal{}, &model.RiskEvent{}, &model.CasbinRule{}, &model.AuthzRole{})
+				_ = sqlDB.Close()
+			})
+			require.NoError(t, model.MigrateRiskEvents())
+			require.NoError(t, db.AutoMigrate(&model.CasbinRule{}, &model.AuthzRole{}))
+			require.NoError(t, authz.Init(db))
+			event, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 1, TokenID: 2, Model: "private-model", RequestID: "private-request", RuleID: "secret-rule", RuleVersion: "secret-version"})
+			require.NoError(t, err)
+			other, err := model.RecordRiskEvent(model.RiskEventInput{UserID: 2, Model: "other-model"})
+			require.NoError(t, err)
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				id, _ := strconv.Atoi(c.GetHeader("X-Test-User"))
+				role, _ := strconv.Atoi(c.GetHeader("X-Test-Role"))
+				c.Set("id", id)
+				c.Set("role", role)
+			})
+			router.GET("/risk/self", GetRiskEventsSelf)
+			router.GET("/risk/self/:event_id", GetRiskEventSelfDetail)
+			router.POST("/risk/self/:event_id/appeals", SubmitRiskEventAppeal)
+			router.GET("/risk", middleware.RequirePermission(authz.RiskRead), GetRiskEvents)
+			router.GET("/risk/:event_id", middleware.RequirePermission(authz.RiskRead), GetRiskEventDetail)
+			router.POST("/risk/:event_id/review", middleware.RequirePermission(authz.RiskReview), ReviewRiskEvent)
+			request := func(method, path, body string, id, role int) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(method, path, strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("X-Test-User", strconv.Itoa(id))
+				req.Header.Set("X-Test-Role", strconv.Itoa(role))
+				out := httptest.NewRecorder()
+				router.ServeHTTP(out, req)
+				return out
+			}
+			out := request("GET", "/risk/self?user_id=2", "", 1, common.RoleCommonUser)
+			require.Equal(t, 200, out.Code)
+			assert.Contains(t, out.Body.String(), event.EventID)
+			assert.NotContains(t, out.Body.String(), other.EventID)
+			for _, secret := range []string{"rule_id", "rule_version", "review_reason", "reviewer_id", "token_id"} {
+				assert.NotContains(t, out.Body.String(), secret)
+			}
+			assert.Equal(t, 404, request("GET", "/risk/self/"+other.EventID, "", 1, common.RoleCommonUser).Code)
+			assert.Equal(t, 404, request("POST", "/risk/self/"+other.EventID+"/appeals", `{"reason":"appeal"}`, 1, common.RoleCommonUser).Code)
+			assert.Equal(t, 403, request("GET", "/risk", "", 9, common.RoleAdminUser).Code)
+			assert.Equal(t, 403, request("POST", "/risk/"+event.EventID+"/review", `{"expected_version":1,"status":"confirmed","reason":"checked"}`, 9, common.RoleAdminUser).Code)
+			require.NoError(t, authz.SetUserPermissions(9, authz.PermissionsMap{authz.ResourceRisk: {"read": true}}))
+			assert.Equal(t, 200, request("GET", "/risk?user_id=2", "", 9, common.RoleAdminUser).Code)
+			assert.Equal(t, 403, request("POST", "/risk/"+event.EventID+"/review", `{"expected_version":1,"status":"confirmed","reason":"checked"}`, 9, common.RoleAdminUser).Code)
+			require.NoError(t, authz.SetUserPermissions(9, authz.PermissionsMap{authz.ResourceRisk: {"read": true, "review": true}}))
+			out = request("POST", "/risk/self/"+event.EventID+"/appeals", `{"reason":"first appeal","user_id":2}`, 1, common.RoleCommonUser)
+			require.Equal(t, 200, out.Code)
+			appeals, err := model.ListRiskAppeals(event.EventID, 1)
+			require.NoError(t, err)
+			require.Len(t, appeals, 1)
+			assert.Equal(t, 1, appeals[0].UserID)
+			body := fmt.Sprintf(`{"expected_version":1,"status":"false_positive","reason":"internal-private-note","appeal_id":%d,"expected_appeal_version":1,"reviewer_id":666,"reviewed_at":1}`, appeals[0].ID)
+			require.Equal(t, 200, request("POST", "/risk/"+event.EventID+"/review", body, 9, common.RoleAdminUser).Code)
+			current, err := model.GetRiskEvent(event.EventID, 1)
+			require.NoError(t, err)
+			assert.Equal(t, 9, current.ReviewerID)
+			assert.Greater(t, current.ReviewedAt, int64(1))
+			assert.Equal(t, 409, request("POST", "/risk/"+event.EventID+"/review", body, 9, common.RoleAdminUser).Code)
+			out = request("GET", "/risk/self/"+event.EventID, "", 1, common.RoleCommonUser)
+			require.Equal(t, 200, out.Code)
+			assert.NotContains(t, out.Body.String(), "internal-private-note")
+			assert.NotContains(t, out.Body.String(), "changes")
+			assert.Equal(t, 200, request("GET", "/risk", "", 10, common.RoleRootUser).Code)
+			assert.Equal(t, 400, request("GET", "/risk/self?start_timestamp=bad", "", 1, common.RoleCommonUser).Code)
+			assert.Equal(t, 400, request("GET", "/risk/self?p=999999999999", "", 1, common.RoleCommonUser).Code)
+			require.NoError(t, db.Migrator().DropTable(&model.RiskEvent{}))
+			out = request("GET", "/risk/self", "", 1, common.RoleCommonUser)
+			assert.Equal(t, 500, out.Code)
+			assert.NotContains(t, out.Body.String(), "risk_api_")
+			assert.Contains(t, out.Body.String(), "Risk operation unavailable")
+		})
+	}
+}
+
+func TestAuditWriteFailurePersistsSafeRecoveryRecordDatabaseMatrix(t *testing.T) {
+	for _, kind := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(kind, func(t *testing.T) {
+			dsn := os.Getenv("TEST_" + strings.ToUpper(kind) + "_DSN")
+			if kind != "sqlite" && dsn == "" {
+				t.Skip("isolated database DSN not configured")
+			}
+			mainDB, _ := newAuditTestDatabase(t, kind, dsn)
+			logDB, _ := newAuditTestDatabase(t, kind, dsn)
+			oldDB, oldLog := model.DB, model.LOG_DB
+			oldRedis := common.RedisEnabled
+			common.RedisEnabled = false
+			oldMainType, oldLogType := common.MainDatabaseType(), common.LogDatabaseType()
+			model.DB, model.LOG_DB = mainDB, logDB
+			databaseType := common.DatabaseType(kind)
+			if kind == "postgres" {
+				databaseType = common.DatabaseTypePostgreSQL
+			}
+			common.SetDatabaseTypes(databaseType, databaseType)
+			t.Cleanup(func() {
+				model.DB, model.LOG_DB = oldDB, oldLog
+				common.RedisEnabled = oldRedis
+				common.SetDatabaseTypes(oldMainType, oldLogType)
+			})
+			require.NoError(t, mainDB.AutoMigrate(&model.User{}))
+			require.NoError(t, model.MigrateAuditLogs())
+			require.NoError(t, model.MigrateAuditDelivery())
+			writeAttempts := 0
+			require.NoError(t, logDB.Callback().Create().Before("gorm:create").Register("audit:offline", func(tx *gorm.DB) { writeAttempts++; tx.AddError(errors.New("isolated log database unavailable")) }))
+			entry := model.AuditLog{EventId: "audit-recover", UserId: 9, Username: "operator", ActorRole: common.RoleAdminUser, Category: model.AuditCategoryOperation, Action: "option.update", Content: "Safe operation result", RequestId: "safe-request", Other: model.AuditOther{Op: &model.AuditOperation{Action: "option.update", Params: model.AuditFields{"key": "safe_setting", "changed": true}}}}
+			model.RecordAuditLog(nil, entry)
+			model.RecordAuditLog(nil, entry)
+			assert.Equal(t, 1, writeAttempts, "initial delivery and retries must share the same durable claim")
+			var pending model.AuditDelivery
+			require.NoError(t, mainDB.First(&pending).Error)
+			assert.Contains(t, pending.Payload, "safe-request")
+			assert.NotContains(t, pending.Payload, "Authorization")
+			assert.Equal(t, 1, pending.Attempts)
+			logDB.Callback().Create().Remove("audit:offline")
+			require.NoError(t, model.RetryAuditDelivery(context.Background(), common.GetTimestamp()+60, 20))
+			require.NoError(t, model.RetryAuditDelivery(context.Background(), common.GetTimestamp()+60, 20))
+			var count int64
+			require.NoError(t, mainDB.Model(&model.AuditDelivery{}).Count(&count).Error)
+			assert.Zero(t, count)
+			require.NoError(t, logDB.Model(&model.AuditLog{}).Where("event_id = ?", entry.EventId).Count(&count).Error)
+			assert.EqualValues(t, 1, count)
+			health := model.CheckDatabaseHealth(context.Background())
+			assert.True(t, health.MainHealthy)
+			assert.True(t, health.LogHealthy)
+			assert.True(t, health.IndependentLog)
+			// A crash after the destination commit must replay without a second log.
+			payload, err := common.Marshal(entry)
+			require.NoError(t, err)
+			require.NoError(t, mainDB.Create(&model.AuditDelivery{EventID: entry.EventId, Payload: string(payload), State: "retry", CreatedAt: 1}).Error)
+			require.NoError(t, model.RetryAuditDelivery(context.Background(), common.GetTimestamp(), 20))
+			require.NoError(t, logDB.Model(&model.AuditLog{}).Where("event_id = ?", entry.EventId).Count(&count).Error)
+			assert.EqualValues(t, 1, count)
+			// The final claimed attempt cannot be silently retried after a crash.
+			exhausted := model.AuditDelivery{EventID: "audit-exhausted", Payload: string(payload), State: "retry", Attempts: 8, LeaseUntil: common.GetTimestamp() - 1, LeaseToken: "crashed-worker"}
+			require.NoError(t, mainDB.Create(&exhausted).Error)
+			require.NoError(t, model.RetryAuditDelivery(context.Background(), common.GetTimestamp(), 20))
+			require.NoError(t, mainDB.First(&exhausted, "event_id = ?", exhausted.EventID).Error)
+			assert.Equal(t, "needs_review", exhausted.State)
+			assert.Equal(t, 8, exhausted.Attempts)
+			health = model.CheckDatabaseHealth(context.Background())
+			assert.EqualValues(t, 1, health.AuditNeedsReview)
+			logSQL, err := logDB.DB()
+			require.NoError(t, err)
+			require.NoError(t, logSQL.Close())
+			health = model.CheckDatabaseHealth(context.Background())
+			assert.True(t, health.MainHealthy)
+			assert.False(t, health.LogHealthy)
+			router := gin.New()
+			router.GET("/health", middleware.RootAuth(), GetSystemDatabaseHealth)
+			for _, role := range []int{common.RoleCommonUser, common.RoleAdminUser, common.RoleRootUser} {
+				token := fmt.Sprintf("health-token-%d", role)
+				u := model.User{Username: fmt.Sprintf("health-%d", role), Role: role, Status: common.UserStatusEnabled, AccessToken: &token, AffCode: fmt.Sprintf("health-aff-%d", role)}
+				require.NoError(t, mainDB.Create(&u).Error)
+				request := httptest.NewRequest(http.MethodGet, "/health", nil)
+				request.Header.Set("Authorization", "Bearer "+token)
+				out := httptest.NewRecorder()
+				router.ServeHTTP(out, request)
+				if role != common.RoleRootUser {
+					assert.Equal(t, 403, out.Code)
+					continue
+				}
+				assert.Equal(t, 200, out.Code)
+				assert.Contains(t, out.Body.String(), `"log_healthy":false`)
+				assert.NotContains(t, out.Body.String(), "safe_setting")
+			}
+		})
+	}
+}
 
 func setupAccessTokenAudit(t *testing.T) (*model.User, string) {
 	t.Helper()
@@ -37,7 +239,7 @@ func setupAccessTokenAudit(t *testing.T) (*model.User, string) {
 	previousRedis := common.RedisEnabled
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}, &model.AuditLog{}, &model.CasbinRule{}, &model.AuthzRole{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Log{}, &model.AuditLog{}, &model.CasbinRule{}, &model.AuthzRole{}, &model.AuditDelivery{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
@@ -432,6 +634,23 @@ type releasedAuditLog struct {
 
 func (releasedAuditLog) TableName() string { return "logs" }
 
+// SubscriptionOrder before receipt and entitlement linkage were introduced.
+type releasedSubscriptionOrder struct {
+	Id              int
+	UserId          int `gorm:"index"`
+	PlanId          int `gorm:"index"`
+	Money           float64
+	TradeNo         string `gorm:"unique;type:varchar(255);index"`
+	PaymentMethod   string `gorm:"type:varchar(50)"`
+	PaymentProvider string `gorm:"type:varchar(50);default:''"`
+	Status          string
+	CreateTime      int64
+	CompleteTime    int64
+	ProviderPayload string `gorm:"type:text"`
+}
+
+func (releasedSubscriptionOrder) TableName() string { return "subscription_orders" }
+
 // External tests create a new database per case on a loopback-only disposable
 // instance. They never drop databases or tables supplied through an environment variable.
 func newAuditTestDatabase(t *testing.T, kind, dsn string) (*gorm.DB, string) {
@@ -679,6 +898,8 @@ func TestAuditDatabaseMatrix(t *testing.T) {
 						legacy := "released-token"
 						require.NoError(t, db.Create(&releasedAuditUser{Username: "released-owner", Password: "placeholder", AccessToken: &legacy, AffCode: "released-aff", Quota: 1234}).Error)
 						require.NoError(t, db.Create(&releasedAuditLog{UserId: 1, Type: model.LogTypeLogin, Content: "historical login", CreatedAt: 100, RequestId: "legacy-request"}).Error)
+						require.NoError(t, db.AutoMigrate(&releasedSubscriptionOrder{}))
+						require.NoError(t, db.Create(&releasedSubscriptionOrder{UserId: 1, PlanId: 73, Money: 2, TradeNo: "released-subscription", PaymentProvider: model.PaymentProviderStripe, Status: common.TopUpStatusSuccess, ProviderPayload: "retained legacy metadata"}).Error)
 					}
 					for range 2 {
 						require.NoError(t, model.InitDB())
@@ -702,6 +923,19 @@ func TestAuditDatabaseMatrix(t *testing.T) {
 						var old model.Log
 						require.NoError(t, db.First(&old).Error)
 						assert.Equal(t, "historical login", old.Content)
+						var order model.SubscriptionOrder
+						require.NoError(t, db.Where("trade_no = ?", "released-subscription").Take(&order).Error)
+						assert.Equal(t, "retained legacy metadata", order.ProviderPayload)
+						assert.Zero(t, order.UserSubscriptionId, "migration cannot invent an entitlement linkage")
+						require.Error(t, db.Create(&model.SubscriptionOrder{TradeNo: order.TradeNo}).Error, "legacy order uniqueness must remain enforced")
+						event, err := model.RecordPaymentEvent(model.PaymentEventInput{Provider: model.PaymentProviderStripe, EventID: "evt_legacy_subscription", EventType: "checkout.session.completed", SessionID: "cs_legacy", TradeNo: order.TradeNo, PaidMinor: 200, Currency: "USD", PaymentStatus: "paid", SessionStatus: "complete"})
+						require.NoError(t, err)
+						assert.ErrorIs(t, model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderStripe, "", *event), model.ErrPaymentFinancialReview)
+						var count int64
+						require.NoError(t, db.Model(&model.PaymentReceipt{}).Count(&count).Error)
+						assert.Zero(t, count)
+						require.NoError(t, db.First(&user, 1).Error)
+						assert.Equal(t, 1234, user.Quota)
 					}
 					require.NoError(t, model.UpdateUserAccessToken(1, "matrix-token"))
 					require.Error(t, db.Create(&model.User{Username: "duplicate", Password: "placeholder", AffCode: "duplicate-aff", AccessToken: common.GetPointer("matrix-token")}).Error, "PAT uniqueness must survive upgrade")

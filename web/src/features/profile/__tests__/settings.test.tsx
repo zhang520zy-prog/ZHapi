@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/lib/api'
 
 import { updateUserSettings } from '../api'
+import { SidebarModulesCard } from '../components/sidebar-modules-card'
 import { NotificationTab } from '../components/tabs/notification-tab'
 import type { UserProfile } from '../types'
 
@@ -191,4 +192,24 @@ describe('user settings saves across profile and security', () => {
       record_ip_log: false,
     })
   })
+})
+
+it('does not restore chat or playground switches from an old personal configuration', async () => {
+  const get = vi
+    .spyOn(api, 'get')
+    .mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          sidebar_modules:
+            '{"chat":{"enabled":true,"chat":true,"playground":true}}',
+        },
+      },
+    })
+  render(<SidebarModulesCard />)
+  await waitFor(() => expect(get).toHaveBeenCalledWith('/api/user/self'))
+  expect(screen.getByText('Sidebar Personal Settings')).toBeVisible()
+  expect(screen.queryByText('Chat Area')).not.toBeInTheDocument()
+  expect(screen.queryByText('Playground')).not.toBeInTheDocument()
+  expect(screen.getByText('Token Management')).toBeVisible()
 })

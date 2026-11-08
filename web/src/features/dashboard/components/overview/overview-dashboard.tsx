@@ -24,9 +24,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Circle,
   Copy,
-  CreditCard,
   FileText,
   KeyRound,
   ListChecks,
@@ -36,7 +34,6 @@ import {
   Timer,
   type LucideIcon,
 } from 'lucide-react'
-import { motion, useReducedMotion } from 'motion/react'
 import { useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -53,7 +50,6 @@ import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserModels } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
-import { MOTION_TRANSITION } from '@/lib/motion'
 import { ROLE } from '@/lib/roles'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
@@ -73,21 +69,9 @@ import { UptimePanel } from './uptime-panel'
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
 
-const SETUP_GUIDE_CODE_PATTERN = [
-  'const request = await client.responses.create({',
-  "  model: 'gpt-4.1-mini',",
-  "  input: 'Start routing traffic',",
-  '})',
-  '',
-  'if (request.output_text) {',
-  '  console.log(request.output_text)',
-  '}',
-].join('\n')
-
 type DashboardActionPath =
   | '/keys'
   | '/wallet'
-  | '/playground'
   | '/channels'
   | '/usage-logs'
   | '/pricing'
@@ -96,7 +80,6 @@ interface StartStep {
   title: string
   description: string
   to: DashboardActionPath
-  icon: LucideIcon
   completed: boolean
 }
 
@@ -183,94 +166,31 @@ function buildCurlCommand(args: {
   ].join('\n')
 }
 
-function SetupGuideBackdrop(props: { compact?: boolean }) {
+function StartStepItem(props: { step: StartStep; index: number }) {
   return (
-    <>
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_48%_120%_at_78%_0%,color-mix(in_oklch,var(--overview-accent-1)_14%,transparent)_0%,transparent_62%),linear-gradient(112deg,color-mix(in_oklch,var(--card)_94%,var(--overview-accent-2)_6%)_0%,color-mix(in_oklch,var(--card)_94%,var(--overview-accent-3)_6%)_48%,color-mix(in_oklch,var(--background)_90%,var(--overview-accent-1)_10%)_100%)] dark:opacity-60',
-          props.compact
-            ? '[mask-image:linear-gradient(90deg,black_0%,black_48%,transparent_74%)] opacity-55'
-            : 'opacity-85'
-        )}
-        aria-hidden='true'
-      />
-      <div
-        className={cn(
-          'text-foreground/5 dark:text-foreground/8 pointer-events-none absolute inset-y-0 right-0 hidden overflow-hidden font-mono sm:block',
-          props.compact ? 'w-1/2 opacity-45' : 'w-[58%] opacity-75'
-        )}
-        aria-hidden='true'
-      >
-        <pre
-          className={cn(
-            'absolute right-3 [mask-image:linear-gradient(90deg,transparent_0%,black_30%,black_82%,transparent_100%)] text-right tracking-[0.38em] whitespace-pre',
-            props.compact
-              ? '-top-6 text-[9px] leading-4'
-              : 'top-1 text-[11px] leading-5'
-          )}
-        >
-          {SETUP_GUIDE_CODE_PATTERN}
-        </pre>
-      </div>
-      <div
-        className='from-background/35 to-background/70 dark:from-background/20 dark:to-background/80 pointer-events-none absolute inset-0 bg-linear-to-b via-transparent'
-        aria-hidden='true'
-      />
-    </>
-  )
-}
-
-function StartStepItem(props: {
-  step: StartStep
-  index: number
-  isLast: boolean
-}) {
-  const Icon = props.step.icon
-  const StatusIcon = props.step.completed ? Check : Circle
-
-  return (
-    <li className='relative flex gap-3 pb-2.5 last:pb-0'>
-      {!props.isLast && (
-        <span
-          className='bg-border absolute top-9 bottom-0 left-4 w-px'
-          aria-hidden='true'
-        />
-      )}
-      <span
-        className={cn(
-          'bg-background relative z-10 flex size-8 shrink-0 items-center justify-center rounded-lg border shadow-xs',
-          props.step.completed && 'border-success/30 bg-success/10'
-        )}
-      >
-        <StatusIcon
-          className={props.step.completed ? 'text-success size-4' : 'size-4'}
-          aria-hidden='true'
-        />
-      </span>
-
+    <li className='border-b last:border-b-0'>
       <Link
         to={props.step.to}
-        className='bg-background/70 hover:bg-muted/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left shadow-xs transition-colors outline-none focus-visible:ring-2'
+        className='hover:bg-accent/50 focus-visible:ring-ring flex items-start gap-4 py-4 outline-none focus-visible:ring-2'
       >
-        <span className='flex min-w-0 items-start gap-2.5'>
-          <span className='bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg'>
-            <Icon className='size-3.5' aria-hidden='true' />
-          </span>
-          <span className='flex min-w-0 flex-col gap-0.5'>
-            <span className='flex items-center gap-2 text-sm font-medium'>
-              <span className='text-muted-foreground font-mono text-xs tabular-nums'>
-                {props.index + 1}.
-              </span>
-              <span className='truncate'>{props.step.title}</span>
-            </span>
-            <span className='text-muted-foreground line-clamp-1 text-xs'>
-              {props.step.description}
-            </span>
+        <span
+          className='text-primary flex w-6 shrink-0 items-center justify-center pt-0.5 font-mono text-sm'
+          aria-hidden='true'
+        >
+          {props.step.completed ? (
+            <Check className='size-4' />
+          ) : (
+            `0${props.index + 1}`
+          )}
+        </span>
+        <span className='flex min-w-0 flex-1 flex-col gap-1'>
+          <span className='text-sm font-medium'>{props.step.title}</span>
+          <span className='text-muted-foreground text-xs leading-relaxed'>
+            {props.step.description}
           </span>
         </span>
         <ArrowRight
-          className='text-muted-foreground size-4 shrink-0'
+          className='text-muted-foreground mt-1 size-4 shrink-0'
           aria-hidden='true'
         />
       </Link>
@@ -283,7 +203,6 @@ function RequestPreview(props: {
   signals: HeroSignal[]
 }) {
   const { t } = useTranslation()
-  const shouldReduceMotion = useReducedMotion()
   const [isCopying, setIsCopying] = useState(false)
   const { copyToClipboard } = useCopyToClipboard({ notify: false })
   const previewCurl = buildCurlCommand({
@@ -323,22 +242,8 @@ function RequestPreview(props: {
   }
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
-      animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
-      transition={MOTION_TRANSITION.slow}
-      className='bg-background/75 relative overflow-hidden rounded-2xl border p-3 shadow-sm backdrop-blur'
-    >
-      {!shouldReduceMotion && (
-        <motion.div
-          className='via-foreground/30 pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent'
-          animate={{ x: ['-100%', '100%'] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-          aria-hidden='true'
-        />
-      )}
-
-      <div className='flex items-center justify-between gap-3 border-b pb-3'>
+    <div className='bg-background min-w-0 overflow-hidden rounded-lg border p-4 sm:p-5'>
+      <div className='flex flex-wrap items-center justify-between gap-3 border-b pb-3'>
         <div className='flex min-w-0 items-center gap-2'>
           <IconBadge tone='info'>
             <TerminalSquare />
@@ -373,17 +278,22 @@ function RequestPreview(props: {
         )}
       </div>
 
-      <div className='bg-foreground/[0.035] my-3 rounded-xl p-3 font-mono text-xs'>
+      <div className='my-4 font-mono text-xs'>
         <div className='mb-2 flex items-center gap-1.5'>
           <span className='bg-destructive size-2 rounded-full' />
           <span className='bg-warning size-2 rounded-full' />
           <span className='bg-success size-2 rounded-full' />
         </div>
-        <div className='flex flex-col gap-1 overflow-hidden'>
+        <div
+          role='region'
+          aria-label={t('First API request')}
+          tabIndex={0}
+          className='focus-visible:ring-ring flex flex-col gap-2 overflow-x-auto py-2 outline-none focus-visible:ring-2'
+        >
           {previewLines.map((line) => (
             <code
               key={line}
-              className='text-muted-foreground truncate'
+              className='text-muted-foreground whitespace-pre'
               title={line}
             >
               {line}
@@ -399,7 +309,7 @@ function RequestPreview(props: {
           return (
             <div
               key={signal.label}
-              className='bg-muted/40 flex items-center justify-between gap-3 rounded-xl px-3 py-2'
+              className='flex flex-wrap items-center justify-between gap-3 border-t py-2.5'
             >
               <span className='flex min-w-0 items-center gap-2'>
                 <IconBadge tone={signal.tone} size='xs'>
@@ -416,7 +326,7 @@ function RequestPreview(props: {
           )
         })}
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -425,11 +335,11 @@ function QuickActionItem(props: { action: QuickAction }) {
 
   return (
     <Button
-      variant='outline'
-      className='h-auto justify-start rounded-xl px-3 py-3 text-left'
+      variant='ghost'
+      className='h-auto justify-start rounded-none px-0 py-3 text-left'
       render={<Link to={props.action.to} />}
     >
-      <span className='bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg'>
+      <span className='text-primary flex size-8 shrink-0 items-center justify-center'>
         <Icon className='size-4' aria-hidden='true' />
       </span>
       <span className='flex min-w-0 flex-1 flex-col gap-0.5'>
@@ -510,21 +420,20 @@ export function OverviewDashboard() {
         title: t('Create API Key'),
         description: t('Create a key for your app or service'),
         to: '/keys',
-        icon: KeyRound,
         completed: Boolean(preferredKey),
       },
       {
         title: t('Add credits'),
         description: t('Keep enough balance before production traffic'),
         to: '/wallet',
-        icon: CreditCard,
         completed: remainQuota > 0 || usedQuota > 0,
       },
       {
-        title: t('Send a request'),
-        description: t('Verify routing with Playground or your client'),
-        to: '/playground',
-        icon: TerminalSquare,
+        title: t('Verify requests'),
+        description: t(
+          'Send a request from your client, then check its usage log'
+        ),
+        to: '/usage-logs',
         completed: requestCount > 0,
       },
     ],
@@ -649,11 +558,10 @@ export function OverviewDashboard() {
         <div className='flex flex-col gap-4'>
           <div id={setupGuideId} hidden={!setupGuideExpanded}>
             {setupGuideExpanded && (
-              <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
-                <CardStaggerItem className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
-                  <div className='relative h-full overflow-hidden p-4 sm:p-5'>
-                    <SetupGuideBackdrop />
-                    <div className='relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]'>
+              <CardStaggerContainer className='flex flex-col gap-5'>
+                <CardStaggerItem className='bg-card h-full overflow-hidden rounded-lg border'>
+                  <div className='h-full p-5 sm:p-7'>
+                    <div className='grid gap-7 lg:grid-cols-2 xl:gap-10'>
                       <div className='flex min-w-0 flex-col gap-5'>
                         <div className='flex flex-wrap items-start justify-between gap-3'>
                           <div className='flex max-w-2xl flex-col gap-1'>
@@ -691,13 +599,12 @@ export function OverviewDashboard() {
                           </div>
                         </div>
 
-                        <ol className='bg-background/45 rounded-2xl border p-2 backdrop-blur'>
+                        <ol className='border-t'>
                           {startSteps.map((step, index) => (
                             <StartStepItem
                               key={step.title}
                               step={step}
                               index={index}
-                              isLast={index === startSteps.length - 1}
                             />
                           ))}
                         </ol>
@@ -711,7 +618,7 @@ export function OverviewDashboard() {
                   </div>
                 </CardStaggerItem>
 
-                <CardStaggerItem className='bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
+                <CardStaggerItem className='border-b pb-5'>
                   <div className='flex h-full flex-col gap-4'>
                     <div className='flex flex-col gap-1'>
                       <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
@@ -721,7 +628,7 @@ export function OverviewDashboard() {
                         {t('Keep the platform ready')}
                       </h3>
                     </div>
-                    <div className='grid gap-2'>
+                    <div className='grid gap-x-6 sm:grid-cols-2 xl:grid-cols-4'>
                       {visibleQuickActions.map((action) => (
                         <QuickActionItem key={action.title} action={action} />
                       ))}
@@ -733,9 +640,8 @@ export function OverviewDashboard() {
           </div>
           {!setupGuideExpanded && !setupComplete && (
             <CardStaggerContainer>
-              <CardStaggerItem className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
+              <CardStaggerItem className='bg-card overflow-hidden rounded-lg border'>
                 <div className='relative overflow-hidden px-4 py-3 sm:px-5'>
-                  <SetupGuideBackdrop compact />
                   <div className='relative flex flex-wrap items-center justify-between gap-3'>
                     <div className='flex min-w-0 items-center gap-3'>
                       <span className='bg-background/70 flex size-9 shrink-0 items-center justify-center rounded-xl border shadow-xs'>

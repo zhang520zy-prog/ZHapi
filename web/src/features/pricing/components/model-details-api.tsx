@@ -109,7 +109,7 @@ function buildChatSample(lang: Lang, ctx: SampleContext): string {
       `curl ${url} \\`,
       `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${bodyJson.replace(/\n/g, '\n     ')}'`,
+      `  -d '${bodyJson.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
 
@@ -177,7 +177,7 @@ function buildAnthropicSample(lang: Lang, ctx: SampleContext): string {
       `  -H "x-api-key: $${ctx.apiKeyEnv}" \\`,
       `  -H "anthropic-version: 2023-06-01" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${body.replace(/\n/g, '\n     ')}'`,
+      `  -d '${body.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
@@ -249,7 +249,7 @@ function buildGeminiSample(lang: Lang, ctx: SampleContext): string {
     return [
       `curl '${url}' \\`,
       `  -H 'Content-Type: application/json' \\`,
-      `  -d '${body.replace(/\n/g, '\n     ')}'`,
+      `  -d '${body.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
@@ -299,7 +299,7 @@ function buildEmbeddingSample(lang: Lang, ctx: SampleContext): string {
       `curl ${url} \\`,
       `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${body.replace(/\n/g, '\n     ')}'`,
+      `  -d '${body.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
@@ -365,7 +365,7 @@ function buildImageSample(lang: Lang, ctx: SampleContext): string {
       `curl ${url} \\`,
       `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
       `  -H "Content-Type: application/json" \\`,
-      `  -d '${body.replace(/\n/g, '\n     ')}'`,
+      `  -d '${body.replaceAll('\n', '\n     ')}'`,
     ].join('\n')
   }
   if (lang === 'python') {
@@ -430,8 +430,9 @@ function buildSample(
 ): string {
   if (endpointType === 'anthropic') return buildAnthropicSample(lang, ctx)
   if (endpointType === 'gemini') return buildGeminiSample(lang, ctx)
-  if (endpointType === 'embeddings' || endpointType === 'jina-rerank')
+  if (endpointType === 'embeddings' || endpointType === 'jina-rerank') {
     return buildEmbeddingSample(lang, ctx)
+  }
   if (endpointType === 'image-generation') return buildImageSample(lang, ctx)
   return buildChatSample(lang, ctx)
 }
@@ -563,7 +564,14 @@ function SupportedParametersSection(props: { model: PricingModel }) {
 
   return (
     <section>
-      <SectionTitle icon={Sigma}>{t('Supported parameters')}</SectionTitle>
+      <SectionTitle icon={Sigma}>
+        {t('Common parameter reference')}
+      </SectionTitle>
+      <p className='text-muted-foreground mb-3 text-xs leading-relaxed'>
+        {t(
+          'These are common request fields for this endpoint. Actual support depends on the selected upstream model and deployment configuration.'
+        )}
+      </p>
       <StaticDataTable
         className={tableStyles.sectionContainer}
         headerRowClassName={tableStyles.mutedHeaderRow}
@@ -669,7 +677,21 @@ function RateLimitsSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const limits = useMemo(() => buildRateLimits(props.model), [props.model])
 
-  if (limits.length === 0) return null
+  if (limits.length === 0) {
+    return (
+      <section>
+        <SectionTitle icon={Gauge}>{t('Rate limits')}</SectionTitle>
+        <div className='border-border/60 bg-muted/20 text-muted-foreground rounded-lg border p-3 text-xs leading-relaxed'>
+          <p>{t('Current deployment does not provide rate-limit data.')}</p>
+          <p className='mt-1'>
+            {t(
+              'Limits may come from your API key, this gateway, or the upstream provider.'
+            )}
+          </p>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section>

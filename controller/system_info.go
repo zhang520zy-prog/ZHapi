@@ -1,14 +1,22 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 )
+
+func GetSystemDatabaseHealth(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 6*time.Second)
+	defer cancel()
+	common.ApiSuccess(c, model.CheckDatabaseHealth(ctx))
+}
 
 func ListSystemInstances(c *gin.Context) {
 	instances, err := model.ListSystemInstances()

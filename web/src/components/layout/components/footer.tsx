@@ -82,7 +82,13 @@ function FooterLinkItem(props: { link: FooterLink }) {
 function LegalLinks(props: { leadingSeparator?: boolean }) {
   const { t } = useTranslation()
   const { status } = useStatus()
-  const items: { key: string; label: string; href: string }[] = []
+  const items: { key: string; label: string; href: string }[] = [
+    {
+      key: 'registration-notice',
+      label: t('Registration Notice'),
+      href: '/registration-notice',
+    },
+  ]
   if (status?.user_agreement_enabled) {
     items.push({
       key: 'user-agreement',
@@ -159,7 +165,7 @@ export function Footer(props: FooterProps) {
   } = useSystemConfig()
 
   const displayLogo = systemLogo || props.logo || '/logo.png'
-  const displayName = systemName || props.name || 'New API'
+  const displayName = systemName || props.name || 'ZH Api'
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()
 

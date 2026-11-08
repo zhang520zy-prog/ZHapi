@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { Link } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -64,6 +65,7 @@ export function RequestChecksSection({
 }: RequestChecksSectionProps) {
   const { t } = useTranslation()
   const updateOption = useSavePolicy()
+  const [testInput, setTestInput] = useState('')
   const form = useForm<SensitiveFormValues>({
     resolver: zodResolver(sensitiveSchema),
     defaultValues,
@@ -72,6 +74,54 @@ export function RequestChecksSection({
   useEffect(() => {
     form.reset(defaultValues)
   }, [defaultValues, form])
+
+  const sensitiveWords = form.watch('SensitiveWords') ?? ''
+  const filteringEnabled =
+    form.watch('CheckSensitiveEnabled') &&
+    form.watch('CheckSensitiveOnPromptEnabled')
+  const testRules = useMemo(
+    () =>
+      sensitiveWords
+        .split(/\r?\n/)
+        .map((word) => word.trim())
+        .filter(Boolean),
+    [sensitiveWords]
+  )
+  const matchedRuleCount = useMemo(() => {
+    const normalizedInput = testInput.toLowerCase()
+    if (!normalizedInput) return 0
+    return testRules.filter((rule) =>
+      normalizedInput.includes(rule.toLowerCase())
+    ).length
+  }, [testInput, testRules])
+  const testResult = (() => {
+    if (!testInput.trim()) return null
+    if (!filteringEnabled) {
+      return (
+        <p className='text-muted-foreground text-xs'>
+          {t(
+            'Prompt text filtering is disabled in the current form values. This text would not be blocked by this filter.'
+          )}
+        </p>
+      )
+    }
+    if (matchedRuleCount > 0) {
+      return (
+        <Alert variant='destructive'>
+          <AlertDescription>
+            {t('{{count}} current rule(s) would block this request', {
+              count: matchedRuleCount,
+            })}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+    return (
+      <p className='text-xs text-emerald-600 dark:text-emerald-400'>
+        {t('No current rule matches this text.')}
+      </p>
+    )
+  })()
 
   const onSubmit = async (values: SensitiveFormValues) => {
     const updates = Object.entries(values).filter(
@@ -196,6 +246,36 @@ export function RequestChecksSection({
               </FormItem>
             )}
           />
+
+          <div className='border-border/60 bg-muted/20 space-y-3 rounded-lg border p-3'>
+            <div>
+              <h3 className='text-sm font-medium'>{t('Rule test')}</h3>
+              <p className='text-muted-foreground mt-1 text-xs leading-relaxed'>
+                {t(
+                  'Paste harmless text to test the current form values locally. This test never calls upstream or consumes quota.'
+                )}
+              </p>
+            </div>
+            <Textarea
+              rows={4}
+              value={testInput}
+              onChange={(event) => setTestInput(event.target.value)}
+              placeholder={t('Enter harmless text to test the current rules')}
+              aria-label={t('Rule test input')}
+            />
+            {testResult}
+          </div>
+
+          <div className='text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs'>
+            <span>{t('Review recorded policy events in request logs.')}</span>
+            <Link
+              className='text-primary underline underline-offset-4'
+              to='/usage-logs/$section'
+              params={{ section: 'common' }}
+            >
+              {t('Open request logs')}
+            </Link>
+          </div>
         </SettingsForm>
       </Form>
     </SettingsSection>
