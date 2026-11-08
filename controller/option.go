@@ -39,6 +39,31 @@ func isPaymentComplianceOptionKey(key string) bool {
 	return strings.HasPrefix(key, "payment_setting.compliance_")
 }
 
+// bumpCommissionTermsVersion 两份规则文本各自版本号（B1.8）：
+// 推广参数变更只升《推广返现规则》版本，分销参数变更只升《分销协议》版本，
+// 补充条款两边都升。
+func bumpCommissionTermsVersion(changedKey string) bool {
+	bump := func(key string, current int) {
+		if err := model.UpdateOption(key, strconv.Itoa(current+1)); err != nil {
+			common.SysError("failed to bump " + key + ": " + err.Error())
+		}
+	}
+	switch changedKey {
+	case "ReferralRateBps":
+		bump("CommissionTermsVersion", operation_setting.CommissionTermsVersion)
+	case "DistributorDefaultRateBps", "DistributorHoldDays", "DistributorWithdrawMinCNY",
+		"DistributorWithdrawMethods", "DistributorUsdtNetworks":
+		bump("DistributorAgreementVersion", operation_setting.DistributorAgreementVersion)
+		return true
+	case "ReferralTermsExtra":
+		bump("CommissionTermsVersion", operation_setting.CommissionTermsVersion)
+	case "DistributorTermsExtra":
+		bump("DistributorAgreementVersion", operation_setting.DistributorAgreementVersion)
+		return true
+	}
+	return false
+}
+
 func isPositiveOptionValue(value string) bool {
 	intValue, err := strconv.Atoi(strings.TrimSpace(value))
 	if err == nil {
@@ -206,6 +231,13 @@ func UpdateOption(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 			return
 		}
+	case "ReferralCommissionEnabled", "ReferralRateBps", "DistributorEnabled", "DistributorApplyEnabled",
+		"DistributorDefaultRateBps", "DistributorWithdrawEnabled":
+		v := strings.TrimSpace(option.Value.(string))
+		if (v == "true" || isPositiveOptionValue(v)) && !operation_setting.IsPaymentComplianceConfirmed() {
+			common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
+			return
+		}
 	default:
 		if isPaymentComplianceOptionKey(option.Key) {
 			common.ApiErrorMsg(c, "合规确认字段不允许通过通用设置接口修改")
@@ -224,6 +256,14 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "无法启用 GitHub OAuth，请先填入 GitHub Client Id 以及 GitHub Client Secret！",
+			})
+			return
+		}
+	case "GoogleOAuthEnabled":
+		if option.Value == "true" && common.GoogleClientId == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 Google OAuth，请先填入 Google Client Id 以及 Google Client Secret！",
 			})
 			return
 		}
@@ -495,6 +535,9 @@ func UpdateOption(c *gin.Context) {
 			common.ApiError(c, err)
 		}
 		return
+	}
+	if bumpCommissionTermsVersion(option.Key) {
+		service.NotifyActiveDistributorsAgreementUpdate(operation_setting.DistributorAgreementVersion)
 	}
 	// 出于安全考虑只记录被修改的配置项名称，不记录配置值（可能含密钥等敏感信息）。
 	recordManageAudit(c, "option.update", map[string]any{

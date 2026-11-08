@@ -370,8 +370,32 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
+		&RiskEvent{},
+		&RiskAppeal{},
+		&RiskEventChange{},
+		&PaymentEvent{},
+		&PaymentEventAction{},
+		&PaymentReceipt{},
+		&AuditDelivery{},
+		&DistributorProfile{},
+		&DistributorApplication{},
+		&CommissionRecord{},
+		&CommissionSettlement{},
+		&CommissionDebt{},
+		&DistributorWithdrawal{},
+		&CommissionCampaign{},
+		&InvoiceRequest{},
+		&InviteAttribution{},
+		&TermsAcknowledgement{},
+		&UserNotification{},
 	)
 	if err != nil {
+		return err
+	}
+	if _, err := backfillInviteAttributions(); err != nil {
+		return err
+	}
+	if _, err := backfillTermsAcknowledgements(); err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {

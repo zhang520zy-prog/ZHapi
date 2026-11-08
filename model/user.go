@@ -88,6 +88,7 @@ type User struct {
 	Email                string                     `json:"email" gorm:"index" validate:"max=50"`
 	GitHubId             string                     `json:"github_id" gorm:"column:github_id;index"`
 	DiscordId            string                     `json:"discord_id" gorm:"column:discord_id;index"`
+	GoogleId             string                     `json:"google_id" gorm:"column:google_id;index"`
 	OidcId               string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
 	WeChatId             string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
 	TelegramId           string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
@@ -99,6 +100,7 @@ type User struct {
 	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`               // request number
 	Group                string                     `json:"group" gorm:"type:varchar(64);default:'default'"`
 	AffCode              string                     `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	DistCode             string                     `json:"dist_code,omitempty" gorm:"-"`
 	AffCount             int                        `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
 	AffQuota             int                        `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
 	AffHistoryQuota      int                        `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
@@ -216,6 +218,7 @@ func UpdateUserSetting(userId int, setting dto.UserSetting) error {
 var userBindColumns = map[string]bool{
 	"github_id":   true,
 	"discord_id":  true,
+	"google_id":   true,
 	"oidc_id":     true,
 	"linux_do_id": true,
 	"wechat_id":   true,
@@ -544,7 +547,7 @@ func GetSelfUserById(id int) (*User, error) {
 	}
 	err := DB.Model(&User{}).Select([]string{
 		"id", "username", "display_name", "role", "status", "email",
-		"github_id", "discord_id", "oidc_id", "wechat_id", "telegram_id",
+		"github_id", "discord_id", "google_id", "oidc_id", "wechat_id", "telegram_id",
 		"group", "quota", "used_quota", "request_count", "aff_code", "aff_count",
 		"aff_quota", "aff_history", "inviter_id", "linux_do_id", "setting",
 		"stripe_customer", "auth_version",
@@ -599,36 +602,8 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	if float64(quota) < common.QuotaPerUnit {
 		return fmt.Errorf("转移额度最小为%s！", logger.LogQuota(common.QuotaFromFloat(common.QuotaPerUnit)))
 	}
-
-	// 开始数据库事务
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-	defer tx.Rollback() // 确保在函数退出时事务能回滚
-
-	// 加锁查询用户以确保数据一致性
-	err := lockForUpdate(tx).First(user, user.Id).Error
-	if err != nil {
-		return err
-	}
-
-	// 再次检查用户的AffQuota是否足够
-	if user.AffQuota < quota {
-		return errors.New("邀请额度不足！")
-	}
-
-	// 更新用户额度
-	user.AffQuota -= quota
-	user.Quota += quota
-
-	// 保存用户状态
-	if err := tx.Save(user).Error; err != nil {
-		return err
-	}
-
-	// 提交事务
-	return tx.Commit().Error
+	// B1.13：与新转账接口同一路径，原子扣减并写 commission_settlements 流水。
+	return TransferReferralQuotaToQuota(user.Id, quota)
 }
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {
@@ -708,6 +683,21 @@ func (user *User) Insert(inviterId int) error {
 	return nil
 }
 
+// InsertWithInvite 把建用户和写归属放进同一个事务（R3）：归属写失败则注册失败，
+// 避免"客户永远没有归属、之后充值不返现也没有提示"的静默丢单。
+func (user *User) InsertWithInvite(inviterId int, program, inviteCode string) error {
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		if err := user.InsertWithTx(tx, inviterId); err != nil {
+			return err
+		}
+		return SaveInviteAttributionTx(tx, user.Id, program, inviterId, inviteCode)
+	}); err != nil {
+		return err
+	}
+	user.finishInsert(inviterId)
+	return nil
+}
+
 func (user *User) finishInsert(inviterId int) {
 	// 用户创建成功后，根据角色初始化边栏配置
 	// 需要重新获取用户以确保有正确的ID和Role
@@ -727,7 +717,14 @@ func (user *User) finishInsert(inviterId int) {
 	if common.QuotaForNewUser > 0 {
 		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
 	}
-	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
+	// 一次性拉新奖励只发给推广归属：分销归属的客户走分销佣金，
+	// 不发 QuotaForInviter/QuotaForInvitee，也不计入 aff_count（R4）。
+	referralAttribution := inviterId != 0
+	if referralAttribution {
+		attr := GetInviteAttribution(user.Id)
+		referralAttribution = attr != nil && attr.Program == CommissionProgramReferral
+	}
+	if referralAttribution && operation_setting.IsPaymentComplianceConfirmed() {
 		if common.QuotaForInvitee > 0 {
 			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
 			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)))
@@ -784,7 +781,13 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 	if common.QuotaForNewUser > 0 {
 		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
 	}
-	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
+	// 一次性拉新奖励只发给推广归属（与 finishInsert 同一规则，R4）。
+	referralAttribution := inviterId != 0
+	if referralAttribution {
+		attr := GetInviteAttribution(user.Id)
+		referralAttribution = attr != nil && attr.Program == CommissionProgramReferral
+	}
+	if referralAttribution && operation_setting.IsPaymentComplianceConfirmed() {
 		if common.QuotaForInvitee > 0 {
 			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
 			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)))
@@ -923,6 +926,7 @@ func (user *User) ClearBinding(bindingType string) error {
 		"email":    "email",
 		"github":   "github_id",
 		"discord":  "discord_id",
+		"google":   "google_id",
 		"oidc":     "oidc_id",
 		"wechat":   "wechat_id",
 		"telegram": "telegram_id",
@@ -1114,6 +1118,14 @@ func (user *User) FillUserByDiscordId() error {
 	return nil
 }
 
+func (user *User) FillUserByGoogleId() error {
+	if user.GoogleId == "" {
+		return errors.New("google id 为空！")
+	}
+	DB.Where(User{GoogleId: user.GoogleId}).First(user)
+	return nil
+}
+
 func (user *User) FillUserByOidcId() error {
 	if user.OidcId == "" {
 		return errors.New("oidc id 为空！")
@@ -1179,6 +1191,10 @@ func IsDiscordIdAlreadyTaken(discordId string) bool {
 
 func IsOidcIdAlreadyTaken(oidcId string) bool {
 	return DB.Where("oidc_id = ?", oidcId).Find(&User{}).RowsAffected == 1
+}
+
+func IsGoogleIdAlreadyTaken(googleId string) bool {
+	return DB.Unscoped().Where("google_id = ?", googleId).Find(&User{}).RowsAffected == 1
 }
 
 func IsTelegramIdAlreadyTaken(telegramId string) bool {

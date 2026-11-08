@@ -272,7 +272,8 @@ func Register(c *gin.Context) {
 		return
 	}
 	affCode := user.AffCode // this code is the inviter's code, not the user's own code
-	inviterId, _ := model.GetUserIdByAffCode(affCode)
+	// 归属解析：dist_code 优先且不带回退；都没有则按 aff_code 走推广
+	program, inviterId, inviteCode := model.ResolveInviteAttribution(affCode, user.DistCode)
 	cleanUser := model.User{
 		Username:    user.Username,
 		Password:    user.Password,
@@ -283,7 +284,8 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
+	// 建用户与写归属同一事务：归属失败则注册失败（R3）。
+	if err := cleanUser.InsertWithInvite(inviterId, program, inviteCode); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
@@ -291,13 +293,7 @@ func Register(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
-		return
-	}
+	insertedUser := cleanUser
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
 		key, err := common.GenerateKey()
@@ -502,6 +498,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"email":             user.Email,
 		"github_id":         user.GitHubId,
 		"discord_id":        user.DiscordId,
+		"google_id":         user.GoogleId,
 		"oidc_id":           user.OidcId,
 		"wechat_id":         user.WeChatId,
 		"telegram_id":       user.TelegramId,
@@ -518,6 +515,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"setting":           user.Setting,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"distributor":       map[string]any{"status": model.GetDistributorStatus(user.Id)},
 		"permissions":       permissions,
 	}
 }

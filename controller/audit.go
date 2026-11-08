@@ -70,6 +70,22 @@ var auditContentTemplates = map[string]string{
 
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
 	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
+
+	"distributor.application_review":      "Reviewed distributor application ${application_id} (${action})",
+	"distributor.application_submit":      "Submitted a distributor application",
+	"distributor.profile_update":          "Updated distributor profile for user ${target_user_id} (${status})",
+	"distributor.commission_confirm":      "Confirmed ${count} distributor commissions",
+	"distributor.commission_adjust_time":  "Adjusted commission ${record_id} available time",
+	"distributor.commission_reverse":      "Reversed commission record ${record_id}",
+	"distributor.commission_backfill":     "Backfilled commissions since ${since} (${created} created)",
+	"distributor.debt_waive":              "Waived ${amount} commission debt for user ${target_user_id}",
+	"distributor.campaign_create":         "Created commission campaign ${campaign_id} (${program}, ${rate_bps}bps)",
+	"distributor.campaign_update":         "Updated commission campaign ${campaign_id}",
+	"distributor.campaign_cancel":         "Cancelled commission campaign ${campaign_id}",
+	"distributor.withdrawal_review":       "Reviewed withdrawal ${withdrawal_id} (${action})",
+	"distributor.withdrawal_paid":         "Marked withdrawal ${withdrawal_id} as paid",
+	"distributor.withdrawal_account_view": "Viewed payout account for withdrawal ${withdrawal_id}",
+	"distributor.balance_transfer":        "Transferred distributor balance to account quota",
 }
 
 func recordPasskeyDomainAudit(c *gin.Context, change *model.PasskeyDomainChange, confirmed bool, err error) {

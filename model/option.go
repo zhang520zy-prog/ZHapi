@@ -133,6 +133,9 @@ func InitOptionMap() {
 	common.OptionMap["PayMethods"] = operation_setting.PayMethods2JsonString()
 	common.OptionMap["GitHubClientId"] = ""
 	common.OptionMap["GitHubClientSecret"] = ""
+	common.OptionMap["GoogleOAuthEnabled"] = strconv.FormatBool(common.GoogleOAuthEnabled)
+	common.OptionMap["GoogleClientId"] = ""
+	common.OptionMap["GoogleClientSecret"] = ""
 	common.OptionMap["TelegramBotToken"] = ""
 	common.OptionMap["TelegramBotName"] = ""
 	common.OptionMap["WeChatServerAddress"] = ""
@@ -186,12 +189,66 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticRetryStatusCodes"] = operation_setting.AutomaticRetryStatusCodesToString()
 	common.OptionMap["ExposeRatioEnabled"] = strconv.FormatBool(ratio_setting.IsExposeRatioEnabled())
 
+	// 推广与分销
+	common.OptionMap["ReferralCommissionEnabled"] = strconv.FormatBool(operation_setting.ReferralCommissionEnabled)
+	common.OptionMap["ReferralRateBps"] = strconv.Itoa(operation_setting.ReferralRateBps)
+	common.OptionMap["DistributorEnabled"] = strconv.FormatBool(operation_setting.DistributorEnabled)
+	common.OptionMap["DistributorApplyEnabled"] = strconv.FormatBool(operation_setting.DistributorApplyEnabled)
+	common.OptionMap["DistributorDefaultRateBps"] = strconv.Itoa(operation_setting.DistributorDefaultRateBps)
+	common.OptionMap["DistributorHoldDays"] = strconv.Itoa(operation_setting.DistributorHoldDays)
+	common.OptionMap["DistributorWithdrawEnabled"] = strconv.FormatBool(operation_setting.DistributorWithdrawEnabled)
+	common.OptionMap["DistributorWithdrawMinCNY"] = operation_setting.DistributorWithdrawMinCNY
+	common.OptionMap["DistributorWithdrawMethods"] = `["alipay","wechat","bank","usdt"]`
+	common.OptionMap["DistributorUsdtNetworks"] = "[]"
+	common.OptionMap["CommissionTermsExtra"] = ""
+	common.OptionMap["ReferralTermsExtra"] = ""
+	common.OptionMap["DistributorTermsExtra"] = ""
+	common.OptionMap["CommissionTermsVersion"] = strconv.Itoa(operation_setting.CommissionTermsVersion)
+	// 首次升级时《分销协议》版本与细则版本对齐，之后独立 +1。
+	common.OptionMap["DistributorAgreementVersion"] = strconv.Itoa(operation_setting.CommissionTermsVersion)
+	common.OptionMap["InvoiceEnabled"] = strconv.FormatBool(operation_setting.InvoiceEnabled)
+	common.OptionMap["InvoiceMinCNY"] = operation_setting.InvoiceMinCNY
+	common.OptionMap["InvoiceMaxCNY"] = operation_setting.InvoiceMaxCNY
+	common.OptionMap["InvoiceFeeRateFastBps"] = strconv.Itoa(operation_setting.InvoiceFeeRateFastBps)
+	common.OptionMap["InvoiceFeeRateNormalBps"] = strconv.Itoa(operation_setting.InvoiceFeeRateNormalBps)
+	common.OptionMap["InvoiceFeeRateVatBps"] = strconv.Itoa(operation_setting.InvoiceFeeRateVatBps)
+	common.OptionMap["InvoiceTypes"] = operation_setting.InvoiceTypesText
+	common.OptionMap["InvoiceCategories"] = operation_setting.InvoiceCategoriesText
+	common.OptionMap["InvoiceItems"] = operation_setting.InvoiceItemsText
+
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
 	maps.Copy(common.OptionMap, modelConfigs)
 
 	common.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
+	migrateTermsExtraOptions()
+}
+
+// migrateTermsExtraOptions R5：补充条款拆成推广/分销两份。旧共用值一次性复制
+// 到两个新键（版本号不变），随后清空旧键；只在两个新键在库里都没有记录时执行，
+// 保证幂等且不会覆盖管理员拆分后的修改。
+func migrateTermsExtraOptions() {
+	var newRows int64
+	if err := DB.Model(&Option{}).Where(commonKeyCol+" IN ?", []string{"ReferralTermsExtra", "DistributorTermsExtra"}).Count(&newRows).Error; err != nil {
+		common.SysError("failed to check terms extra migration state: " + err.Error())
+		return
+	}
+	if newRows > 0 {
+		return
+	}
+	old := common.OptionMap["CommissionTermsExtra"]
+	if old == "" {
+		return
+	}
+	if err := UpdateOptionsBulk(map[string]string{"ReferralTermsExtra": old, "DistributorTermsExtra": old}); err != nil {
+		common.SysError("failed to migrate CommissionTermsExtra: " + err.Error())
+		return
+	}
+	if err := UpdateOption("CommissionTermsExtra", ""); err != nil {
+		common.SysError("failed to clear CommissionTermsExtra after migration: " + err.Error())
+	}
+	common.SysLog("migrated CommissionTermsExtra into ReferralTermsExtra and DistributorTermsExtra")
 }
 
 func loadOptionsFromDatabase() {
@@ -380,6 +437,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.EmailVerificationEnabled = boolValue
 		case "GitHubOAuthEnabled":
 			common.GitHubOAuthEnabled = boolValue
+		case "GoogleOAuthEnabled":
+			common.GoogleOAuthEnabled = boolValue
 		case "LinuxDOOAuthEnabled":
 			common.LinuxDOOAuthEnabled = boolValue
 		case "WeChatAuthEnabled":
@@ -459,6 +518,14 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.DefaultUseAutoGroup = boolValue
 		case "ExposeRatioEnabled":
 			ratio_setting.SetExposeRatioEnabled(boolValue)
+		case "ReferralCommissionEnabled":
+			operation_setting.ReferralCommissionEnabled = boolValue
+		case "DistributorEnabled":
+			operation_setting.DistributorEnabled = boolValue
+		case "DistributorApplyEnabled":
+			operation_setting.DistributorApplyEnabled = boolValue
+		case "DistributorWithdrawEnabled":
+			operation_setting.DistributorWithdrawEnabled = boolValue
 		}
 	}
 	if key == setting.TaskPluginDisabledFactoryKeysKey {
@@ -576,6 +643,10 @@ func updateOptionMap(key string, value string) (err error) {
 		common.GitHubClientId = value
 	case "GitHubClientSecret":
 		common.GitHubClientSecret = value
+	case "GoogleClientId":
+		common.GoogleClientId = value
+	case "GoogleClientSecret":
+		common.GoogleClientSecret = value
 	case "LinuxDOClientId":
 		common.LinuxDOClientId = value
 	case "LinuxDOClientSecret":
@@ -674,6 +745,42 @@ func updateOptionMap(key string, value string) (err error) {
 		// WaffoPayMethods is read directly from OptionMap via setting.GetWaffoPayMethods().
 		// The value is already stored in OptionMap at the top of this function (line: common.OptionMap[key] = value).
 		// No additional in-memory variable to update.
+	case "ReferralRateBps":
+		operation_setting.ReferralRateBps, _ = strconv.Atoi(value)
+	case "DistributorDefaultRateBps":
+		operation_setting.DistributorDefaultRateBps, _ = strconv.Atoi(value)
+	case "DistributorHoldDays":
+		operation_setting.DistributorHoldDays, _ = strconv.Atoi(value)
+	case "DistributorWithdrawMinCNY":
+		operation_setting.DistributorWithdrawMinCNY = value
+	case "CommissionTermsExtra":
+		operation_setting.CommissionTermsExtra = value
+	case "ReferralTermsExtra":
+		operation_setting.ReferralTermsExtra = value
+	case "DistributorTermsExtra":
+		operation_setting.DistributorTermsExtra = value
+	case "CommissionTermsVersion":
+		operation_setting.CommissionTermsVersion, _ = strconv.Atoi(value)
+	case "DistributorAgreementVersion":
+		operation_setting.DistributorAgreementVersion, _ = strconv.Atoi(value)
+	case "InvoiceEnabled":
+		operation_setting.InvoiceEnabled = value == "true"
+	case "InvoiceMinCNY":
+		operation_setting.InvoiceMinCNY = value
+	case "InvoiceMaxCNY":
+		operation_setting.InvoiceMaxCNY = value
+	case "InvoiceFeeRateFastBps":
+		operation_setting.InvoiceFeeRateFastBps, _ = strconv.Atoi(value)
+	case "InvoiceFeeRateNormalBps":
+		operation_setting.InvoiceFeeRateNormalBps, _ = strconv.Atoi(value)
+	case "InvoiceFeeRateVatBps":
+		operation_setting.InvoiceFeeRateVatBps, _ = strconv.Atoi(value)
+	case "InvoiceTypes":
+		operation_setting.InvoiceTypesText = value
+	case "InvoiceCategories":
+		operation_setting.InvoiceCategoriesText = value
+	case "InvoiceItems":
+		operation_setting.InvoiceItemsText = value
 	}
 	return err
 }

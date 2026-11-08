@@ -157,7 +157,24 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		ResourceTaskPlugin: {
 			ActionBind: false,
 		},
-		ResourceAudit: {ActionRead: false},
+		ResourceAudit:   {ActionRead: false},
+		ResourceRisk:    {"read": false, "review": false},
+		ResourcePayment: {"read": false, "operate": false, "review": false},
+		ResourceDistributor: {
+			"read":   true,
+			"review": true,
+			"manage": false,
+			"settle": false,
+		},
+		ResourceReferral: {
+			"read":   true,
+			"manage": false,
+			"settle": false,
+		},
+		ResourceInvoice: {
+			"read":   true,
+			"review": false,
+		},
 	}, ExplicitUserPermissions(42))
 	assert.Equal(t, PermissionsMap{
 		ResourceChannel: {
@@ -189,7 +206,24 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		ResourceTaskPlugin: {
 			ActionBind: false,
 		},
-		ResourceAudit: {ActionRead: false},
+		ResourceAudit:   {ActionRead: false},
+		ResourceRisk:    {"read": false, "review": false},
+		ResourcePayment: {"read": false, "operate": false, "review": false},
+		ResourceDistributor: {
+			"read":   true,
+			"review": true,
+			"manage": false,
+			"settle": false,
+		},
+		ResourceReferral: {
+			"read":   true,
+			"manage": false,
+			"settle": false,
+		},
+		ResourceInvoice: {
+			"read":   true,
+			"review": false,
+		},
 	}, ExplicitUserPermissions(42))
 	assert.Empty(t, ExplicitUserOverrides(42))
 }
@@ -319,4 +353,34 @@ func TestTaskPluginBindIsRootOnlyUntilGranted(t *testing.T) {
 	_, err = enforcer.RemovePolicy(RoleSubject(BuiltInRoleAdmin), ResourceTaskPlugin, ActionBind, EffectAllow)
 	require.NoError(t, err)
 	assert.False(t, Can(2, common.RoleAdminUser, TaskPluginBind))
+}
+
+func TestDistributorResourceDefaults(t *testing.T) {
+	db := newAuthzTestDB(t)
+	require.NoError(t, Init(db))
+
+	assert.True(t, Can(2, common.RoleAdminUser, DistributorRead))
+	assert.True(t, Can(2, common.RoleAdminUser, DistributorReview))
+	assert.False(t, Can(2, common.RoleAdminUser, DistributorManage))
+	assert.False(t, Can(2, common.RoleAdminUser, DistributorSettle))
+	assert.True(t, Can(1, common.RoleRootUser, DistributorManage))
+	assert.True(t, Can(1, common.RoleRootUser, DistributorSettle))
+	assert.False(t, Can(3, common.RoleCommonUser, DistributorRead))
+
+	// 普通管理员可通过用户级覆写获得 manage/settle
+	enforcer := currentEnforcer()
+	require.NotNil(t, enforcer)
+	_, err := enforcer.AddPolicy(UserSubject(2), ResourceDistributor, "settle", EffectAllow)
+	require.NoError(t, err)
+	assert.True(t, Can(2, common.RoleAdminUser, DistributorSettle))
+	_, err = enforcer.RemovePolicy(UserSubject(2), ResourceDistributor, "settle", EffectAllow)
+	require.NoError(t, err)
+	assert.False(t, Can(2, common.RoleAdminUser, DistributorSettle))
+
+	// referral 资源与 distributor 对称：admin 默认 read，manage/settle 无默认角色
+	assert.True(t, Can(2, common.RoleAdminUser, ReferralRead))
+	assert.False(t, Can(2, common.RoleAdminUser, ReferralManage))
+	assert.False(t, Can(2, common.RoleAdminUser, ReferralSettle))
+	assert.True(t, Can(1, common.RoleRootUser, ReferralSettle))
+	assert.False(t, Can(3, common.RoleCommonUser, ReferralRead))
 }

@@ -86,6 +86,8 @@ func SetApiRouter(router *gin.Engine) {
 			//userRoute.POST("/tokenlog", middleware.CriticalRateLimit(), controller.TokenLog)
 			userRoute.POST("/epay/notify", anonymousRequestBodyLimit, controller.EpayNotify)
 			userRoute.GET("/epay/notify", controller.EpayNotify)
+			userRoute.POST("/epay/invoice_notify", anonymousRequestBodyLimit, controller.InvoiceEpayNotify)
+			userRoute.GET("/epay/invoice_notify", controller.InvoiceEpayNotify)
 			userRoute.GET("/groups", controller.GetUserGroups)
 
 			selfRoute := userRoute.Group("/")
@@ -123,6 +125,41 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/waffo-pancake/amount", controller.RequestWaffoPancakeAmount)
 				selfRoute.POST("/waffo-pancake/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPancakePay)
 				selfRoute.POST("/aff_transfer", middleware.UserCriticalRateLimit("aff-transfer"), controller.TransferAffQuota)
+
+				// 推广与分销（用户侧）
+				selfRoute.GET("/commission/summary", controller.GetReferralSummary)
+				selfRoute.GET("/commission/trend", controller.GetReferralTrend)
+				selfRoute.GET("/commission/records", controller.GetReferralCommissions)
+				selfRoute.GET("/commission/invitees", controller.GetReferralInvitees)
+				selfRoute.GET("/commission/settlements", controller.GetSelfCommissionSettlements)
+				selfRoute.GET("/commission/debt", controller.GetSelfCommissionDebts)
+				selfRoute.POST("/commission/transfer", middleware.UserCriticalRateLimit("commission-transfer"), controller.TransferReferralToQuota)
+				selfRoute.GET("/distributor", controller.GetSelfDistributor)
+				selfRoute.POST("/distributor/applications", middleware.UserCriticalRateLimit("distributor-apply"), controller.SubmitDistributorApplication)
+				selfRoute.POST("/distributor/applications/:id/withdraw", controller.WithdrawDistributorApplication)
+				selfRoute.POST("/distributor/agreement/ack", controller.AcknowledgeDistributorAgreement)
+				selfRoute.POST("/commission/terms/read", controller.AcknowledgeTermsRead)
+
+				distributorSelf := selfRoute.Group("/distributor", middleware.RequireDistributor())
+				{
+					distributorSelf.GET("/summary", controller.GetDistributorSummary)
+					distributorSelf.GET("/trend", controller.GetDistributorTrend)
+					distributorSelf.GET("/invitees", controller.GetDistributorInvitees)
+					distributorSelf.GET("/commissions", controller.GetDistributorCommissions)
+					distributorSelf.GET("/settlements", controller.GetDistributorSettlements)
+					distributorSelf.GET("/wallet", controller.GetDistributorWallet)
+					distributorSelf.GET("/withdrawals", controller.GetDistributorWithdrawals)
+					distributorSelf.POST("/withdrawals", middleware.UserCriticalRateLimit("distributor-withdraw"), controller.RequestDistributorWithdrawal)
+					distributorSelf.POST("/transfer", middleware.UserCriticalRateLimit("distributor-transfer"), controller.TransferDistributorBalance)
+				}
+				// 申请发票（用户侧）
+				selfRoute.GET("/invoices", controller.ListMyInvoices)
+				selfRoute.GET("/invoices/options", controller.GetInvoiceOptions)
+				selfRoute.POST("/invoices", middleware.UserCriticalRateLimit("invoice-apply"), controller.CreateInvoice)
+
+				selfRoute.GET("/notifications", controller.ListMyNotifications)
+				selfRoute.POST("/notifications/read", controller.ReadMyNotifications)
+
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
 
 				// 2FA routes
@@ -308,9 +345,59 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
+		// 推广与分销
+		apiRouter.GET("/commission/terms", middleware.DisableCache(), middleware.UserAuth(), controller.GetCommissionTerms)
+		apiRouter.GET("/commission/campaigns/active", middleware.DisableCache(), middleware.UserAuth(), controller.GetActiveCommissionCampaigns)
+		commissionAdmin := apiRouter.Group("/commission/admin", middleware.DisableCache(), middleware.AdminAuth())
+		{
+			// program 相关端点在 handler 内按业务线校验 referral.* / distributor.* 权限。
+			commissionAdmin.GET("/records", controller.AdminListCommissionRecords)
+			commissionAdmin.GET("/due-summary", middleware.RequirePermission(authz.DistributorRead), controller.AdminDueCommissionSummary)
+			commissionAdmin.GET("/attributions", controller.AdminListInviteAttributions)
+			commissionAdmin.GET("/settlements", controller.AdminListCommissionSettlements)
+			commissionAdmin.GET("/debts", controller.AdminListCommissionDebts)
+			commissionAdmin.GET("/campaigns", controller.AdminListCommissionCampaigns)
+			commissionAdmin.POST("/confirm", middleware.RequirePermission(authz.DistributorSettle), controller.AdminConfirmCommissions)
+			commissionAdmin.PUT("/records/:id/available_at", controller.AdminAdjustCommissionAvailableAt)
+			commissionAdmin.POST("/records/:id/reverse", controller.AdminReverseCommissionRecord)
+			commissionAdmin.POST("/debts/:user_id/waive", controller.AdminWaiveCommissionDebt)
+			commissionAdmin.POST("/backfill", controller.AdminBackfillCommissions)
+			commissionAdmin.POST("/campaigns", controller.AdminCreateCommissionCampaign)
+			commissionAdmin.PUT("/campaigns/:id", controller.AdminUpdateCommissionCampaign)
+			commissionAdmin.POST("/campaigns/:id/cancel", controller.AdminCancelCommissionCampaign)
+		}
+		distributorAdmin := apiRouter.Group("/distributor/admin", middleware.DisableCache(), middleware.AdminAuth())
+		{
+			distributorAdmin.GET("/applications", middleware.RequirePermission(authz.DistributorRead), controller.AdminListDistributorApplications)
+			distributorAdmin.POST("/applications/:id/review", middleware.RequirePermission(authz.DistributorReview), controller.AdminReviewDistributorApplication)
+			distributorAdmin.GET("/profiles", middleware.RequirePermission(authz.DistributorRead), controller.AdminListDistributorProfiles)
+			distributorAdmin.PUT("/profiles/:user_id", middleware.RequirePermission(authz.DistributorManage), controller.AdminUpdateDistributorProfile)
+			distributorAdmin.POST("/profiles/:user_id/settle_out", middleware.RequirePermission(authz.DistributorSettle), controller.AdminSettleOutDistributor)
+			distributorAdmin.GET("/withdrawals", middleware.RequirePermission(authz.DistributorRead), controller.AdminListDistributorWithdrawals)
+			distributorAdmin.GET("/withdrawals/:id", middleware.RequirePermission(authz.DistributorSettle), controller.AdminGetDistributorWithdrawal)
+			distributorAdmin.POST("/withdrawals/:id/review", middleware.RequirePermission(authz.DistributorSettle), controller.AdminReviewDistributorWithdrawal)
+			distributorAdmin.POST("/withdrawals/:id/paid", middleware.RequirePermission(authz.DistributorSettle), controller.AdminMarkDistributorWithdrawalPaid)
+		}
+		invoiceAdmin := apiRouter.Group("/invoice/admin", middleware.DisableCache(), middleware.AdminAuth())
+		{
+			invoiceAdmin.GET("/invoices", middleware.RequirePermission(authz.InvoiceRead), controller.AdminListInvoices)
+			invoiceAdmin.POST("/invoices/:id/review", middleware.RequirePermission(authz.InvoiceReview), controller.AdminReviewInvoice)
+		}
 		apiRouter.GET("/audit", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), controller.GetAuditLogs)
 		apiRouter.GET("/audit/self", middleware.DisableCache(), middleware.UserAuth(), controller.GetAuditLogs)
+		riskRoute := apiRouter.Group("/risk")
+		riskRoute.GET("/self", middleware.DisableCache(), middleware.UserAuth(), controller.GetRiskEventsSelf)
+		riskRoute.GET("/self/:event_id", middleware.DisableCache(), middleware.UserAuth(), controller.GetRiskEventSelfDetail)
+		riskRoute.POST("/self/:event_id/appeals", middleware.DisableCache(), middleware.UserAuth(), controller.SubmitRiskEventAppeal)
+		riskRoute.GET("/", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.RiskRead), controller.GetRiskEvents)
+		riskRoute.GET("/:event_id", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.RiskRead), controller.GetRiskEventDetail)
+		riskRoute.POST("/:event_id/review", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.RiskReview), controller.ReviewRiskEvent)
 		logRoute := apiRouter.Group("/log")
+		paymentEvents := apiRouter.Group("/payment-events", middleware.DisableCache(), middleware.AdminAuth())
+		paymentEvents.GET("/", middleware.RequirePermission(authz.PaymentRead), controller.GetPaymentEvents)
+		paymentEvents.GET("/:id", middleware.RequirePermission(authz.PaymentRead), controller.GetPaymentEventDetail)
+		paymentEvents.POST("/:id/retry", middleware.RequirePermission(authz.PaymentOperate), controller.RetryPaymentEvent)
+		paymentEvents.POST("/:id/review", middleware.RequirePermission(authz.PaymentReview), controller.ReviewPaymentFinancialEvent)
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)
 		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
@@ -331,6 +418,7 @@ func SetApiRouter(router *gin.Engine) {
 		systemInfoRoute := apiRouter.Group("/system-info")
 		systemInfoRoute.Use(middleware.RootAuth())
 		{
+			systemInfoRoute.GET("/database-health", middleware.DisableCache(), controller.GetSystemDatabaseHealth)
 			systemInfoRoute.GET("/instances", controller.ListSystemInstances)
 			systemInfoRoute.DELETE("/stale-instances", controller.DeleteStaleSystemInstances)
 			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
