@@ -224,7 +224,8 @@ type SubscriptionOrder struct {
 	CreateTime      int64  `json:"create_time"`
 	CompleteTime    int64  `json:"complete_time"`
 
-	ProviderPayload string `json:"provider_payload" gorm:"type:text"`
+	ProviderPayload    string `json:"provider_payload" gorm:"type:text"`
+	UserSubscriptionId int    `json:"user_subscription_id"`
 }
 
 func (o *SubscriptionOrder) Insert() error {
@@ -502,7 +503,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := getDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -566,7 +567,7 @@ func refreshSubscriptionUserGroupCache(userId int, operation string) {
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.
 // expectedPaymentProvider guards against cross-gateway callback attacks (empty skips the check).
 // actualPaymentMethod updates the order's PaymentMethod to reflect the real payment type used (empty skips update).
-func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string) error {
+func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string, verified ...PaymentEvent) error {
 	if tradeNo == "" {
 		return errors.New("tradeNo is empty")
 	}
@@ -579,6 +580,13 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 	var logMoney float64
 	var logPaymentMethod string
 	var upgradeGroup string
+	var evidence *PaymentEvent
+	if len(verified) > 1 {
+		return ErrPaymentEventInvalid
+	}
+	if len(verified) == 1 {
+		evidence = &verified[0]
+	}
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var order SubscriptionOrder
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
@@ -588,12 +596,12 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 			return ErrPaymentMethodMismatch
 		}
 		if order.Status == common.TopUpStatusSuccess {
-			return nil
+			return verifyPaymentReceiptTx(tx, evidence)
 		}
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := GetSubscriptionPlanById(order.PlanId)
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
 			return err
 		}
@@ -617,6 +625,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 			return err
 		}
 		order.Status = common.TopUpStatusSuccess
+		order.UserSubscriptionId = subscription.Id
 		order.CompleteTime = common.GetTimestamp()
 		if providerPayload != "" {
 			order.ProviderPayload = providerPayload
@@ -625,6 +634,9 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 			order.PaymentMethod = actualPaymentMethod
 		}
 		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+		if err := recordPaymentReceiptTx(tx, evidence, order.UserId, 0, subscription.Id, 0); err != nil {
 			return err
 		}
 		logUserId = order.UserId
@@ -683,6 +695,13 @@ func upsertSubscriptionTopUpTx(tx *gorm.DB, order *SubscriptionOrder) error {
 }
 
 func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) error {
+	return UpdatePendingSubscriptionOrderStatus(tradeNo, expectedPaymentProvider, common.TopUpStatusExpired)
+}
+
+func UpdatePendingSubscriptionOrderStatus(tradeNo string, expectedPaymentProvider string, targetStatus string) error {
+	if targetStatus != common.TopUpStatusFailed && targetStatus != common.TopUpStatusExpired {
+		return ErrSubscriptionOrderStatusInvalid
+	}
 	if tradeNo == "" {
 		return errors.New("tradeNo is empty")
 	}
@@ -701,7 +720,7 @@ func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) err
 		if order.Status != common.TopUpStatusPending {
 			return nil
 		}
-		order.Status = common.TopUpStatusExpired
+		order.Status = targetStatus
 		order.CompleteTime = common.GetTimestamp()
 		return tx.Save(&order).Error
 	})
