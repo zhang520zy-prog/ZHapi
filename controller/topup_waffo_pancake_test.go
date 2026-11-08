@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +24,7 @@ func TestFormatWaffoPancakeAmount_UsesDisplayPriceString(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, formatWaffoPancakeAmount(tc.amount))
+			require.Equal(t, tc.expected, formatWaffoPancakeAmount(decimal.NewFromFloat(tc.amount)))
 		})
 	}
 }
@@ -84,7 +85,7 @@ func TestGetWaffoPancakePayMoney(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			operation_setting.GetGeneralSetting().QuotaDisplayType = tc.quotaDisplayType
 			actual := getWaffoPancakePayMoney(tc.amount, tc.group)
-			require.InDelta(t, tc.expected, actual, 0.000001)
+			require.InDelta(t, tc.expected, actual.InexactFloat64(), 0.000001)
 		})
 	}
 }

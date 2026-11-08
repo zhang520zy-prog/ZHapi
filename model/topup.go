@@ -23,6 +23,28 @@ type TopUp struct {
 	CreateTime      int64   `json:"create_time"`
 	CompleteTime    int64   `json:"complete_time"`
 	Status          string  `json:"status"`
+
+	// 手续费快照（下单时写入）：Money 仍是到账金额；实付 = CreditedMoney + FeeMoney。
+	// 金额列用 decimal.Decimal 存取；default 写作 0.00 与 MySQL 对
+	// decimal(18,2) 默认值的存储形态一致，避免重复 AutoMigrate。
+	FeeRateBps    int             `json:"fee_rate_bps" gorm:"not null;default:0"`
+	FeeMoney      decimal.Decimal `json:"-" gorm:"type:decimal(18,2);not null;default:0.00"`
+	CreditedMoney decimal.Decimal `json:"-" gorm:"type:decimal(18,2);not null;default:0.00"`
+	Currency      string          `json:"currency" gorm:"type:varchar(8);not null;default:''"`
+}
+
+// MarshalJSON 按规则输出：金额快照以字符串（两位小数）返回给前端。
+func (topUp TopUp) MarshalJSON() ([]byte, error) {
+	type Alias TopUp
+	return common.Marshal(struct {
+		Alias
+		FeeMoney      string `json:"fee_money"`
+		CreditedMoney string `json:"credited_money"`
+	}{
+		Alias:         Alias(topUp),
+		FeeMoney:      topUp.FeeMoney.StringFixed(2),
+		CreditedMoney: topUp.CreditedMoney.StringFixed(2),
+	})
 }
 
 const (
@@ -173,7 +195,8 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 // 在同一个事务内完成，因此同一订单的并发/重复回调（包括多实例部署下）最多充值一次。
 // alreadyDone=true 表示订单此前已完成，本次为幂等重复回调。
 // 进程内的 LockOrder 只是优化，正确性由本函数的数据库行锁保证。
-func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+// paidMoney 为回调里的实付金额（VerifyRes.Money），入账前与订单快照核对。
+func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string, paidMoney string) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -199,6 +222,10 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		if topUp.Status != common.TopUpStatusPending {
 			return ErrTopUpStatusInvalid
 		}
+		if err := verifyPaidMoney(PaymentProviderEpay, tradeNo, topUp.Currency, "",
+			expectedPaidMoney(topUp.CreditedMoney, topUp.FeeMoney, topUp.Money, topUp.Currency), paidMoney); err != nil {
+			return err
+		}
 		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
 			topUp.PaymentMethod = actualPaymentMethod
 		}
@@ -217,6 +244,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
 	})
 	if err != nil {
+		err = noteAmountMismatch(err)
 		if !errors.Is(err, ErrTopUpNotFound) && !errors.Is(err, ErrPaymentMethodMismatch) && !errors.Is(err, ErrTopUpStatusInvalid) {
 			common.SysError("epay topup failed: " + err.Error())
 		}
@@ -550,7 +578,11 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
 	return nil
 }
-func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
+
+// RechargeCreem 完成 Creem 充值订单。Creem 价格已含手续费，期望实付为
+// credited_money（老订单为 Money）；paidMinor/paidCurrency 来自回调
+// order.amount_paid（最小货币单位）与 order.currency。
+func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string, paidMinor int64, paidCurrency string) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -575,6 +607,11 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
+		}
+
+		if err := verifyPaidMinor(PaymentProviderCreem, referenceId, topUp.Currency, paidCurrency,
+			expectedCreditedMoney(topUp.CreditedMoney, topUp.Money, topUp.Currency), paidMinor); err != nil {
+			return err
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -612,6 +649,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 	})
 
 	if err != nil {
+		err = noteAmountMismatch(err)
 		common.SysError("creem topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
@@ -623,7 +661,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 	return nil
 }
 
-func RechargeWaffo(tradeNo string, callerIp string) (err error) {
+// RechargeWaffo 完成 Waffo 充值订单。paidMoney/paidCurrency 来自回调的
+// OrderAmount/OrderCurrency（下单时提交给支付方的金额与币种），入账前
+// 与 credited_money + fee_money（老订单为 Money）核对。
+func RechargeWaffo(tradeNo string, callerIp string, paidMoney string, paidCurrency string) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -654,6 +695,11 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return errors.New("充值订单状态错误")
 		}
 
+		if err := verifyPaidMoney(PaymentProviderWaffo, tradeNo, topUp.Currency, paidCurrency,
+			expectedPaidMoney(topUp.CreditedMoney, topUp.FeeMoney, topUp.Money, topUp.Currency), paidMoney); err != nil {
+			return err
+		}
+
 		quotaToAdd, err = common.WalletQuotaFromDecimalStrict(
 			decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
 		)
@@ -671,6 +717,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 	})
 
 	if err != nil {
+		err = noteAmountMismatch(err)
 		common.SysError("waffo topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
@@ -684,7 +731,10 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 	return nil
 }
 
-func RechargeWaffoPancake(tradeNo string) (err error) {
+// RechargeWaffoPancake 完成 Waffo Pancake 充值订单。paidMoney/paidCurrency
+// 来自回调 evt.Data.Amount/evt.Data.Currency，入账前与
+// credited_money + fee_money（老订单为 Money）核对。
+func RechargeWaffoPancake(tradeNo string, paidMoney string, paidCurrency string) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -715,6 +765,11 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return errors.New("充值订单状态错误")
 		}
 
+		if err := verifyPaidMoney(PaymentProviderWaffoPancake, tradeNo, topUp.Currency, paidCurrency,
+			expectedPaidMoney(topUp.CreditedMoney, topUp.FeeMoney, topUp.Money, topUp.Currency), paidMoney); err != nil {
+			return err
+		}
+
 		quotaToAdd, err = common.WalletQuotaFromDecimalStrict(
 			decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
 		)
@@ -732,6 +787,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	})
 
 	if err != nil {
+		err = noteAmountMismatch(err)
 		common.SysError("waffo pancake topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}

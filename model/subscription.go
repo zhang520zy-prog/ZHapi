@@ -226,6 +226,27 @@ type SubscriptionOrder struct {
 
 	ProviderPayload    string `json:"provider_payload" gorm:"type:text"`
 	UserSubscriptionId int    `json:"user_subscription_id"`
+
+	// 手续费快照（下单时写入）：Money 仍是套餐到账金额；实付 =
+	// CreditedMoney + FeeMoney。规则同 top_ups 的四列。
+	FeeRateBps    int             `json:"fee_rate_bps" gorm:"not null;default:0"`
+	FeeMoney      decimal.Decimal `json:"-" gorm:"type:decimal(18,2);not null;default:0.00"`
+	CreditedMoney decimal.Decimal `json:"-" gorm:"type:decimal(18,2);not null;default:0.00"`
+	Currency      string          `json:"currency" gorm:"type:varchar(8);not null;default:''"`
+}
+
+// MarshalJSON 金额快照以字符串（两位小数）返回给前端。
+func (o SubscriptionOrder) MarshalJSON() ([]byte, error) {
+	type Alias SubscriptionOrder
+	return common.Marshal(struct {
+		Alias
+		FeeMoney      string `json:"fee_money"`
+		CreditedMoney string `json:"credited_money"`
+	}{
+		Alias:         Alias(o),
+		FeeMoney:      o.FeeMoney.StringFixed(2),
+		CreditedMoney: o.CreditedMoney.StringFixed(2),
+	})
 }
 
 func (o *SubscriptionOrder) Insert() error {
@@ -567,7 +588,9 @@ func refreshSubscriptionUserGroupCache(userId int, operation string) {
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.
 // expectedPaymentProvider guards against cross-gateway callback attacks (empty skips the check).
 // actualPaymentMethod updates the order's PaymentMethod to reflect the real payment type used (empty skips update).
-func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string, verified ...PaymentEvent) error {
+// paidMoney/paidCurrency 为回调实付金额与币种（主单位）；在线支付通道
+// （epay、creem、waffo_pancake）必须在入账前核对，stripe/balance 传空跳过。
+func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string, paidMoney string, paidCurrency string, verified ...PaymentEvent) error {
 	if tradeNo == "" {
 		return errors.New("tradeNo is empty")
 	}
@@ -600,6 +623,12 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		}
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
+		}
+		if paymentAmountCheckProviders[order.PaymentProvider] {
+			expected := expectedPaidMoney(order.CreditedMoney, order.FeeMoney, order.Money, order.Currency)
+			if err := verifyPaidMoney(order.PaymentProvider, tradeNo, order.Currency, paidCurrency, expected, paidMoney); err != nil {
+				return err
+			}
 		}
 		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
@@ -646,7 +675,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		return nil
 	})
 	if err != nil {
-		return err
+		return noteAmountMismatch(err)
 	}
 	if upgradeGroup != "" && logUserId > 0 {
 		refreshSubscriptionUserGroupCache(logUserId, "subscription payment completion")
@@ -833,6 +862,10 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			CreateTime:      now,
 			CompleteTime:    now,
 			ProviderPayload: fmt.Sprintf("charged_quota=%d", requiredQuota),
+			FeeRateBps:      0,
+			FeeMoney:        decimal.Zero,
+			CreditedMoney:   decimal.NewFromFloat(plan.PriceAmount),
+			Currency:        strings.ToUpper(strings.TrimSpace(plan.Currency)),
 		}
 		if err := tx.Create(order).Error; err != nil {
 			return err

@@ -2,14 +2,17 @@ package controller
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -95,6 +98,69 @@ func UpdateSubscriptionPreference(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, gin.H{"billing_preference": pref})
+}
+
+type SubscriptionQuoteRequest struct {
+	PlanId        int    `json:"plan_id"`
+	PaymentMethod string `json:"payment_method"` // balance | epay:<method> | creem | waffo_pancake
+}
+
+// SubscriptionRequestQuote 返回订阅购买的报价：credited_money 为套餐价，
+// 在线支付通道按费率加收手续费。balance 与 creem 不产生手续费（creem 为
+// fee_included，手续费已含在价格中）。
+func SubscriptionRequestQuote(c *gin.Context) {
+	var req SubscriptionQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlanId <= 0 {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+
+	plan, err := model.GetSubscriptionPlanById(req.PlanId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !plan.Enabled {
+		common.ApiErrorMsg(c, "套餐未启用")
+		return
+	}
+
+	credited := decimal.NewFromFloat(plan.PriceAmount)
+	currency := strings.ToUpper(strings.TrimSpace(plan.Currency))
+	if currency == "" {
+		currency = "USD"
+	}
+	var quote service.PaymentQuote
+	switch {
+	case req.PaymentMethod == model.PaymentMethodBalance:
+		quote, err = service.BuildPaymentQuote(credited, 0, currency)
+	case strings.HasPrefix(req.PaymentMethod, model.PaymentProviderEpay+":"):
+		method := strings.TrimPrefix(req.PaymentMethod, model.PaymentProviderEpay+":")
+		if !operation_setting.ContainsPayMethod(method) {
+			common.ApiErrorMsg(c, "支付方式不存在")
+			return
+		}
+		quote, err = service.BuildPaymentQuote(credited,
+			operation_setting.GetFeeRateBps(model.PaymentProviderEpay, method), "CNY")
+	case req.PaymentMethod == model.PaymentMethodCreem:
+		quote, err = service.BuildPaymentQuote(credited, 0, currency)
+		quote.FeeIncluded = true
+	case req.PaymentMethod == model.PaymentMethodWaffoPancake:
+		quote, err = service.BuildPaymentQuote(credited,
+			operation_setting.GetFeeRateBps(model.PaymentProviderWaffoPancake, "default"), "USD")
+	default:
+		common.ApiErrorMsg(c, "支付方式不存在")
+		return
+	}
+	if err != nil {
+		common.ApiErrorMsg(c, "套餐金额无效")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success",
+		"data":    quote.TotalMoney.StringFixed(service.MinorUnitsForCurrency(quote.Currency)),
+		"quote":   quote,
+	})
 }
 
 func SubscriptionRequestBalancePay(c *gin.Context) {

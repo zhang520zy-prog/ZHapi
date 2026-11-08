@@ -53,6 +53,16 @@ type PaymentEvent struct {
 	RelatedTradeNo    string `json:"related_trade_no" gorm:"type:varchar(255)"`
 }
 
+// PaymentEventTypeAmountMismatch 回调实付金额与订单快照不一致的事件类型。
+const PaymentEventTypeAmountMismatch = "callback.amount_mismatch"
+
+var paymentAmountCheckProviders = map[string]bool{
+	PaymentProviderEpay:         true,
+	PaymentProviderCreem:        true,
+	PaymentProviderWaffo:        true,
+	PaymentProviderWaffoPancake: true,
+}
+
 type PaymentEventAction struct {
 	ID             int    `json:"id"`
 	PaymentEventID int    `json:"payment_event_id" gorm:"index"`
@@ -108,6 +118,41 @@ func RecordPaymentEvent(input PaymentEventInput) (*PaymentEvent, error) {
 		return nil, ErrPaymentEventConflict
 	}
 	return &stored, nil
+}
+
+// recordPaymentAmountMismatch 在订单事务之外写一条 sanitize 后的支付事件：
+// 只存通道、单号、实付金额（最小单位）和币种，不存回调原文、签名、凭证。
+// 订单保持 pending，事件置为 needs_review 供管理员核对；EventID 由单号
+// 派生，对同一订单的重复不一致回调幂等。
+func recordPaymentAmountMismatch(provider, tradeNo string, paidMinor int64, currency string) error {
+	if !paymentAmountCheckProviders[provider] || tradeNo == "" || paidMinor < 0 ||
+		paidMinor > int64(common.MaxWalletQuota) {
+		return ErrPaymentEventInvalid
+	}
+	input := PaymentEventInput{
+		Provider:      provider,
+		EventID:       "amount-mismatch-" + provider + "-" + tradeNo,
+		EventType:     PaymentEventTypeAmountMismatch,
+		TradeNo:       tradeNo,
+		PaidMinor:     paidMinor,
+		Currency:      strings.ToUpper(currency),
+		PaymentStatus: "mismatch",
+	}
+	encoded, err := common.Marshal(input)
+	if err != nil {
+		return err
+	}
+	now := common.GetTimestamp()
+	event := &PaymentEvent{
+		PaymentEventInput: input,
+		EventKey:          fmt.Sprintf("%x", sha256.Sum256([]byte(input.Provider+"\x00"+input.EventID))),
+		Fingerprint:       fmt.Sprintf("%x", sha256.Sum256(encoded)),
+		Status:            "needs_review",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		Version:           1,
+	}
+	return DB.Clauses(clause.OnConflict{DoNothing: true}).Create(event).Error
 }
 
 // Claims are atomic across nodes. An expired lease can replay fulfillment;

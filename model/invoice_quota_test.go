@@ -101,11 +101,64 @@ func invoiceQuotaScenario(f *commissionFixture, t *testing.T) {
 	assert.Equal(t, "150.00", consumed.StringFixed(2))
 }
 
+// invoiceQuotaFeeSnapshotScenario B3.5 快照分支：带手续费的 CNY 充值只计
+// credited_money；外币快照订单、invoice_fee 订单、余额订阅不计入；
+// CNY 在线订阅按 credited_money 计入。
+func invoiceQuotaFeeSnapshotScenario(f *commissionFixture, t *testing.T) {
+	withInvoiceTables(t)
+	u := f.makeUser("inv_fee", 0)
+	require.NoError(t, f.db.Model(&User{}).Where("id = ?", u.Id).Update("quota", int64(10_000_000)).Error)
+	now := common.GetTimestamp()
+	mkTopUp := func(trade, method, currency string, credited, fee float64, status string) {
+		require.NoError(t, f.db.Create(&TopUp{
+			UserId: u.Id, Amount: 1, Money: credited, TradeNo: trade,
+			PaymentMethod: method, PaymentProvider: PaymentProviderEpay, Status: status,
+			CreateTime: now, CompleteTime: now,
+			FeeRateBps: 300, FeeMoney: decimal.NewFromFloat(fee), CreditedMoney: decimal.NewFromFloat(credited), Currency: currency,
+		}).Error)
+	}
+	mkSub := func(trade, provider, currency string, credited float64) {
+		require.NoError(t, f.db.Create(&SubscriptionOrder{
+			UserId: u.Id, PlanId: 1, Money: credited, TradeNo: trade,
+			PaymentMethod: provider, PaymentProvider: provider, Status: common.TopUpStatusSuccess,
+			CreateTime: now, CompleteTime: now,
+			FeeRateBps: 300, FeeMoney: decimal.NewFromFloat(credited * 0.03), CreditedMoney: decimal.NewFromFloat(credited), Currency: currency,
+		}).Error)
+	}
+
+	// 计入 200 + 50 = 250：CNY 快照充值按 credited_money（实付 206 中的
+	// 手续费 6 不计入）；CNY 在线订阅（creem）按 credited_money。
+	mkTopUp("tu_fee_cny", "alipay", "CNY", 200, 6, common.TopUpStatusSuccess)
+	mkSub("sub_cny", PaymentProviderCreem, "CNY", 50)
+	// 排除：USD 快照充值、invoice_fee 快照订单、余额订阅、USD 快照订阅、待支付。
+	mkTopUp("tu_usd", "alipay", "USD", 80, 2, common.TopUpStatusSuccess)
+	mkTopUp("tu_invfee", "invoice_fee", "CNY", 6, 0, common.TopUpStatusSuccess)
+	mkSub("sub_bal", PaymentProviderBalance, "CNY", 40)
+	mkSub("sub_usd", PaymentProviderWaffoPancake, "USD", 30)
+	mkTopUp("tu_pend", "alipay", "CNY", 70, 2, common.TopUpStatusPending)
+
+	received, consumed, available, err := InvoiceSummary(u.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "250.00", received.StringFixed(2))
+	assert.Equal(t, "0.00", consumed.StringFixed(2))
+	assert.Equal(t, "250.00", available.StringFixed(2))
+
+	_, err = CreateInvoiceRequest(u.Id, invoiceInput("250.01"))
+	assert.ErrorIs(t, err, ErrInvoiceQuotaExceeded)
+	inv, err := CreateInvoiceRequest(u.Id, invoiceInput("250.00"))
+	require.NoError(t, err)
+	assert.Equal(t, InvoiceStatusPending, inv.Status)
+}
+
 func TestInvoiceQuotaMatrix(t *testing.T) {
 	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
 		t.Run(dialect, func(t *testing.T) {
 			f := newCommissionFixture(t, dialect)
 			invoiceQuotaScenario(f, t)
+		})
+		t.Run(dialect+"/fee_snapshot", func(t *testing.T) {
+			f := newCommissionFixture(t, dialect)
+			invoiceQuotaFeeSnapshotScenario(f, t)
 		})
 	}
 }

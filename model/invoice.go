@@ -131,23 +131,52 @@ func prepareInvoice(userId int, input CreateInvoiceInput) (*InvoiceRequest, erro
 	}, nil
 }
 
-// invoiceableCNYTx B3.5 可开票金额 = 人民币(epay)充值到账合计 + 人民币(epay)在线
-// 订阅到账 − 占用中的发票金额（pending/awaiting_payment/processing/issued；
-// rejected 释放额度）。外币订单与余额购买不计入。
-func invoiceableCNYTx(tx *gorm.DB, userId int) (decimal.Decimal, error) {
-	var topupMoney, subMoney float64
+// invoiceableReceivedCNYTx B3.5：可开票到账合计 = A + B + C。
+//
+//	A：写过快照的 CNY 充值按 credited_money（不含手续费）；
+//	B：升级前的老充值订单（currency=''）为 epay 人民币单，按 money；
+//	C：CNY 在线订阅按 credited_money（余额购买不计入），
+//	   老订阅订单（currency=''）为 epay 人民币单，按 money。
+//
+// 求和结果用 decimal.NullDecimal 扫描，不经过 float64。
+func invoiceableReceivedCNYTx(tx *gorm.DB, userId int) (decimal.Decimal, error) {
+	var topupNew decimal.NullDecimal
 	if err := tx.Model(&TopUp{}).
-		Where("user_id = ? AND status = ? AND payment_provider = ? AND payment_method <> ?",
-			userId, common.TopUpStatusSuccess, PaymentProviderEpay, "invoice_fee").
-		Select("COALESCE(SUM(money),0)").Scan(&topupMoney).Error; err != nil {
+		Where("user_id = ? AND status = ? AND currency = ? AND payment_method <> ?",
+			userId, common.TopUpStatusSuccess, "CNY", "invoice_fee").
+		Select("COALESCE(SUM(credited_money),0)").Scan(&topupNew).Error; err != nil {
 		return decimal.Zero, err
 	}
+	var topupLegacy decimal.NullDecimal
+	if err := tx.Model(&TopUp{}).
+		Where("user_id = ? AND status = ? AND currency = ? AND payment_provider = ? AND payment_method <> ?",
+			userId, common.TopUpStatusSuccess, "", PaymentProviderEpay, "invoice_fee").
+		Select("COALESCE(SUM(money),0)").Scan(&topupLegacy).Error; err != nil {
+		return decimal.Zero, err
+	}
+	var subNew decimal.NullDecimal
 	if err := tx.Model(&SubscriptionOrder{}).
-		Where("user_id = ? AND status = ? AND payment_provider = ?",
-			userId, common.TopUpStatusSuccess, PaymentProviderEpay).
-		Select("COALESCE(SUM(money),0)").Scan(&subMoney).Error; err != nil {
+		Where("user_id = ? AND status = ? AND currency = ? AND payment_provider <> ?",
+			userId, common.TopUpStatusSuccess, "CNY", PaymentProviderBalance).
+		Select("COALESCE(SUM(credited_money),0)").Scan(&subNew).Error; err != nil {
 		return decimal.Zero, err
 	}
+	var subLegacy decimal.NullDecimal
+	if err := tx.Model(&SubscriptionOrder{}).
+		Where("user_id = ? AND status = ? AND currency = ? AND payment_provider = ?",
+			userId, common.TopUpStatusSuccess, "", PaymentProviderEpay).
+		Select("COALESCE(SUM(money),0)").Scan(&subLegacy).Error; err != nil {
+		return decimal.Zero, err
+	}
+	return topupNew.Decimal.
+		Add(topupLegacy.Decimal).
+		Add(subNew.Decimal).
+		Add(subLegacy.Decimal), nil
+}
+
+// invoiceConsumedCNYTx 占用中的发票金额（pending/awaiting_payment/processing/issued；
+// rejected 释放额度）。
+func invoiceConsumedCNYTx(tx *gorm.DB, userId int) (decimal.Decimal, error) {
 	var consumedAmounts []string
 	if err := tx.Model(&InvoiceRequest{}).
 		Where("user_id = ? AND status IN ?",
@@ -163,7 +192,20 @@ func invoiceableCNYTx(tx *gorm.DB, userId int) (decimal.Decimal, error) {
 		}
 		consumed = consumed.Add(d)
 	}
-	return decimal.NewFromFloat(topupMoney + subMoney).Sub(consumed), nil
+	return consumed, nil
+}
+
+// invoiceableCNYTx 可开票金额 = 到账合计 − 已占用。
+func invoiceableCNYTx(tx *gorm.DB, userId int) (decimal.Decimal, error) {
+	received, err := invoiceableReceivedCNYTx(tx, userId)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	consumed, err := invoiceConsumedCNYTx(tx, userId)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	return received.Sub(consumed), nil
 }
 
 // checkInvoiceableQuotaTx 用户行锁内校验申请金额不超可开票额度，
@@ -188,37 +230,16 @@ func checkInvoiceableQuotaTx(tx *gorm.DB, userId int, amountCny string) error {
 }
 
 // InvoiceSummary 可开票摘要（F3.5 页头）：人民币到账 / 已开票+处理中 / 可开票。
+// 与 invoiceableCNYTx 共用同一套汇总，不维护第二份查询。
 func InvoiceSummary(userId int) (received decimal.Decimal, consumed decimal.Decimal, available decimal.Decimal, err error) {
-	var topupMoney, subMoney float64
-	if err = DB.Model(&TopUp{}).
-		Where("user_id = ? AND status = ? AND payment_provider = ? AND payment_method <> ?",
-			userId, common.TopUpStatusSuccess, PaymentProviderEpay, "invoice_fee").
-		Select("COALESCE(SUM(money),0)").Scan(&topupMoney).Error; err != nil {
+	received, err = invoiceableReceivedCNYTx(DB, userId)
+	if err != nil {
 		return
 	}
-	if err = DB.Model(&SubscriptionOrder{}).
-		Where("user_id = ? AND status = ? AND payment_provider = ?",
-			userId, common.TopUpStatusSuccess, PaymentProviderEpay).
-		Select("COALESCE(SUM(money),0)").Scan(&subMoney).Error; err != nil {
+	consumed, err = invoiceConsumedCNYTx(DB, userId)
+	if err != nil {
 		return
 	}
-	var consumedAmounts []string
-	if err = DB.Model(&InvoiceRequest{}).
-		Where("user_id = ? AND status IN ?",
-			userId, []string{InvoiceStatusPending, InvoiceStatusAwaitingPayment, InvoiceStatusProcessing, InvoiceStatusIssued}).
-		Pluck("amount_cny", &consumedAmounts).Error; err != nil {
-		return
-	}
-	consumed = decimal.Zero
-	for _, raw := range consumedAmounts {
-		d, parseErr := decimal.NewFromString(raw)
-		if parseErr != nil {
-			err = parseErr
-			return
-		}
-		consumed = consumed.Add(d)
-	}
-	received = decimal.NewFromFloat(topupMoney + subMoney)
 	available = received.Sub(consumed)
 	return
 }
@@ -284,7 +305,8 @@ func PersistDirectInvoiceOrder(invoice *InvoiceRequest, topUp *TopUp) error {
 
 // SettleInvoiceEpay 收银台回调核销：订单行锁 + 状态校验 + 订单完成 + 申请转
 // 待开票在同一事务内完成，重复/并发回调最多核销一次。
-func SettleInvoiceEpay(tradeNo string, actualPaymentMethod string) (alreadyDone bool, err error) {
+// paidMoney 为回调实付金额（VerifyRes.Money），与其他通道一致在入账前核对。
+func SettleInvoiceEpay(tradeNo string, actualPaymentMethod string, paidMoney string) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -306,6 +328,10 @@ func SettleInvoiceEpay(tradeNo string, actualPaymentMethod string) (alreadyDone 
 		}
 		if topUp.Status != common.TopUpStatusPending {
 			return ErrTopUpStatusInvalid
+		}
+		if err := verifyPaidMoney(PaymentProviderEpay, tradeNo, topUp.Currency, "",
+			expectedPaidMoney(topUp.CreditedMoney, topUp.FeeMoney, topUp.Money, topUp.Currency), paidMoney); err != nil {
+			return err
 		}
 		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
 			topUp.PaymentMethod = actualPaymentMethod
@@ -333,7 +359,7 @@ func SettleInvoiceEpay(tradeNo string, actualPaymentMethod string) (alreadyDone 
 			"version":     invoice.Version + 1,
 		}).Error
 	})
-	return alreadyDone, err
+	return alreadyDone, noteAmountMismatch(err)
 }
 
 func ListInvoices(userId int, status string, start int, size int) ([]InvoiceRequest, int64, error) {

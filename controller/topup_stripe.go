@@ -317,7 +317,7 @@ func fulfillStoredStripeEvent(event model.PaymentEvent) error {
 	if err != nil {
 		return err
 	}
-	err = model.CompleteSubscriptionOrder(event.TradeNo, string(payload), model.PaymentProviderStripe, "", event)
+	err = model.CompleteSubscriptionOrder(event.TradeNo, string(payload), model.PaymentProviderStripe, "", "", "", event)
 	if !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
 		return err
 	}

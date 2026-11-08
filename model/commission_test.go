@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/glebarez/sqlite"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -221,6 +222,7 @@ func TestCommissionMatrix(t *testing.T) {
 			run  func(*commissionFixture, *testing.T)
 		}{
 			{"referral_instant_and_idempotent", (*commissionFixture).referralInstant},
+			{"referral_fee_snapshot_same_cashback", (*commissionFixture).referralFeeSnapshot},
 			{"distributor_frozen_then_confirmed", (*commissionFixture).distributorFrozenConfirm},
 			{"reversal_and_debt_offset", (*commissionFixture).reversalDebtOffset},
 			{"campaign_rate_priority", (*commissionFixture).campaignRatePriority},
@@ -275,6 +277,43 @@ func (f *commissionFixture) referralInstant(t *testing.T) {
 	require.NoError(t, f.db.Model(&CommissionRecord{}).Where("source_id = ?", topUp2.Id).Count(&count).Error)
 	assert.Equal(t, int64(0), count)
 	operation_setting.ReferralCommissionEnabled = true
+}
+
+// B3.6 回归：推广返现基数是到账额度（creditedQuota），不是含手续费的实付金额。
+// 同一笔到账，费率 0 与 300 bps 的手续费快照产生的返现相同，
+// 均等于 入账额度 × 150 / 10000。
+func (f *commissionFixture) referralFeeSnapshot(t *testing.T) {
+	inviter := f.makeUser("inviter-f", 0)
+	invitee := f.makeUser("invitee-f", inviter.Id)
+	now := common.GetTimestamp()
+	credited := int(100 * common.QuotaPerUnit)
+
+	// 费率 0：无手续费，credited_money = money
+	zeroFee := f.makeTopUp(invitee.Id, PaymentProviderEpay, 100, 730, now)
+	zeroFee.Currency = "CNY"
+	zeroFee.CreditedMoney = decimal.NewFromInt(730)
+	zeroFee.FeeMoney = decimal.Zero
+	zeroFee.FeeRateBps = 0
+	require.NoError(t, f.db.Save(zeroFee).Error)
+
+	// 费率 300 bps：money 仍是到账金额，fee 3% 只加在实付上
+	withFee := f.makeTopUp(invitee.Id, PaymentProviderEpay, 100, 730, now)
+	withFee.Currency = "CNY"
+	withFee.CreditedMoney = decimal.NewFromInt(730)
+	withFee.FeeMoney = decimal.RequireFromString("21.9")
+	withFee.FeeRateBps = 300
+	require.NoError(t, f.db.Save(withFee).Error)
+
+	accrueCommission(zeroFee, credited)
+	accrueCommission(withFee, credited)
+
+	expected := credited * 150 / 10000
+	zeroRecord := f.recordOf(zeroFee.Id)
+	feeRecord := f.recordOf(withFee.Id)
+	assert.Equal(t, CommissionProgramReferral, zeroRecord.Program)
+	assert.Equal(t, expected, zeroRecord.CommissionQuota)
+	assert.Equal(t, expected, feeRecord.CommissionQuota)
+	assert.Equal(t, zeroRecord.BaseQuota, feeRecord.BaseQuota)
 }
 
 // 分销：冻结 → 到期后管理员确认才入账；并发确认只入账一次；提前确认需理由。

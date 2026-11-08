@@ -3,13 +3,16 @@ package model
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/glebarez/sqlite"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -218,7 +221,7 @@ func TestPaymentEventDatabaseMatrix(t *testing.T) {
 			subInput.EventID, subInput.TradeNo, subInput.SessionID, subInput.PaymentIntent, subInput.InvoiceID = "evt_sub_paid", subOrder.TradeNo, "cs_subscription", "", "in_subscription"
 			subPaid, err := RecordPaymentEvent(subInput)
 			require.NoError(t, err)
-			require.NoError(t, CompleteSubscriptionOrder(subOrder.TradeNo, "", PaymentProviderStripe, "", *subPaid))
+			require.NoError(t, CompleteSubscriptionOrder(subOrder.TradeNo, "", PaymentProviderStripe, "", "", "", *subPaid))
 			invoice, err := RecordPaymentEvent(PaymentEventInput{Provider: PaymentProviderStripe, EventID: "evt_sub_invoice", EventType: "invoice.paid", InvoiceID: "in_subscription", PaymentIntent: "pi_subscription", PaidMinor: 200, Currency: "USD"})
 			require.NoError(t, err)
 			require.NoError(t, AttachVerifiedInvoicePayment(*invoice))
@@ -300,6 +303,220 @@ func TestPaymentEventDatabaseMatrix(t *testing.T) {
 						assert.Equal(t, beforeQuota-int(common.QuotaPerUnit/2), user.Quota)
 					}
 				})
+			}
+		})
+	}
+}
+
+// TestPaymentAmountCheckMatrix B3.3：四通道回调在入账前核对实付金额。
+// 精确金额入账一次且幂等；少付 0.01 不入账、订单保持 pending 并写
+// needs_review 支付事件；老订单（currency=”）按 Money 核对。
+func TestPaymentAmountCheckMatrix(t *testing.T) {
+	for _, dialect := range []common.DatabaseType{common.DatabaseTypeSQLite, common.DatabaseTypeMySQL, common.DatabaseTypePostgreSQL} {
+		t.Run(string(dialect), func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case common.DatabaseTypeSQLite:
+				driver = sqlite.Open(":memory:")
+			case common.DatabaseTypeMySQL:
+				if os.Getenv("TEST_MYSQL_DSN") == "" {
+					t.Skip("TEST_MYSQL_DSN not configured")
+				}
+				driver = mysql.Open(os.Getenv("TEST_MYSQL_DSN"))
+			case common.DatabaseTypePostgreSQL:
+				if os.Getenv("TEST_POSTGRES_DSN") == "" {
+					t.Skip("TEST_POSTGRES_DSN not configured")
+				}
+				driver = postgres.Open(os.Getenv("TEST_POSTGRES_DSN"))
+			}
+			db, err := gorm.Open(driver, &gorm.Config{NamingStrategy: schema.NamingStrategy{TablePrefix: fmt.Sprintf("amount_%d_", time.Now().UnixNano())}, Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			if dialect == common.DatabaseTypeSQLite {
+				sqlDB.SetMaxOpenConns(1)
+			}
+			previousDB, previousRedis := DB, common.RedisEnabled
+			previousMainType, previousLogType := common.MainDatabaseType(), common.LogDatabaseType()
+			DB, common.RedisEnabled = db, false
+			common.SetDatabaseTypes(dialect, dialect)
+			t.Cleanup(func() {
+				DB, common.RedisEnabled = previousDB, previousRedis
+				common.SetDatabaseTypes(previousMainType, previousLogType)
+				_ = db.Migrator().DropTable(&PaymentEvent{}, &PaymentEventAction{}, &PaymentReceipt{}, &SubscriptionOrder{}, &SubscriptionPlan{}, &UserSubscription{}, &TopUp{}, &Log{}, &User{})
+				_ = sqlDB.Close()
+			})
+			// B3.3 迁移覆盖：新列存在，重复 AutoMigrate 无新增变更。
+			require.NoError(t, db.AutoMigrate(&User{}, &TopUp{}, &Log{}, &SubscriptionOrder{}, &SubscriptionPlan{}, &UserSubscription{}))
+			require.NoError(t, db.AutoMigrate(&TopUp{}, &SubscriptionOrder{}))
+			require.NoError(t, MigratePaymentEvents())
+			for _, column := range []string{"fee_rate_bps", "fee_money", "credited_money", "currency"} {
+				assert.True(t, db.Migrator().HasColumn(&TopUp{}, column), "top_ups missing %s", column)
+				assert.True(t, db.Migrator().HasColumn(&SubscriptionOrder{}, column), "subscription_orders missing %s", column)
+			}
+
+			user := User{Username: "amount-owner", Password: "preserved", Quota: 7}
+			require.NoError(t, db.Create(&user).Error)
+			quotaOf := func() int {
+				require.NoError(t, db.First(&user, user.Id).Error)
+				return user.Quota
+			}
+
+			// epay 快照订单：credited 100 + fee 3 = 实付应为 103。
+			mkTopUp := func(trade, provider, method, currency string, credited, fee float64) TopUp {
+				topUp := TopUp{UserId: user.Id, Amount: 2, Money: credited, TradeNo: trade,
+					PaymentProvider: provider, PaymentMethod: method, Status: common.TopUpStatusPending,
+					CreditedMoney: decimal.NewFromFloat(credited), FeeMoney: decimal.NewFromFloat(fee), FeeRateBps: 300, Currency: currency}
+				require.NoError(t, db.Create(&topUp).Error)
+				return topUp
+			}
+
+			snapshot := mkTopUp("epay-exact", PaymentProviderEpay, "alipay", "CNY", 100, 3)
+			done, err := RechargeEpay(snapshot.TradeNo, "alipay", "127.0.0.1", "103.00")
+			require.NoError(t, err)
+			assert.False(t, done)
+			assert.Equal(t, 7+int(2*common.QuotaPerUnit), quotaOf())
+			// 重复回调幂等：不再入账。
+			done, err = RechargeEpay(snapshot.TradeNo, "alipay", "127.0.0.1", "103.00")
+			require.NoError(t, err)
+			assert.True(t, done)
+			assert.Equal(t, 7+int(2*common.QuotaPerUnit), quotaOf())
+
+			// 少付 0.01：不入账、保持 pending、写 needs_review 事件。
+			short := mkTopUp("epay-short", PaymentProviderEpay, "alipay", "CNY", 100, 3)
+			_, err = RechargeEpay(short.TradeNo, "alipay", "127.0.0.1", "102.99")
+			assert.ErrorIs(t, err, ErrPaymentAmountMismatch)
+			assert.Equal(t, 7+int(2*common.QuotaPerUnit), quotaOf())
+			require.NoError(t, db.First(&short, short.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, short.Status)
+			var mismatch PaymentEvent
+			require.NoError(t, db.Where("trade_no = ? AND event_type = ?", short.TradeNo, PaymentEventTypeAmountMismatch).First(&mismatch).Error)
+			assert.Equal(t, "needs_review", mismatch.Status)
+			assert.EqualValues(t, 10299, mismatch.PaidMinor)
+			// 补齐正确金额后仍可入账。
+			done, err = RechargeEpay(short.TradeNo, "alipay", "127.0.0.1", "103.00")
+			require.NoError(t, err)
+			assert.False(t, done)
+			assert.Equal(t, 7+int(4*common.QuotaPerUnit), quotaOf())
+
+			// 老订单（currency=''）按 Money 核对。
+			legacy := TopUp{UserId: user.Id, Amount: 2, Money: 10, TradeNo: "legacy-epay",
+				PaymentProvider: PaymentProviderEpay, Status: common.TopUpStatusPending}
+			require.NoError(t, db.Create(&legacy).Error)
+			done, err = RechargeEpay(legacy.TradeNo, "", "127.0.0.1", "10.00")
+			require.NoError(t, err)
+			assert.False(t, done)
+			legacyShort := TopUp{UserId: user.Id, Amount: 2, Money: 10, TradeNo: "legacy-short",
+				PaymentProvider: PaymentProviderEpay, Status: common.TopUpStatusPending}
+			require.NoError(t, db.Create(&legacyShort).Error)
+			_, err = RechargeEpay(legacyShort.TradeNo, "", "127.0.0.1", "9.99")
+			assert.ErrorIs(t, err, ErrPaymentAmountMismatch)
+			require.NoError(t, db.First(&legacyShort, legacyShort.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, legacyShort.Status)
+
+			// Waffo 回调带币种：金额对但币种错同样不入账。
+			// 这三个通道按既有约定对外屏蔽内部错误，核对明细看订单状态与事件。
+			wrongCurrency := mkTopUp("waffo-currency", PaymentProviderWaffo, "1", "CNY", 100, 3)
+			err = RechargeWaffo(wrongCurrency.TradeNo, "127.0.0.1", "103.00", "USD")
+			assert.Error(t, err)
+			require.NoError(t, db.First(&wrongCurrency, wrongCurrency.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, wrongCurrency.Status)
+			assert.Equal(t, 7+int(6*common.QuotaPerUnit), quotaOf())
+			var waffoEvent PaymentEvent
+			require.NoError(t, db.Where("trade_no = ? AND event_type = ?", wrongCurrency.TradeNo, PaymentEventTypeAmountMismatch).First(&waffoEvent).Error)
+			assert.Equal(t, "USD", waffoEvent.Currency)
+
+			// Creem 是 fee_included：实付应等于 credited_money（最小单位核对）。
+			creem := mkTopUp("creem-order", PaymentProviderCreem, "creem", "USD", 20, 0)
+			err = RechargeCreem(creem.TradeNo, "", "", "127.0.0.1", 2000, "USD")
+			require.NoError(t, err)
+			creemShort := mkTopUp("creem-short", PaymentProviderCreem, "creem", "USD", 20, 0)
+			err = RechargeCreem(creemShort.TradeNo, "", "", "127.0.0.1", 1999, "USD")
+			assert.Error(t, err)
+			require.NoError(t, db.First(&creemShort, creemShort.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, creemShort.Status)
+			var creemEvent PaymentEvent
+			require.NoError(t, db.Where("trade_no = ? AND event_type = ?", creemShort.TradeNo, PaymentEventTypeAmountMismatch).First(&creemEvent).Error)
+			assert.EqualValues(t, 1999, creemEvent.PaidMinor)
+
+			// Waffo Pancake：快照订单按 credited+fee 核对。
+			pancake := mkTopUp("pancake-order", PaymentProviderWaffoPancake, "waffo_pancake", "USD", 50, 1.5)
+			err = RechargeWaffoPancake(pancake.TradeNo, "51.50", "USD")
+			require.NoError(t, err)
+			pancakeShort := mkTopUp("pancake-short", PaymentProviderWaffoPancake, "waffo_pancake", "USD", 50, 1.5)
+			err = RechargeWaffoPancake(pancakeShort.TradeNo, "51.49", "USD")
+			assert.Error(t, err)
+			require.NoError(t, db.First(&pancakeShort, pancakeShort.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, pancakeShort.Status)
+
+			// 订阅订单回调同样核对：少付保持 pending，不建订阅。
+			plan := SubscriptionPlan{Title: "Amount plan", PriceAmount: 30, Currency: "CNY", DurationUnit: SubscriptionDurationMonth, DurationValue: 1, Enabled: true, TotalAmount: 1000}
+			require.NoError(t, db.Create(&plan).Error)
+			subOrder := SubscriptionOrder{UserId: user.Id, PlanId: plan.Id, Money: 30, TradeNo: "sub-short",
+				PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", Status: common.TopUpStatusPending,
+				CreditedMoney: decimal.NewFromInt(30), FeeMoney: decimal.RequireFromString("0.9"), FeeRateBps: 300, Currency: "CNY"}
+			require.NoError(t, db.Create(&subOrder).Error)
+			err = CompleteSubscriptionOrder(subOrder.TradeNo, "", PaymentProviderEpay, "", "30.89", "")
+			assert.ErrorIs(t, err, ErrPaymentAmountMismatch)
+			require.NoError(t, db.First(&subOrder, subOrder.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, subOrder.Status)
+			err = CompleteSubscriptionOrder(subOrder.TradeNo, "", PaymentProviderEpay, "", "30.90", "")
+			require.NoError(t, err)
+			require.NoError(t, db.First(&subOrder, subOrder.Id).Error)
+			assert.Equal(t, common.TopUpStatusSuccess, subOrder.Status)
+		})
+	}
+}
+
+// TestFeeSnapshotAutoMigrateIdempotent B3.3 迁移幂等：第二次 AutoMigrate
+// 不得再产生 ALTER/DDL（decimal 默认值若写错方言会在每次启动重复 ALTER）。
+func TestFeeSnapshotAutoMigrateIdempotent(t *testing.T) {
+	for _, dialect := range []common.DatabaseType{common.DatabaseTypeSQLite, common.DatabaseTypeMySQL, common.DatabaseTypePostgreSQL} {
+		t.Run(string(dialect), func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case common.DatabaseTypeSQLite:
+				driver = sqlite.Open(":memory:")
+			case common.DatabaseTypeMySQL:
+				if os.Getenv("TEST_MYSQL_DSN") == "" {
+					t.Skip("TEST_MYSQL_DSN not configured")
+				}
+				driver = mysql.Open(os.Getenv("TEST_MYSQL_DSN"))
+			case common.DatabaseTypePostgreSQL:
+				if os.Getenv("TEST_POSTGRES_DSN") == "" {
+					t.Skip("TEST_POSTGRES_DSN not configured")
+				}
+				driver = postgres.Open(os.Getenv("TEST_POSTGRES_DSN"))
+			}
+			var sqlLog strings.Builder
+			db, err := gorm.Open(driver, &gorm.Config{
+				NamingStrategy: schema.NamingStrategy{TablePrefix: fmt.Sprintf("fee_mig_%d_", time.Now().UnixNano())},
+				Logger:         logger.New(log.New(&sqlLog, "", 0), logger.Config{LogLevel: logger.Info}),
+			})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			if dialect == common.DatabaseTypeSQLite {
+				sqlDB.SetMaxOpenConns(1)
+			}
+			t.Cleanup(func() {
+				_ = db.Migrator().DropTable(&TopUp{}, &SubscriptionOrder{})
+				_ = sqlDB.Close()
+			})
+			require.NoError(t, db.AutoMigrate(&TopUp{}, &SubscriptionOrder{}))
+			sqlLog.Reset()
+			require.NoError(t, db.AutoMigrate(&TopUp{}, &SubscriptionOrder{}))
+			out := sqlLog.String()
+			for line := range strings.Lines(out) {
+				upper := strings.ToUpper(line)
+				isDDL := strings.Contains(upper, "ALTER TABLE") || strings.Contains(upper, "ADD COLUMN") ||
+					strings.Contains(upper, "MODIFY COLUMN") || strings.Contains(upper, "CREATE TABLE")
+				if !isDDL {
+					continue
+				}
+				for _, column := range []string{"fee_rate_bps", "fee_money", "credited_money", "currency"} {
+					assert.NotContains(t, line, column, "second AutoMigrate re-emitted DDL for %s:\n%s", column, out)
+				}
 			}
 		})
 	}

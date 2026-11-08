@@ -930,7 +930,7 @@ func TestAuditDatabaseMatrix(t *testing.T) {
 						require.Error(t, db.Create(&model.SubscriptionOrder{TradeNo: order.TradeNo}).Error, "legacy order uniqueness must remain enforced")
 						event, err := model.RecordPaymentEvent(model.PaymentEventInput{Provider: model.PaymentProviderStripe, EventID: "evt_legacy_subscription", EventType: "checkout.session.completed", SessionID: "cs_legacy", TradeNo: order.TradeNo, PaidMinor: 200, Currency: "USD", PaymentStatus: "paid", SessionStatus: "complete"})
 						require.NoError(t, err)
-						assert.ErrorIs(t, model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderStripe, "", *event), model.ErrPaymentFinancialReview)
+						assert.ErrorIs(t, model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderStripe, "", "", "", *event), model.ErrPaymentFinancialReview)
 						var count int64
 						require.NoError(t, db.Model(&model.PaymentReceipt{}).Count(&count).Error)
 						assert.Zero(t, count)

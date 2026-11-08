@@ -199,7 +199,7 @@ func InvoiceEpayNotify(c *gin.Context) {
 	if verifyInfo.TradeStatus == epay.StatusTradeSuccess {
 		LockOrder(verifyInfo.ServiceTradeNo)
 		defer UnlockOrder(verifyInfo.ServiceTradeNo)
-		if _, err := model.SettleInvoiceEpay(verifyInfo.ServiceTradeNo, verifyInfo.Type); err != nil {
+		if _, err := model.SettleInvoiceEpay(verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.Money); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("易支付 发票手续费核销失败 trade_no=%s error=%q", verifyInfo.ServiceTradeNo, err.Error()))
 			_, _ = c.Writer.Write([]byte("fail"))
 			return
