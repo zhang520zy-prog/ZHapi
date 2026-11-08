@@ -16,13 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
-import { getNotice } from '@/lib/api'
+import {
+  getNotice,
+  getUserNotifications,
+  markUserNotificationsRead,
+} from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
+import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore } from '@/stores/notification-store'
+
+export type NotificationTab = 'notice' | 'announcements' | 'messages'
 
 function hashString(input: string): string {
   let hash = 0
@@ -65,9 +72,9 @@ function getAnnouncementKey(item: Record<string, unknown>): string {
  */
 export function useNotifications() {
   const [popoverOpen, setPopoverOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'notice' | 'announcements'>(
-    'notice'
-  )
+  const [activeTab, setActiveTab] = useState<NotificationTab>('notice')
+  const queryClient = useQueryClient()
+  const isAuthenticated = useAuthStore((s) => s.auth.user !== null)
 
   // Fetch Notice from API
   const {
@@ -90,6 +97,32 @@ export function useNotifications() {
       20
     )
   }, [announcementsEnabled, status?.announcements])
+
+  // Fetch in-site user notifications (distributor lifecycle etc.)
+  const { data: userNotificationData } = useQuery({
+    queryKey: ['user-notifications'],
+    queryFn: () => getUserNotifications(1, 20),
+    enabled: isAuthenticated,
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60,
+  })
+  const userNotifications = useMemo(
+    () => userNotificationData?.page.items ?? [],
+    [userNotificationData]
+  )
+  const userUnreadCount = userNotificationData?.unreadCount ?? 0
+
+  const markMessagesReadMutation = useMutation({
+    mutationFn: (ids?: number[]) => markUserNotificationsRead(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-notifications'] })
+    },
+  })
+  const markAllMessagesRead = () => {
+    if (userUnreadCount > 0) {
+      markMessagesReadMutation.mutate(undefined)
+    }
+  }
 
   // Notification store
   const {
@@ -119,9 +152,15 @@ export function useNotifications() {
     return {
       notice: noticeUnread,
       announcements: announcementsUnread,
-      total: noticeUnread + announcementsUnread,
+      total: noticeUnread + announcementsUnread + userUnreadCount,
     }
-  }, [noticeContent, lastReadNotice, announcements, isAnnouncementRead])
+  }, [
+    noticeContent,
+    lastReadNotice,
+    announcements,
+    isAnnouncementRead,
+    userUnreadCount,
+  ])
 
   const markAnnouncementsAsRead = () => {
     if (announcements.length > 0) {
@@ -133,7 +172,7 @@ export function useNotifications() {
   }
 
   // Handle popover open
-  const handleOpenPopover = (tab?: 'notice' | 'announcements') => {
+  const handleOpenPopover = (tab?: NotificationTab) => {
     const nextTab = tab || activeTab
 
     // Mark currently visible content as read when opening the notification center
@@ -142,6 +181,9 @@ export function useNotifications() {
     }
     if (nextTab === 'announcements') {
       markAnnouncementsAsRead()
+    }
+    if (nextTab === 'messages') {
+      markAllMessagesRead()
     }
 
     setActiveTab(nextTab)
@@ -158,11 +200,14 @@ export function useNotifications() {
   }
 
   // Handle tab change - mark announcements as read when switching to that tab
-  const handleTabChange = (tab: 'notice' | 'announcements') => {
+  const handleTabChange = (tab: NotificationTab) => {
     setActiveTab(tab)
 
     if (tab === 'announcements') {
       markAnnouncementsAsRead()
+    }
+    if (tab === 'messages') {
+      markAllMessagesRead()
     }
   }
 
@@ -170,6 +215,7 @@ export function useNotifications() {
     // Data
     notice: noticeContent,
     announcements,
+    userNotifications,
     loading: noticeLoading || statusLoading,
 
     // Unread counts

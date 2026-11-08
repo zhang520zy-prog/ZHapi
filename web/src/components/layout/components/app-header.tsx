@@ -106,7 +106,9 @@ export function AppHeader({
 }: AppHeaderProps) {
   // Prioritize dynamically generated links from backend
   const dynamicLinks = useTopNavLinks()
-  const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
+  const links = (dynamicLinks.length > 0 ? dynamicLinks : navLinks).filter(
+    (link) => !link.href.includes('docs.newapi.pro')
+  )
 
   // Notifications hook
   const notifications = useNotifications()
@@ -141,6 +143,7 @@ export function AppHeader({
               onTabChange={notifications.setActiveTab}
               notice={notifications.notice}
               announcements={notifications.announcements}
+              userNotifications={notifications.userNotifications}
               loading={notifications.loading}
             />
           )}
