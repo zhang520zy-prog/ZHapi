@@ -426,10 +426,14 @@ For commercial licensing, please contact support@quantumnous.com
  *   - `anthropic`: warm cream surfaces are a brand choice, NOT a primary-mix
  *     derivation (the Anthropic system deliberately uses warm neutrals for
  *     cards/borders rather than tinting them with the clay accent).
- *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces. */
+ *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces.
+ *   - `relaydesk`: surfaces are neutral dark/light panels from the Mobius
+ *     homepage palette, not primary-tinted derivations. */
 [data-theme-preset]:not([data-theme-preset='default']):not(
   [data-theme-preset='anthropic']
-):not([data-theme-preset='simple-large']) {
+):not([data-theme-preset='simple-large']):not(
+  [data-theme-preset='relaydesk']
+) {
   --card: color-mix(in oklch, var(--primary) 3%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 5%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 7%, var(--background));
@@ -454,7 +458,9 @@ For commercial licensing, please contact support@quantumnous.com
 .dark
   [data-theme-preset]:not([data-theme-preset='default']):not(
     [data-theme-preset='anthropic']
-  ):not([data-theme-preset='simple-large']) {
+  ):not([data-theme-preset='simple-large']):not(
+    [data-theme-preset='relaydesk']
+  ) {
   --card: color-mix(in oklch, var(--primary) 8%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 12%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 12%, var(--background));
@@ -610,6 +616,164 @@ For commercial licensing, please contact support@quantumnous.com
 
   --skeleton-base: oklch(0.305 0.004 60);
   --skeleton-highlight: oklch(0.41 0.004 60);
+}
+
+/* ── RelayDesk ────────────────────────────────────────────────────────── */
+/*
+ * Console palette taken from the shipped Mobius homepage (product decision
+ * 2026-11-08): pure solid surfaces — no grid, gradient, noise, or tint —
+ * with the yellow-green #c4f58b accent. Light set is a deepened pairing of
+ * the same hues (the homepage itself ships dark only).
+ *
+ * Surface ladder: page background < card < popover; hierarchy comes from
+ * those three steps plus hairline borders, never from shadows in dark.
+ *
+ * Opted out of the semantic surface bridge above: the Mobius card/popover
+ * tones are bespoke neutrals, not primary-tinted derivations.
+ */
+[data-theme-preset='relaydesk'] {
+  /* Light set — deepened counterparts of the dark homepage palette. */
+  --background: #f1f2eb;
+  --foreground: #111610;
+
+  --card: #f8f9f4;
+  --card-foreground: #111610;
+  --popover: #ffffff;
+  --popover-foreground: #111610;
+
+  /* Accent — selected, links, primary buttons, focus ring. */
+  --primary: #3f6a12;
+  --primary-foreground: #ffffff;
+  --rd-accent-hover: #2f520c;
+
+  /* Secondary button: transparent fill + hairline border. */
+  --secondary: transparent;
+  --secondary-foreground: #111610;
+
+  --muted: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  --muted-foreground: #525a4e;
+  /* Accent tint for selected backgrounds and chips (≈ #3f6a121a). */
+  --accent: color-mix(in oklch, var(--primary) 10%, transparent);
+  --accent-foreground: var(--primary);
+
+  --destructive: #b42323;
+  --destructive-foreground: #ffffff;
+  --success: #0f6e52;
+  --success-foreground: #ffffff;
+  --warning: #9a4f00;
+  --warning-foreground: #ffffff;
+  --info: #1a6a94;
+  --info-foreground: #ffffff;
+  --neutral: #525a4e;
+  --neutral-foreground: #ffffff;
+
+  /* Hairline — 14% ink, matching the dark set's #ffffff21 line. */
+  --border: #11161024;
+  --input: #11161024;
+  --ring: var(--primary);
+
+  --chart-1: #3f6a12;
+  --chart-2: #1a6a94;
+  --chart-3: #6247c4;
+  --chart-4: #85580a;
+  /* Series beyond four fall back to the muted "other" bucket. */
+  --chart-5: var(--muted-foreground);
+
+  --overview-accent-1: var(--chart-1);
+  --overview-accent-2: var(--chart-2);
+  --overview-accent-3: var(--chart-3);
+
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Skeleton: foreground at 6% opacity per the design rules. */
+  --skeleton-base: color-mix(in oklch, var(--foreground) 6%, transparent);
+  --skeleton-highlight: color-mix(
+    in oklch,
+    var(--foreground) 11%,
+    transparent
+  );
+
+  /* Fixed top bar: page background at 90% + backdrop blur. */
+  --rd-header-bg: color-mix(in oklch, var(--background) 90%, transparent);
+  /* Scrim for dialogs/drawers. */
+  --rd-overlay: rgb(0 0 0 / 0.4);
+
+  /* Controls (inputs, buttons, dropdowns) land at 10px radius. */
+  --radius: 0.625rem;
+}
+.dark [data-theme-preset='relaydesk'] {
+  /* Dark set — the homepage's own colors, verbatim. */
+  --background: #090c0b;
+  --foreground: #eeefe7;
+
+  --card: #10150f;
+  --card-foreground: #eeefe7;
+  --popover: #161d16;
+  --popover-foreground: #eeefe7;
+
+  --primary: #c4f58b;
+  --primary-foreground: #090c0b;
+  --rd-accent-hover: #d6f9ae;
+
+  --secondary: transparent;
+  --secondary-foreground: #eeefe7;
+
+  --muted: color-mix(in oklch, var(--foreground) 7%, var(--card));
+  --muted-foreground: #a0a79f;
+  /* ≈ #c4f58b24 */
+  --accent: color-mix(in oklch, var(--primary) 14%, transparent);
+  --accent-foreground: var(--primary);
+
+  --destructive: #ff7a7a;
+  --destructive-foreground: #090c0b;
+  --success: #6fdcb0;
+  --success-foreground: #090c0b;
+  --warning: #f59f45;
+  --warning-foreground: #090c0b;
+  --info: #6cc4e8;
+  --info-foreground: #090c0b;
+  --neutral: #a0a79f;
+  --neutral-foreground: #090c0b;
+
+  --border: #ffffff21;
+  --input: #ffffff21;
+  --ring: var(--primary);
+
+  --chart-1: #c4f58b;
+  --chart-2: #6cc4e8;
+  --chart-3: #b69cff;
+  --chart-4: #e8b85c;
+  --chart-5: var(--muted-foreground);
+
+  --overview-accent-1: var(--chart-1);
+  --overview-accent-2: var(--chart-2);
+  --overview-accent-3: var(--chart-3);
+
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --skeleton-base: color-mix(in oklch, var(--foreground) 6%, transparent);
+  --skeleton-highlight: color-mix(
+    in oklch,
+    var(--foreground) 11%,
+    transparent
+  );
+
+  --rd-header-bg: color-mix(in oklch, var(--background) 90%, transparent);
+  --rd-overlay: rgb(0 0 0 / 0.6);
 }
 
 /* ── Font axis ────────────────────────────────────────────────────────────

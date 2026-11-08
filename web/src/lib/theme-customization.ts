@@ -77,6 +77,13 @@ export const THEME_PRESETS = [
     name: 'Lavender Dream',
     swatches: ['oklch(0.5709 0.1808 306.89)', 'oklch(0.811 0.0589 201.14)'],
   },
+  {
+    // Console palette taken from the shipped Mobius homepage: near-black
+    // canvas (#090c0b) with the yellow-green accent (#c4f58b).
+    value: 'relaydesk',
+    name: 'RelayDesk',
+    swatches: ['#090c0b', '#c4f58b'],
+  },
 ] as const
 
 export type ThemePreset = (typeof THEME_PRESETS)[number]['value']
