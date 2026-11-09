@@ -23,6 +23,7 @@ import {
   Activity,
   ChevronRight,
   CircleAlert,
+  Eye,
   EyeOff,
   GitBranch,
   Hash,
@@ -97,8 +98,6 @@ import { FlowNodeFilterControl } from './flow-node-filter'
 
 interface FlowChartsProps {
   filters?: DashboardFilters
-  // When false, sensitive node labels are masked in the rendered Sankey.
-  sensitiveVisible?: boolean
 }
 
 const FLOW_METRIC_OPTIONS = [
@@ -279,6 +278,7 @@ export function FlowCharts(props: FlowChartsProps) {
     FlowLinkSelection | undefined
   >()
   const [hiddenStages, setHiddenStages] = useState<FlowNodeKind[]>([])
+  const [sensitiveVisible, setSensitiveVisible] = useState(true)
 
   const stages = useMemo(() => getFlowStages(flowRole), [flowRole])
   const visibleStages = useMemo(
@@ -344,7 +344,7 @@ export function FlowCharts(props: FlowChartsProps) {
     staleTime: 60_000,
   })
 
-  const maskSensitive = props.sensitiveVisible === false
+  const maskSensitive = !sensitiveVisible
   const flowData = useMemo(
     () =>
       buildDashboardFlowData(isLoading ? [] : (flowRows ?? []), metric, {
@@ -676,6 +676,36 @@ export function FlowCharts(props: FlowChartsProps) {
           </div>
           <TooltipProvider>
             <div className='flex min-w-0 items-center gap-1 overflow-x-auto pb-1 lg:justify-end lg:pb-0'>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Toggle
+                      variant='outline'
+                      size='sm'
+                      pressed={sensitiveVisible}
+                      onPressedChange={() =>
+                        setSensitiveVisible((prev) => !prev)
+                      }
+                      aria-label={
+                        sensitiveVisible
+                          ? t('Hide sensitive data')
+                          : t('Show sensitive data')
+                      }
+                      className={cn(
+                        'shrink-0',
+                        !sensitiveVisible && 'opacity-50'
+                      )}
+                    />
+                  }
+                >
+                  {sensitiveVisible ? <Eye /> : <EyeOff />}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {sensitiveVisible
+                    ? t('Hide sensitive data')
+                    : t('Show sensitive data')}
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger
                   render={

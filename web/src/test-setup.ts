@@ -32,6 +32,8 @@ beforeAll(async () => {
   await i18next.use(initReactI18next).init({
     lng: 'en',
     fallbackLng: 'en',
+    // Match src/i18n/config.ts: literal colons are allowed in keys.
+    nsSeparator: false,
     resources: {
       en: {
         translation: {},

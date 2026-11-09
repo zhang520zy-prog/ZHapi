@@ -16,23 +16,31 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export {
-  cleanFilters,
-  buildQueryParams,
-  getSavedGranularity,
-  saveGranularity,
-  getDefaultDays,
-  getSavedChartPreferences,
-  saveChartPreferences,
-  buildDefaultDashboardFilters,
-} from './filters'
+export { buildQueryParams, getDefaultDays } from './filters'
 export {
   getLatencyColorClass,
   testUrlLatency,
   openExternalSpeedTest,
   getDefaultPingStatus,
 } from './api-info'
+export {
+  chartColorAlpha,
+  getChartLabelColor,
+  getChartOtherColor,
+  getChartSeriesColor,
+  getChartSeriesColors,
+  getChartStateStrokeColor,
+} from './chart-colors'
 export { processChartData, processUserChartData } from './charts'
+export {
+  buildMetricTrend,
+  getGreetingKey,
+  getRunwayRange,
+  resolveDashboardRange,
+  sumUsageField,
+  type DashboardRangeKey,
+  type ResolvedDashboardRange,
+} from './dashboard-range'
 export {
   buildDashboardFlowData,
   buildFlowSankeySpec,
@@ -40,5 +48,13 @@ export {
   flowSankeyDatumValue,
   getFlowStages,
 } from './flow'
+export {
+  formatRunwayDays,
+  getQuotaHealth,
+  getQuotaHealthBadgeVariant,
+  getQuotaHealthLabelKey,
+  type QuotaHealth,
+  type QuotaHealthLevel,
+} from './quota-health'
 export { safeDivide, calculateDashboardStats } from './stats'
 export { getPreviewText } from './text'

@@ -16,403 +16,332 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff } from 'lucide-react'
-import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { RotateCw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DateTimePicker } from '@/components/datetime-picker'
+import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { FadeIn } from '@/components/page-transition'
+import { TimeRangeSelector } from '@/components/time-range-selector'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { toIntlLocale } from '@/i18n/languages'
 import { ROLE } from '@/lib/roles'
-import { cn } from '@/lib/utils'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { ModelsChartPreferences } from './components/models/models-chart-preferences'
-import { ModelsFilter } from './components/models/models-filter-dialog'
-import { OverviewDashboard } from './components/overview/overview-dashboard'
-import { DEFAULT_TIME_GRANULARITY } from './constants'
+import { getUserQuotaDates } from './api'
+import { AnalyticsTabsCard } from './components/overview/analytics-tabs-card'
+import { AnnouncementsPanel } from './components/overview/announcements-panel'
+import { ApiInfoPanel } from './components/overview/api-info-panel'
+import { DashboardMetricCards } from './components/overview/dashboard-metric-cards'
+import { FAQPanel } from './components/overview/faq-panel'
+import { PerformanceHealthPanel } from './components/overview/performance-health-panel'
+import { SetupGuide } from './components/overview/setup-guide'
+import { UptimePanel } from './components/overview/uptime-panel'
+import { useSetupGuideState } from './hooks/use-setup-guide'
+import { useDashboardContentVisibility } from './hooks/use-status-data'
 import {
-  buildDefaultDashboardFilters,
-  getDefaultDays,
-  getSavedChartPreferences,
-  getSavedGranularity,
-  saveChartPreferences,
-} from './lib'
-import {
-  type DashboardSectionId,
-  DASHBOARD_DEFAULT_SECTION,
-  DASHBOARD_SECTION_IDS,
-} from './section-registry'
-import type {
-  DashboardChartPreferences,
-  DashboardFilters,
-  QuotaDataItem,
-  UserChartsFilters,
-} from './types'
-
-const route = getRouteApi('/_authenticated/dashboard/$section')
-
-const LOG_STAT_CARD_FALLBACK_KEYS = [
-  'count',
-  'quota',
-  'tokens',
-  'average-rpm',
-  'average-tpm',
-] as const
-const PERFORMANCE_METRIC_FALLBACK_KEYS = [
-  'success-rate',
-  'average-latency',
-  'throughput',
-] as const
-const PERFORMANCE_MODEL_FALLBACK_KEYS = [
-  'primary-model',
-  'secondary-model',
-] as const
-
-const LazyLogStatCards = lazy(() =>
-  import('./components/models/log-stat-cards').then((m) => ({
-    default: m.LogStatCards,
-  }))
-)
-
-const LazyModelCharts = lazy(() =>
-  import('./components/models/model-charts').then((m) => ({
-    default: m.ModelCharts,
-  }))
-)
-
-const LazyConsumptionDistributionChart = lazy(() =>
-  import('./components/models/consumption-distribution-chart').then((m) => ({
-    default: m.ConsumptionDistributionChart,
-  }))
-)
-
-const LazyPerformanceOverview = lazy(() =>
-  import('./components/models/performance-overview').then((m) => ({
-    default: m.PerformanceOverview,
-  }))
-)
-
-const LazyUserCharts = lazy(() =>
-  import('./components/users/user-charts').then((m) => ({
-    default: m.UserCharts,
-  }))
-)
-
-const LazyFlowCharts = lazy(() =>
-  import('./components/flow/flow-charts').then((m) => ({
-    default: m.FlowCharts,
-  }))
-)
-
-function LogStatCardsFallback() {
-  return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='divide-border/60 grid grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
-        {LOG_STAT_CARD_FALLBACK_KEYS.map((key, index) => (
-          <div
-            key={key}
-            className={cn(
-              'px-2.5 py-1.5 sm:px-5 sm:py-4',
-              index === LOG_STAT_CARD_FALLBACK_KEYS.length - 1 &&
-                'col-span-2 sm:col-span-1'
-            )}
-          >
-            <div className='flex items-center gap-1.5 sm:gap-2'>
-              <Skeleton className='size-4 rounded-sm sm:size-7 sm:rounded-md' />
-              <Skeleton className='h-4 w-16' />
-            </div>
-            <Skeleton className='mt-1 h-5 w-16 sm:mt-2 sm:h-7 sm:w-20' />
-            <Skeleton className='mt-1 hidden h-3.5 w-28 md:block' />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ModelChartsFallback() {
-  return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='flex items-center justify-between border-b px-4 py-3 sm:px-5'>
-        <Skeleton className='h-5 w-32' />
-        <Skeleton className='h-8 w-72' />
-      </div>
-      <div className='h-96 p-2'>
-        <Skeleton className='h-full w-full' />
-      </div>
-    </div>
-  )
-}
-
-function PerformanceOverviewFallback() {
-  return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-5'>
-        <div className='flex items-center gap-2'>
-          <Skeleton className='h-4 w-24' />
-        </div>
-        {PERFORMANCE_METRIC_FALLBACK_KEYS.map((key) => (
-          <div key={key} className='flex items-center gap-1.5'>
-            <Skeleton className='h-3 w-14' />
-            <Skeleton className='h-4 w-16' />
-          </div>
-        ))}
-        <div className='ml-auto flex items-center gap-2'>
-          {PERFORMANCE_MODEL_FALLBACK_KEYS.map((key) => (
-            <Skeleton key={key} className='h-5 w-28 rounded-full' />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
-  overview: {
-    titleKey: 'Overview',
-  },
-  models: {
-    titleKey: 'Model Call Analytics',
-  },
-  flow: {
-    titleKey: 'Flow',
-  },
-  users: {
-    titleKey: 'User Analytics',
-  },
-}
+  type DashboardRangeKey,
+  getGreetingKey,
+  getRunwayRange,
+  resolveDashboardRange,
+  sumUsageField,
+} from './lib/dashboard-range'
 
 export function Dashboard() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const params = route.useParams()
-  const userRole = useAuthStore((state) => state.auth.user?.role)
-  const activeSection = (params.section ??
-    DASHBOARD_DEFAULT_SECTION) as DashboardSectionId
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.auth.user)
+  const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
+  const guide = useSetupGuideState()
+  const {
+    apiInfo: showApiInfoPanel,
+    announcements: showAnnouncementsPanel,
+    faq: showFAQPanel,
+    uptimeKuma: showUptimePanel,
+  } = useDashboardContentVisibility()
 
-  const [modelData, setModelData] = useState<QuotaDataItem[]>([])
-  const [dataLoading, setDataLoading] = useState(false)
-  const [chartPreferences, setChartPreferences] =
-    useState<DashboardChartPreferences>(() => getSavedChartPreferences())
-  const [modelFilters, setModelFilters] = useState<DashboardFilters>(() =>
-    buildDefaultDashboardFilters(getSavedChartPreferences())
-  )
-  const [userChartsFilters, setUserChartsFilters] = useState<UserChartsFilters>(
-    () => {
-      const granularity = getSavedGranularity()
-      return {
-        timeGranularity: granularity,
-        selectedRange: getDefaultDays(granularity),
-        topUserLimit: 10,
-      }
-    }
-  )
-  const [flowSensitiveVisible, setFlowSensitiveVisible] = useState(true)
-
-  const handleFilterChange = useCallback((filters: DashboardFilters) => {
-    setModelFilters(filters)
+  // Wall clock for the greeting/date line — ticked once per minute. The range
+  // itself is anchored separately so it doesn't slide every minute.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(id)
   }, [])
 
-  const handleResetFilters = useCallback(() => {
-    setModelFilters(buildDefaultDashboardFilters(chartPreferences))
-  }, [chartPreferences])
+  const [rangeKey, setRangeKey] = useState<DashboardRangeKey>('24h')
+  const [rangeAnchor, setRangeAnchor] = useState(() => new Date())
+  const [customRange, setCustomRange] = useState<{
+    start?: Date
+    end?: Date
+  }>()
+  const [customDraft, setCustomDraft] = useState<{
+    start?: Date
+    end?: Date
+  }>({})
+  const [customRangeOpen, setCustomRangeOpen] = useState(false)
 
-  const handleDataUpdate = useCallback(
-    (data: QuotaDataItem[], loading: boolean) => {
-      setModelData(data)
-      setDataLoading(loading)
-    },
-    []
+  const range = useMemo(
+    () => resolveDashboardRange(rangeKey, rangeAnchor, customRange),
+    [rangeKey, rangeAnchor, customRange]
   )
+  const runwayRange = useMemo(() => getRunwayRange(rangeAnchor), [rangeAnchor])
 
-  const handleChartPreferencesChange = useCallback(
-    (preferences: DashboardChartPreferences) => {
-      setChartPreferences(preferences)
-      setModelFilters(buildDefaultDashboardFilters(preferences))
-      saveChartPreferences(preferences)
-    },
-    []
-  )
-
-  const meta = SECTION_META[activeSection] ?? SECTION_META.overview
-  const isAdmin = Boolean(userRole && userRole >= ROLE.ADMIN)
-  const visibleSections = useMemo(
-    () =>
-      DASHBOARD_SECTION_IDS.filter(
-        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
-      ),
-    [isAdmin]
-  )
-  const handleSectionChange = useCallback(
-    (section: string) => {
-      void navigate({
-        to: '/dashboard/$section',
-        params: { section: section as DashboardSectionId },
-      })
-    },
-    [navigate]
-  )
-  const showSectionTabs =
-    activeSection !== 'overview' && visibleSections.length > 1
-  const modelActions =
-    activeSection === 'models' ? (
-      <>
-        <ModelsChartPreferences
-          preferences={chartPreferences}
-          onPreferencesChange={handleChartPreferencesChange}
-        />
-        <ModelsFilter
-          preferences={chartPreferences}
-          currentFilters={modelFilters}
-          onFilterChange={handleFilterChange}
-          onReset={handleResetFilters}
-        />
-      </>
-    ) : null
-  const flowActions =
-    activeSection === 'flow' ? (
-      <>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant='ghost'
-                size='icon'
-                onClick={() => setFlowSensitiveVisible((prev) => !prev)}
-                aria-label={
-                  flowSensitiveVisible
-                    ? t('Hide sensitive data')
-                    : t('Show sensitive data')
-                }
-                className='text-muted-foreground hover:text-foreground size-8'
-              />
-            }
-          >
-            {flowSensitiveVisible ? <Eye /> : <EyeOff />}
-          </TooltipTrigger>
-          <TooltipContent>
-            {flowSensitiveVisible
-              ? t('Hide sensitive data')
-              : t('Show sensitive data')}
-          </TooltipContent>
-        </Tooltip>
-        <ModelsFilter
-          preferences={chartPreferences}
-          currentFilters={modelFilters}
-          onFilterChange={handleFilterChange}
-          onReset={handleResetFilters}
-          titleKey='Flow Filters'
-          descriptionKey='Filter the traffic flow view by time range and user.'
-        />
-      </>
-    ) : null
-  const sectionActions = modelActions ?? flowActions
-
-  if (activeSection === 'overview') {
-    return <OverviewDashboard />
+  const handleRangeChange = (key: DashboardRangeKey) => {
+    setRangeKey(key)
+    setRangeAnchor(new Date())
+    if (key === 'custom') setCustomRangeOpen(true)
   }
+
+  const handleCustomRangeApply = () => {
+    if (!customDraft.start && !customDraft.end) return
+    setCustomRange(customDraft)
+    setRangeAnchor(new Date())
+    setCustomRangeOpen(false)
+  }
+
+  const handleRefresh = () => {
+    setRangeAnchor(new Date())
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  }
+
+  // The dashboard always shows the current user's own usage (/self). Admin
+  // site-wide analytics live in the user-analytics tab, not here.
+  const usageQuery = useQuery({
+    queryKey: [
+      'dashboard',
+      'usage',
+      range.start_timestamp,
+      range.end_timestamp,
+    ],
+    queryFn: async () =>
+      requireServerSuccess(
+        await getUserQuotaDates(
+          {
+            start_timestamp: range.start_timestamp,
+            end_timestamp: range.end_timestamp,
+            default_time: range.granularity,
+          },
+          false
+        )
+      ),
+    select: (res) => res.data ?? [],
+    staleTime: 60_000,
+  })
+
+  const runwayQuery = useQuery({
+    queryKey: [
+      'dashboard',
+      'quota-runway',
+      runwayRange.start_timestamp,
+      runwayRange.end_timestamp,
+    ],
+    queryFn: async () =>
+      requireServerSuccess(
+        await getUserQuotaDates(
+          {
+            start_timestamp: runwayRange.start_timestamp,
+            end_timestamp: runwayRange.end_timestamp,
+            default_time: 'day',
+          },
+          false
+        )
+      ),
+    select: (res) => res.data ?? [],
+    staleTime: 60_000,
+  })
+
+  const usageData = usageQuery.data ?? []
+  const runwayUsage = runwayQuery.isFetched
+    ? sumUsageField(runwayQuery.data ?? [], 'quota')
+    : undefined
+  const usageLoading = usageQuery.isLoading
+
+  const flowFilters = useMemo(
+    () => ({
+      start_timestamp: new Date(range.start_timestamp * 1000),
+      end_timestamp: new Date(range.end_timestamp * 1000),
+      time_granularity: range.granularity,
+      username: '',
+    }),
+    [range.start_timestamp, range.end_timestamp, range.granularity]
+  )
+  const userTimeRange = useMemo(
+    () => ({
+      start_timestamp: range.start_timestamp,
+      end_timestamp: range.end_timestamp,
+    }),
+    [range.start_timestamp, range.end_timestamp]
+  )
+
+  const showInfoLeft = showAnnouncementsPanel || showFAQPanel
+  const showInfoRight = showApiInfoPanel || showUptimePanel || isAdmin
+  const showInfoPanels = showInfoLeft || showInfoRight
+
+  const greeting = `${t(getGreetingKey(now.getHours()))}${
+    user?.username ? `, ${user.username}` : ''
+  }`
+  const dateLine = now.toLocaleString(locale, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
   return (
     <SectionPageLayout>
-      <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+      <SectionPageLayout.Title>{greeting}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>{dateLine}</SectionPageLayout.Description>
+      <SectionPageLayout.Actions>
+        <TimeRangeSelector
+          value={rangeKey}
+          onChange={handleRangeChange}
+          onCustomSelect={() => setCustomRangeOpen(true)}
+        />
+        <Button
+          variant='ghost'
+          size='icon'
+          onClick={handleRefresh}
+          aria-label={t('Refresh')}
+          className='text-muted-foreground hover:text-foreground size-8'
+        >
+          <RotateCw
+            className={usageQuery.isFetching ? 'animate-spin' : undefined}
+          />
+        </Button>
+        {guide.setupStatusReady && guide.setupComplete && (
+          <Button
+            ref={guide.setupGuideToggleRef}
+            variant='ghost'
+            size='sm'
+            className='text-muted-foreground hover:text-foreground h-auto min-h-7 max-w-[60vw] whitespace-normal'
+            aria-expanded={guide.setupGuideExpanded}
+            aria-controls={guide.setupGuideId}
+            onClick={guide.handleSetupGuideToggle}
+          >
+            {t('Setup guide')}
+          </Button>
+        )}
+      </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <div className='space-y-3 sm:space-y-4'>
-          <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
-            {showSectionTabs ? (
-              <Tabs value={activeSection} onValueChange={handleSectionChange}>
-                <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                  {visibleSections.map((section) => (
-                    <TabsTrigger key={section} value={section}>
-                      {t(SECTION_META[section].titleKey)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+        <div className='flex flex-col gap-4'>
+          <SetupGuide state={guide} />
+
+          <FadeIn>
+            {usageQuery.isError ? (
+              <ErrorState
+                title={t('Failed to load')}
+                description={t('Please try again later.')}
+                onRetry={() => {
+                  void usageQuery.refetch()
+                  void runwayQuery.refetch()
+                }}
+              />
             ) : (
-              <div />
+              <DashboardMetricCards
+                data={usageData}
+                loading={usageLoading}
+                rangeStartSec={range.start_timestamp}
+                rangeEndSec={range.end_timestamp}
+                granularity={range.granularity}
+                remainQuota={Number(user?.quota ?? 0)}
+                usedQuota={Number(user?.used_quota ?? 0)}
+                requestCount={Number(user?.request_count ?? 0)}
+                runwayUsage={runwayUsage}
+                runwayLoading={runwayQuery.isLoading}
+              />
             )}
-            {sectionActions != null && (
-              <div className='flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2'>
-                {sectionActions}
+          </FadeIn>
+
+          <FadeIn delay={0.05}>
+            <AnalyticsTabsCard
+              data={usageData}
+              loading={usageLoading}
+              granularity={range.granularity}
+              isAdmin={isAdmin}
+              rangeStartSec={range.start_timestamp}
+              rangeEndSec={range.end_timestamp}
+              flowFilters={flowFilters}
+              userTimeRange={userTimeRange}
+            />
+          </FadeIn>
+
+          {showInfoPanels && (
+            <FadeIn delay={0.1}>
+              <div className='grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]'>
+                {showInfoLeft ? (
+                  <div className='flex min-w-0 flex-col gap-4'>
+                    {showAnnouncementsPanel && <AnnouncementsPanel />}
+                    {showFAQPanel && <FAQPanel />}
+                  </div>
+                ) : (
+                  <div />
+                )}
+                <div className='flex min-w-0 flex-col gap-4'>
+                  {showApiInfoPanel && <ApiInfoPanel />}
+                  {showUptimePanel && <UptimePanel />}
+                  {isAdmin && <PerformanceHealthPanel />}
+                </div>
               </div>
-            )}
-          </div>
-          {activeSection === 'models' && (
-            <>
-              <FadeIn>
-                <Suspense fallback={<LogStatCardsFallback />}>
-                  <LazyLogStatCards
-                    filters={modelFilters}
-                    onDataUpdate={handleDataUpdate}
-                  />
-                </Suspense>
-              </FadeIn>
-              {isAdmin && (
-                <FadeIn delay={0.05}>
-                  <Suspense fallback={<PerformanceOverviewFallback />}>
-                    <LazyPerformanceOverview />
-                  </Suspense>
-                </FadeIn>
-              )}
-              <FadeIn delay={0.1}>
-                <Suspense fallback={<ModelChartsFallback />}>
-                  <LazyConsumptionDistributionChart
-                    data={modelData}
-                    loading={dataLoading}
-                    defaultChartType={
-                      chartPreferences.consumptionDistributionChart
-                    }
-                    timeGranularity={
-                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
-                    }
-                  />
-                </Suspense>
-              </FadeIn>
-              <FadeIn delay={0.15}>
-                <Suspense fallback={<ModelChartsFallback />}>
-                  <LazyModelCharts
-                    data={modelData}
-                    loading={dataLoading}
-                    defaultChartTab={chartPreferences.modelAnalyticsChart}
-                    timeGranularity={
-                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
-                    }
-                  />
-                </Suspense>
-              </FadeIn>
-            </>
-          )}
-          {activeSection === 'users' && (
-            <FadeIn>
-              <Suspense fallback={<ModelChartsFallback />}>
-                <LazyUserCharts
-                  filters={userChartsFilters}
-                  onFiltersChange={setUserChartsFilters}
-                />
-              </Suspense>
-            </FadeIn>
-          )}
-          {activeSection === 'flow' && (
-            <FadeIn>
-              <Suspense fallback={<ModelChartsFallback />}>
-                <LazyFlowCharts
-                  filters={modelFilters}
-                  sensitiveVisible={flowSensitiveVisible}
-                />
-              </Suspense>
             </FadeIn>
           )}
         </div>
       </SectionPageLayout.Content>
+
+      <Dialog open={customRangeOpen} onOpenChange={setCustomRangeOpen}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>{t('Custom range')}</DialogTitle>
+            <DialogDescription>
+              {t('Pick a start and end time for the dashboard range.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className='flex flex-col gap-3'>
+            <label className='flex flex-col gap-1.5'>
+              <span className='text-muted-foreground text-xs font-medium'>
+                {t('Start time')}
+              </span>
+              <DateTimePicker
+                value={customDraft.start}
+                onChange={(date) =>
+                  setCustomDraft((prev) => ({ ...prev, start: date }))
+                }
+              />
+            </label>
+            <label className='flex flex-col gap-1.5'>
+              <span className='text-muted-foreground text-xs font-medium'>
+                {t('End time')}
+              </span>
+              <DateTimePicker
+                value={customDraft.end}
+                onChange={(date) =>
+                  setCustomDraft((prev) => ({ ...prev, end: date }))
+                }
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setCustomRangeOpen(false)}>
+              {t('Cancel')}
+            </Button>
+            <Button onClick={handleCustomRangeApply}>{t('Apply')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionPageLayout>
   )
 }

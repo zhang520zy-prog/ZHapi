@@ -33,6 +33,12 @@ import type {
   ProcessedFlowData,
 } from '@/features/dashboard/types'
 
+import {
+  chartColorAlpha,
+  getChartLabelColor,
+  getChartSeriesColor,
+  getChartStateStrokeColor,
+} from './chart-colors'
 import { getDashboardChartColors } from './charts'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,7 +104,9 @@ const DEFAULT_FLOW_SANKEY_LABELS: FlowSankeyLabels = {
   share: 'Share',
 }
 
-const DEFAULT_FLOW_CHART_COLOR = '#1664FF'
+function defaultFlowChartColor(): string {
+  return getChartSeriesColor(0)
+}
 
 const FLOW_NODE_KINDS: readonly FlowNodeKind[] = [
   'user',
@@ -279,8 +287,8 @@ function flowPathForStages(
 function colorAt(index: number, palette?: readonly string[]): string {
   const colors =
     palette && palette.length > 0 ? palette : getDashboardChartColors(index + 1)
-  if (colors.length === 0) return DEFAULT_FLOW_CHART_COLOR
-  return colors[index % colors.length] ?? DEFAULT_FLOW_CHART_COLOR
+  if (colors.length === 0) return defaultFlowChartColor()
+  return colors[index % colors.length] ?? defaultFlowChartColor()
 }
 
 function colorPalette(
@@ -289,7 +297,7 @@ function colorPalette(
 ): readonly string[] {
   if (palette && palette.length > 0) return palette
   const colors = getDashboardChartColors(colorCount)
-  return colors.length > 0 ? colors : [DEFAULT_FLOW_CHART_COLOR]
+  return colors.length > 0 ? colors : [defaultFlowChartColor()]
 }
 
 function alphaColor(
@@ -1210,7 +1218,7 @@ export function buildFlowSankeySpec(
       limit: 220,
       interactive: false,
       style: {
-        fill: '#475569',
+        fill: getChartLabelColor(),
         fontSize: 11,
         fontWeight: 600,
       },
@@ -1227,8 +1235,8 @@ export function buildFlowSankeySpec(
         },
         stroke: (datum: Record<string, unknown>) =>
           sankeyDatumFlag(datum, 'highlighted')
-            ? 'rgba(15, 23, 42, 0.74)'
-            : 'rgba(148, 163, 184, 0.45)',
+            ? chartColorAlpha(getChartStateStrokeColor(), 0.74)
+            : chartColorAlpha(getChartLabelColor(), 0.45),
         lineWidth: (datum: Record<string, unknown>) =>
           sankeyDatumFlag(datum, 'highlighted') ? 1.5 : 1,
         cursor: 'pointer',
@@ -1237,12 +1245,12 @@ export function buildFlowSankeySpec(
       state: {
         hover: {
           fillOpacity: 1,
-          stroke: 'rgba(15, 23, 42, 0.68)',
+          stroke: chartColorAlpha(getChartStateStrokeColor(), 0.68),
           lineWidth: 1.5,
         },
         selected: {
           fillOpacity: 1,
-          stroke: 'rgba(15, 23, 42, 0.68)',
+          stroke: chartColorAlpha(getChartStateStrokeColor(), 0.68),
           lineWidth: 1.5,
         },
         blur: {

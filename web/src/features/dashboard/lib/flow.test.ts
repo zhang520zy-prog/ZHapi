@@ -714,7 +714,7 @@ describe('dashboard flow data', () => {
     expect(values.nodes.length).toBe(6)
     expect(values.links.length).toBe(5)
     expect(aliceNode.name).toBe('alice')
-    expect(userNodeLink.linkColor).toMatch(/^rgba\(/)
+    expect(userNodeLink.linkColor).toMatch(/^(rgba|rgb|oklch|hsl|#)/)
 
     const tooltipRows = flowSpec.tooltip.mark.content
     expect(

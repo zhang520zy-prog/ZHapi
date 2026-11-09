@@ -31,14 +31,14 @@ describe('legacy frontend route migration', () => {
       '/console/subscription': '/subscriptions',
       '/console/channel': '/channels',
       '/console/token': '/keys',
-      '/console/playground': '/dashboard/overview',
+      '/console/playground': '/dashboard',
       '/console/redemption': '/redemption-codes',
       '/console/user': '/users',
       '/console/personal': '/profile',
       '/console/log': '/usage-logs',
       '/console/midjourney': '/usage-logs/drawing',
       '/console/task': '/usage-logs/task',
-      '/console/chat/42': '/dashboard/overview',
+      '/console/chat/42': '/dashboard',
     }
 
     for (const [source, target] of Object.entries(routes)) {
@@ -104,6 +104,6 @@ test.each([
       resolveLegacyRoute(
         `${path}?url=https%3A%2F%2Fexample.com&key=retired#chat`
       )
-    ).toBe('/dashboard/overview')
+    ).toBe('/dashboard')
   }
 )

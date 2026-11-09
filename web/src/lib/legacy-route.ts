@@ -73,7 +73,7 @@ export function resolveLegacyRoute(rawHref: string): string | null {
   const pathname = normalizeLegacyPath(source.pathname)
   if (/^\/(?:console\/)?(?:playground|chat|chat2link)(?:\/|$)/.test(pathname)) {
     // Retired tools never forward embedded chat URLs, keys, or stale parameters.
-    return '/dashboard/overview'
+    return '/dashboard'
   }
   if (pathname === '/login') {
     return buildTargetHref('/sign-in', source)

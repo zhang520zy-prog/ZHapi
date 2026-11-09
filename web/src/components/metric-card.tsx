@@ -59,6 +59,8 @@ export interface MetricCardProps {
   /** Optional status chip shown on the title row. */
   status?: MetricCardStatus
   action?: ReactNode
+  /** Optional footer row rendered at the bottom of the card. */
+  footer?: ReactNode
   loading?: boolean
   className?: string
 }
@@ -136,10 +138,7 @@ export function MetricCard(props: MetricCardProps) {
   const Icon = props.icon
   const tone = props.tone ?? 'chart-1'
   return (
-    <Card
-      data-slot='metric-card'
-      className={cn('gap-0 py-0', props.className)}
-    >
+    <Card data-slot='metric-card' className={cn('gap-0 py-0', props.className)}>
       <CardContent className='flex flex-col gap-2 p-4 sm:p-5'>
         <div className='flex items-center gap-2'>
           {Icon != null && (
@@ -193,6 +192,9 @@ export function MetricCard(props: MetricCardProps) {
         )}
         {props.trend != null && props.trend.length > 0 && (
           <MetricTrend values={props.trend} tone={tone} />
+        )}
+        {props.footer != null && (
+          <div className='border-border/60 border-t pt-2'>{props.footer}</div>
         )}
       </CardContent>
     </Card>

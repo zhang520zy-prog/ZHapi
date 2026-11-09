@@ -191,25 +191,6 @@ export interface DashboardFilters {
   username?: string
 }
 
-export type ConsumptionDistributionChartType = 'bar' | 'area'
-
-export type ModelAnalyticsChartTab = 'trend' | 'proportion' | 'top'
-
-export interface DashboardChartPreferences {
-  consumptionDistributionChart: ConsumptionDistributionChartType
-  modelAnalyticsChart: ModelAnalyticsChartTab
-  defaultTimeRangeDays: number
-  defaultTimeGranularity: TimeGranularity
-}
-
-// User analytics selections are held by the dashboard parent so they survive
-// switching between dashboard sub-sections, matching the model/flow filters.
-export interface UserChartsFilters {
-  timeGranularity: TimeGranularity
-  selectedRange: number
-  topUserLimit: number
-}
-
 // ============================================================================
 // API Info Types
 // ============================================================================

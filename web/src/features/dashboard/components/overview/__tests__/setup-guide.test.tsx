@@ -31,7 +31,15 @@ import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
-import { OverviewDashboard } from '../overview-dashboard'
+import { Dashboard } from '../../../index'
+
+vi.mock('@/lib/use-chart-theme', () => ({
+  useChartTheme: () => ({ resolvedTheme: 'light', themeReady: false }),
+}))
+
+vi.mock('@visactor/react-vchart', () => ({
+  VChart: () => null,
+}))
 
 const storageKey = 'dashboard_overview_setup_guide_expanded'
 let client: QueryClient
@@ -95,7 +103,7 @@ afterEach(() => {
 
 async function renderOverview() {
   const router = createRouter({
-    routeTree: createRootRoute({ component: OverviewDashboard }),
+    routeTree: createRootRoute({ component: Dashboard }),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   })
   await router.load()
@@ -113,15 +121,17 @@ describe('overview setup guide', () => {
     const toggle = await screen.findByRole('button', { name: 'Setup guide' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(
-      screen.getAllByRole('heading').map((heading) => heading.textContent)
-    ).toEqual(['Overview', 'Usage at a glance'])
+      screen.getByRole('heading', {
+        name: /Good (morning|afternoon|evening), dashboard-user/,
+      })
+    ).toBeInTheDocument()
     expect(screen.queryByText('Setup guide complete')).not.toBeInTheDocument()
     expect(screen.queryByText('Setup progress: 3/3')).not.toBeInTheDocument()
     for (const name of ['API Keys', 'Channels', 'Usage Logs', 'Pricing']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
-    const panel = document.getElementById(
-      toggle.getAttribute('aria-controls') ?? ''
+    const panel = document.querySelector(
+      `#${CSS.escape(toggle.getAttribute('aria-controls') ?? '')}`
     )
     expect(panel).toBeInTheDocument()
     expect(panel).not.toBeVisible()
@@ -153,12 +163,14 @@ describe('overview setup guide', () => {
     await renderOverview()
     const toggle = await screen.findByRole('button', { name: 'Setup guide' })
 
-    await user.tab()
+    toggle.focus()
     expect(toggle).toHaveFocus()
     await user.keyboard('{Enter}')
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(
-      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
+      document.querySelector(
+        `#${CSS.escape(toggle.getAttribute('aria-controls') ?? '')}`
+      )
     ).toBeVisible()
     expect(
       screen.getByRole('heading', {

@@ -71,7 +71,7 @@ export function useSidebarData(): SidebarData {
         items: [
           {
             title: t('Dashboard'),
-            url: '/dashboard/overview',
+            url: '/dashboard',
             activeUrls: ['/dashboard'],
             icon: LayoutDashboard,
           },
