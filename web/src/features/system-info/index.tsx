@@ -30,14 +30,15 @@ export function SystemInfo() {
 
   return (
     <SectionPageLayout>
-      <SectionPageLayout.Title>
-        <span className='inline-flex min-w-0 items-center gap-2'>
-          <span className='truncate'>{t('System Info')}</span>
-          <Badge variant='outline' className='shrink-0'>
-            Root
-          </Badge>
-        </span>
-      </SectionPageLayout.Title>
+      <SectionPageLayout.Title>{t('System Info')}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {t('Inspect server status, instances and background tasks.')}
+      </SectionPageLayout.Description>
+      <SectionPageLayout.Actions>
+        <Badge variant='outline' className='shrink-0'>
+          Root
+        </Badge>
+      </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
         <div className='space-y-4'>
           <DatabaseHealthPanel />

@@ -64,10 +64,7 @@ function ToolSurchargeMarker() {
               strokeWidth={2}
               aria-hidden='true'
             />
-            <span
-              className='text-[9px] leading-none font-bold'
-              aria-hidden='true'
-            >
+            <span className='text-xs leading-none font-bold' aria-hidden='true'>
               +
             </span>
           </Badge>

@@ -75,10 +75,7 @@ export function PluginIntegrityCheck(props: PluginIntegrityCheckProps) {
       >
         {status === 'pending' && <Spinner />}
         {status === 'verified' && (
-          <CheckCircle2
-            className='text-green-700 dark:text-green-400'
-            aria-hidden='true'
-          />
+          <CheckCircle2 className='text-success' aria-hidden='true' />
         )}
         {status === 'failed' && <AlertTriangle aria-hidden='true' />}
         {(status === 'unavailable' || status === 'missing') && (

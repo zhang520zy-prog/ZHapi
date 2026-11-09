@@ -37,10 +37,8 @@ import type { LogCategory } from '../types'
 import { CommonLogMobileCard } from './common-log-mobile-card'
 
 const logTypeRowTint: Record<number, string> = {
-  [LOG_TYPE_ENUM.ERROR]:
-    'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/50 dark:border-rose-900/30',
-  [LOG_TYPE_ENUM.REFUND]:
-    'bg-blue-50/30 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/30',
+  [LOG_TYPE_ENUM.ERROR]: 'bg-destructive/10 border-destructive/30',
+  [LOG_TYPE_ENUM.REFUND]: 'bg-info/10 border-info/30',
 }
 
 interface UsageLogsMobileListProps<TData> {
@@ -140,7 +138,7 @@ function SummaryField<TData>({
       className={cn('bg-muted/20 min-w-0 rounded-md px-2 py-1.5', className)}
     >
       {label != null && label !== '' && (
-        <div className='text-muted-foreground mb-1 text-[11px] leading-none font-medium select-none'>
+        <div className='text-muted-foreground mb-1 text-xs leading-none font-medium select-none'>
           {label}
         </div>
       )}
@@ -261,8 +259,8 @@ export function UsageLogsMobileList<TData>({
       <div className='rounded-lg border p-6'>
         <Empty className='border-none p-0'>
           <EmptyHeader>
-            <EmptyMedia variant='icon'>
-              <Database className='size-6' />
+            <EmptyMedia>
+              <Database className='text-muted-foreground size-8' />
             </EmptyMedia>
             <EmptyTitle>{resolvedEmptyTitle}</EmptyTitle>
             <EmptyDescription>{resolvedEmptyDescription}</EmptyDescription>

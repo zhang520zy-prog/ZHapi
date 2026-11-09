@@ -64,7 +64,7 @@ function PluginCardComponent({ row }: { row: Row<TaskPluginListItem> }) {
     return flexRender(cell.column.columnDef.cell, cell.getContext())
   }
 
-  const labelClass = 'text-muted-foreground text-[11px] font-medium select-none'
+  const labelClass = 'text-muted-foreground text-xs font-medium select-none'
 
   return (
     <div className='flex h-full flex-col gap-2'>

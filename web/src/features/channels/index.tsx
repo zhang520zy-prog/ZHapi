@@ -88,13 +88,12 @@ export function Channels() {
   return (
     <ChannelsProvider>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          <span className='flex min-w-0 items-center gap-2'>
-            <span className='truncate'>{t('Channels')}</span>
-            {retryBadge}
-          </span>
-        </SectionPageLayout.Title>
+        <SectionPageLayout.Title>{t('Channels')}</SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t('Manage upstream channels, credentials, models and health.')}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>
+          {retryBadge}
           <ChannelsPrimaryButtons />
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>

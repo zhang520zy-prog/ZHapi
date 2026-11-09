@@ -580,19 +580,19 @@ const getOperationSummary = (
 
 const getModeTagTailwind = (mode: string): string => {
   if (mode.includes('header')) {
-    return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/20'
+    return 'bg-chart-2/15 text-chart-2 border-chart-2/30'
   }
   if (mode.includes('replace') || mode.includes('trim')) {
-    return 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20'
+    return 'bg-chart-4/15 text-chart-4 border-chart-4/30'
   }
   if (mode.includes('copy') || mode.includes('move')) {
-    return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20'
+    return 'bg-info/15 text-info border-info/30'
   }
   if (mode.includes('error') || mode.includes('prune')) {
-    return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/20'
+    return 'bg-destructive/15 text-destructive border-destructive/30'
   }
   if (mode.includes('sync')) {
-    return 'bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/20'
+    return 'bg-success/15 text-success border-success/30'
   }
   return 'bg-muted text-muted-foreground'
 }
@@ -1880,7 +1880,7 @@ export function ParamOverrideEditorDialog(
                       <span
                         key={`mode_stat_${mode}`}
                         className={cn(
-                          'inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium',
+                          'inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium',
                           getModeTagTailwind(mode)
                         )}
                       >
@@ -1966,24 +1966,21 @@ export function ParamOverrideEditorDialog(
                                   <span className='text-xs font-semibold'>
                                     #{index + 1}
                                   </span>
-                                  <Badge
-                                    variant='outline'
-                                    className='text-[10px]'
-                                  >
+                                  <Badge variant='outline' className='text-xs'>
                                     {operation.conditions.length}
                                   </Badge>
                                 </div>
-                                <p className='text-muted-foreground mt-0.5 line-clamp-1 text-[11px]'>
+                                <p className='text-muted-foreground mt-0.5 line-clamp-1 text-xs'>
                                   {getOperationSummary(operation, index)}
                                 </p>
                                 {operation.description.trim() && (
-                                  <p className='text-muted-foreground mt-0.5 line-clamp-2 text-[10px]'>
+                                  <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs'>
                                     {operation.description}
                                   </p>
                                 )}
                                 <span
                                   className={cn(
-                                    'mt-1 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium',
+                                    'mt-1 inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium',
                                     getModeTagTailwind(operation.mode || 'set')
                                   )}
                                 >
@@ -2228,7 +2225,7 @@ function RuleEditor(ruleEditorProps: RuleEditorProps) {
             <label className='text-xs font-medium'>
               {t('Rule Description (optional)')}
             </label>
-            <span className='text-muted-foreground text-[10px]'>
+            <span className='text-muted-foreground text-xs'>
               {operation.description.length}/180
             </span>
           </div>
@@ -2505,7 +2502,7 @@ function ConditionEditor(conditionEditorProps: ConditionEditorProps) {
       <div className='rounded-md border'>
         <CollapsibleTrigger className='hover:bg-muted/50 flex w-full items-center justify-between px-3 py-2'>
           <div className='flex items-center gap-2'>
-            <Badge variant='outline' className='text-[10px]'>
+            <Badge variant='outline' className='text-xs'>
               C{conditionEditorProps.conditionIndex + 1}
             </Badge>
             <span className='text-muted-foreground text-xs'>
@@ -2542,9 +2539,7 @@ function ConditionEditor(conditionEditorProps: ConditionEditorProps) {
             </div>
             <div className='grid gap-2 sm:grid-cols-3'>
               <div className='space-y-1'>
-                <label className='text-[10px] font-medium'>
-                  {t('Field Path')}
-                </label>
+                <label className='text-xs font-medium'>{t('Field Path')}</label>
                 <Input
                   value={condition.path}
                   onChange={(e) =>
@@ -2559,9 +2554,7 @@ function ConditionEditor(conditionEditorProps: ConditionEditorProps) {
                 />
               </div>
               <div className='space-y-1'>
-                <label className='text-[10px] font-medium'>
-                  {t('Match Mode')}
-                </label>
+                <label className='text-xs font-medium'>{t('Match Mode')}</label>
                 <Combobox
                   options={CONDITION_MODE_OPTIONS.map((o) => ({
                     value: o.value,
@@ -2580,7 +2573,7 @@ function ConditionEditor(conditionEditorProps: ConditionEditorProps) {
                 />
               </div>
               <div className='space-y-1'>
-                <label className='text-[10px] font-medium'>
+                <label className='text-xs font-medium'>
                   {t('Match Value')}
                 </label>
                 <Input
@@ -2821,7 +2814,7 @@ function ReturnErrorEditor(returnErrorEditorProps: ReturnErrorEditorProps) {
                 type='button'
                 variant='outline'
                 size='sm'
-                className='h-6 text-[10px]'
+                className='h-6 text-xs'
                 onClick={() =>
                   returnErrorEditorProps.updateDraft(
                     returnErrorEditorProps.operationId,
@@ -3027,14 +3020,14 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                     className='bg-background rounded-md border p-2'
                   >
                     <div className='mb-1 flex items-center justify-between'>
-                      <Badge variant='outline' className='text-[10px]'>
+                      <Badge variant='outline' className='text-xs'>
                         R{ruleIndex + 1}
                       </Badge>
                       <Button
                         type='button'
                         variant='ghost'
                         size='sm'
-                        className='text-destructive hover:text-destructive h-6 text-[10px]'
+                        className='text-destructive hover:text-destructive h-6 text-xs'
                         onClick={() =>
                           pruneObjectsEditorProps.removeRule(
                             pruneObjectsEditorProps.operationId,
@@ -3048,7 +3041,7 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                     </div>
                     <div className='grid gap-2 sm:grid-cols-3'>
                       <div className='space-y-0.5'>
-                        <label className='text-[10px] font-medium'>
+                        <label className='text-xs font-medium'>
                           {t('Field Path')}
                         </label>
                         <Input
@@ -3065,7 +3058,7 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                         />
                       </div>
                       <div className='space-y-0.5'>
-                        <label className='text-[10px] font-medium'>
+                        <label className='text-xs font-medium'>
                           {t('Match Mode')}
                         </label>
                         <Combobox
@@ -3086,7 +3079,7 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                         />
                       </div>
                       <div className='space-y-0.5'>
-                        <label className='text-[10px] font-medium'>
+                        <label className='text-xs font-medium'>
                           {t('Match Value (optional)')}
                         </label>
                         <Input
@@ -3104,7 +3097,7 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                       </div>
                     </div>
                     <div className='mt-1.5 flex flex-wrap gap-3'>
-                      <label className='flex items-center gap-1.5 text-[10px]'>
+                      <label className='flex items-center gap-1.5 text-xs'>
                         <Switch
                           checked={rule.invert}
                           onCheckedChange={(checked) =>
@@ -3117,7 +3110,7 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                         />
                         {t('Invert match')}
                       </label>
-                      <label className='flex items-center gap-1.5 text-[10px]'>
+                      <label className='flex items-center gap-1.5 text-xs'>
                         <Switch
                           checked={rule.pass_missing_key}
                           onCheckedChange={(checked) =>
@@ -3163,9 +3156,7 @@ function SyncFieldsEditor(syncFieldsEditorProps: SyncFieldsEditorProps) {
       <label className='text-xs font-medium'>{t('Sync Endpoints')}</label>
       <div className='grid gap-3 sm:grid-cols-2'>
         <div className='space-y-1.5'>
-          <label className='text-[10px] font-medium'>
-            {t('Source Endpoint')}
-          </label>
+          <label className='text-xs font-medium'>{t('Source Endpoint')}</label>
           <div className='flex gap-2'>
             <Select
               items={SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
@@ -3218,9 +3209,7 @@ function SyncFieldsEditor(syncFieldsEditorProps: SyncFieldsEditorProps) {
           </div>
         </div>
         <div className='space-y-1.5'>
-          <label className='text-[10px] font-medium'>
-            {t('Target Endpoint')}
-          </label>
+          <label className='text-xs font-medium'>{t('Target Endpoint')}</label>
           <div className='flex gap-2'>
             <Select
               items={SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
@@ -3291,7 +3280,7 @@ function SyncFieldsEditor(syncFieldsEditorProps: SyncFieldsEditorProps) {
             type='button'
             variant='outline'
             size='sm'
-            className='h-6 text-[10px]'
+            className='h-6 text-xs'
             onClick={() =>
               syncFieldsEditorProps.updateOperation(
                 syncFieldsEditorProps.operationId,

@@ -64,7 +64,7 @@ export function ModelRedirectPanel(props: ModelRedirectPanelProps) {
     <FloatingWindow
       title={t('Model redirects')}
       badge={
-        <Badge variant='secondary' className='h-4 px-1 text-[10px]'>
+        <Badge variant='secondary' className='h-4 px-1 text-xs'>
           {props.mappingCount}
         </Badge>
       }

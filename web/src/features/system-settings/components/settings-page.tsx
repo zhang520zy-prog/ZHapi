@@ -57,6 +57,7 @@ type SettingsPageFrameProps = {
 }
 
 function SettingsPageFrame(props: SettingsPageFrameProps) {
+  const { t } = useTranslation()
   const [actionsContainer, setActionsContainer] =
     useState<HTMLDivElement | null>(null)
   const [titleStatusContainer, setTitleStatusContainer] =
@@ -77,6 +78,9 @@ function SettingsPageFrame(props: SettingsPageFrameProps) {
             />
           </span>
         </SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t('Configure system settings for this deployment.')}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>
           <div
             ref={setActionsContainer}

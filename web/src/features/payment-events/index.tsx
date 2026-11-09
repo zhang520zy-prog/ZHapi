@@ -170,6 +170,11 @@ function PaymentEventList(props: {
       <SectionPageLayout.Title>
         {t('Payment exceptions')}
       </SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {t(
+          'Inspect payment gateway events, signatures and processing results.'
+        )}
+      </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <div className='flex h-full min-h-0 flex-col gap-3'>
           <p className='text-muted-foreground text-sm'>

@@ -216,7 +216,7 @@ function TaskMatrixTable(props: TaskMatrixTableProps) {
                       i18n.language
                     )}
                   </span>
-                  <span className='text-muted-foreground text-[11px] font-normal'>
+                  <span className='text-muted-foreground text-xs font-normal'>
                     {(props.currency ?? USD_PRICING_CURRENCY).symbol}/
                     {taskUsageUnitLabel(
                       definition,
@@ -243,7 +243,7 @@ function TaskMatrixTable(props: TaskMatrixTableProps) {
                     'Added to the usage cost. Set to 0 for no additional charge.'
                   )}
                 </span>
-                <span className='text-muted-foreground text-[11px] font-normal'>
+                <span className='text-muted-foreground text-xs font-normal'>
                   {(props.currency ?? USD_PRICING_CURRENCY).symbol}/
                   {t('request')}
                 </span>
@@ -363,7 +363,7 @@ function TaskMatrixTable(props: TaskMatrixTableProps) {
                     <TooltipTrigger
                       render={
                         <span
-                          className='inline-flex cursor-help text-amber-600 dark:text-amber-400'
+                          className='text-warning inline-flex cursor-help'
                           tabIndex={0}
                         />
                       }
@@ -428,7 +428,7 @@ function TaskMatrixGroup(props: TaskMatrixGroupProps) {
             {t('{{count}} combinations', { count: props.entries.length })}
           </span>
           {!props.allRowsFree && freeCount > 0 ? (
-            <span className='inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400'>
+            <span className='text-warning inline-flex items-center gap-1 text-xs'>
               <AlertTriangle aria-hidden='true' />
               {freeCount}
               <span className='sr-only'>
@@ -510,7 +510,7 @@ export function TaskPricingMatrix(props: TaskPricingMatrixProps) {
     <TooltipProvider>
       <div ref={containerRef} className='flex flex-col gap-3'>
         {allRowsFree ? (
-          <Alert className='border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'>
+          <Alert className='border-warning/30 bg-warning/10 text-warning'>
             <AlertTriangle aria-hidden='true' />
             <AlertDescription className='text-xs text-current'>
               {t(

@@ -465,7 +465,7 @@ export function useCommonLogsColumns(
                             }
                           >
                             <GitBranch
-                              className='size-3.5 text-amber-500'
+                              className='text-warning size-3.5'
                               aria-hidden='true'
                             />
                           </PopoverTrigger>
@@ -486,7 +486,7 @@ export function useCommonLogsColumns(
                       {affinity && (
                         <button
                           type='button'
-                          className='absolute -top-1 -right-1 leading-none text-amber-500'
+                          className='text-warning absolute -top-1 -right-1 leading-none'
                           onClick={(e) => {
                             e.stopPropagation()
                             setAffinityTarget({
@@ -576,7 +576,7 @@ export function useCommonLogsColumns(
                 <Avatar className='ring-border/60 size-6 ring-1 max-sm:hidden'>
                   <AvatarFallback
                     className={cn(
-                      'text-[11px] font-semibold',
+                      'text-xs font-semibold',
                       !sensitiveVisible && 'bg-muted text-muted-foreground'
                     )}
                     style={
@@ -751,7 +751,7 @@ export function useCommonLogsColumns(
                 {completionTokens.toLocaleString()}
               </span>
               {(cacheReadTokens > 0 || cacheWriteTokens > 0) && (
-                <div className='flex items-center gap-1 text-[11px]'>
+                <div className='flex items-center gap-1 text-xs'>
                   {cacheReadTokens > 0 && (
                     <span className='text-muted-foreground/60'>
                       {t('Cache')}↓ {cacheReadTokens.toLocaleString()}
@@ -842,7 +842,7 @@ export function useCommonLogsColumns(
           if (primary?.muted) {
             primaryTextClass = 'text-muted-foreground/60'
           } else if (primary?.danger) {
-            primaryTextClass = 'text-red-600 dark:text-red-400'
+            primaryTextClass = 'text-destructive'
           }
           let detailPreview = (
             <span className='text-muted-foreground/40'>—</span>

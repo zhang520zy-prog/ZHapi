@@ -78,6 +78,9 @@ export function TaskPlugins() {
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{t('Task Plugins')}</SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t('Install, configure and monitor JavaScript task plugins.')}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>
           <div className='flex items-center gap-2'>
             <Switch

@@ -43,15 +43,21 @@ import {
 const route = getRouteApi('/_authenticated/usage-logs/$section')
 const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
-const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
+const SECTION_META: Record<
+  UsageLogsSectionId,
+  { titleKey: string; descriptionKey: string }
+> = {
   common: {
     titleKey: 'Common Logs',
+    descriptionKey: 'Inspect relay requests, token usage and cost details.',
   },
   drawing: {
     titleKey: 'Drawing Logs',
+    descriptionKey: 'Inspect image-generation requests, prompts and results.',
   },
   task: {
     titleKey: 'Task Logs',
+    descriptionKey: 'Inspect asynchronous task runs, progress and artifacts.',
   },
 }
 
@@ -128,6 +134,9 @@ function UsageLogsContent() {
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t(pageMeta.descriptionKey)}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>
           {canManageScope && (
             <Tabs value={viewScope} onValueChange={handleViewScopeChange}>

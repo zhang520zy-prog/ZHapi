@@ -74,6 +74,9 @@ export function RiskEvents() {
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Risk events')}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {t('Review flagged risk events and current restrictions.')}
+      </SectionPageLayout.Description>
       <SectionPageLayout.Actions>
         {canRead && (
           <Tabs

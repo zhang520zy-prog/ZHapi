@@ -173,8 +173,8 @@ export function PrefillGroupManagementDialog({
   } else if (normalizedGroups.length === 0) {
     groupsContent = (
       <Empty className='border border-dashed py-10'>
-        <EmptyMedia variant='icon'>
-          <Layers3 className='h-6 w-6' />
+        <EmptyMedia>
+          <Layers3 className='text-muted-foreground size-8' />
         </EmptyMedia>
         <EmptyHeader>
           <EmptyTitle>{t('No prefill groups yet')}</EmptyTitle>

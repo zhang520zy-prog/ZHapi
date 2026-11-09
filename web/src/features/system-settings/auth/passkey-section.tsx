@@ -403,7 +403,7 @@ export function PasskeySection(props: PasskeySectionProps) {
               className={cn(
                 'lg:col-span-2',
                 hasDomainWarning
-                  ? 'border-warning/40 bg-warning/10 text-amber-800 dark:text-amber-200'
+                  ? 'border-warning/40 bg-warning/10 text-warning'
                   : 'border-info/30 bg-info/10 text-info'
               )}
             >
@@ -557,7 +557,7 @@ export function PasskeySection(props: PasskeySectionProps) {
                     <Input
                       className={cn(
                         hasDomainWarning &&
-                          'border-amber-500 focus-visible:border-amber-500 focus-visible:ring-amber-500/20 dark:border-amber-400 dark:focus-visible:border-amber-400'
+                          'border-warning/30 focus-visible:border-warning/30 focus-visible:ring-warning/20 dark:border-warning/30 dark:focus-visible:border-warning/30'
                       )}
                       placeholder={t('e.g. example.com')}
                       value={field.value ?? ''}
@@ -748,9 +748,7 @@ export function PasskeySection(props: PasskeySectionProps) {
                 </FormControl>
                 <FormDescription
                   aria-live='polite'
-                  className={cn(
-                    currentOriginMissing && 'text-amber-700 dark:text-amber-400'
-                  )}
+                  className={cn(currentOriginMissing && 'text-warning')}
                 >
                   {currentOriginMissing
                     ? t(

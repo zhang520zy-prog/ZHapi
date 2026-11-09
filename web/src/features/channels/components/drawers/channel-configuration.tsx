@@ -137,7 +137,7 @@ export function ChannelConfiguration(props: ChannelConfigurationProps) {
                   <Badge
                     variant='secondary'
                     aria-label={badge.label}
-                    className='h-4 min-w-4 px-1 text-[10px] tabular-nums'
+                    className='h-4 min-w-4 px-1 text-xs tabular-nums'
                   >
                     {badge.count}
                   </Badge>

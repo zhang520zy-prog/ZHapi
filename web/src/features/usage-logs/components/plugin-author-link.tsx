@@ -56,7 +56,7 @@ export function PluginAuthorLink(props: PluginAuthorLinkProps) {
         />
       </a>
       {props.showUrl ? (
-        <span className='text-muted-foreground truncate font-mono text-[11px]'>
+        <span className='text-muted-foreground truncate font-mono text-xs'>
           {authorUrl}
         </span>
       ) : null}

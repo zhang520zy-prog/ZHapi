@@ -117,7 +117,7 @@ export function TaskPluginChannelBadge(props: { pluginKey?: string }) {
           size='sm'
           copyable={false}
           showDot={false}
-          className='shrink-0 text-[10px]'
+          className='shrink-0 text-xs'
         />
       )}
     </div>

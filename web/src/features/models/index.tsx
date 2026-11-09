@@ -48,16 +48,22 @@ const route = getRouteApi('/_authenticated/models/$section')
 
 const SECTION_META: Record<
   ModelsSectionId,
-  { titleKey: string; tabKey: string }
+  { titleKey: string; tabKey: string; descriptionKey: string }
 > = {
   metadata: {
     titleKey: 'Model management',
     tabKey: 'Models',
+    descriptionKey: 'Manage model metadata, pricing and groups.',
   },
-  vendors: { titleKey: 'Vendor management', tabKey: 'Vendors' },
+  vendors: {
+    titleKey: 'Vendor management',
+    tabKey: 'Vendors',
+    descriptionKey: 'Manage vendor records and their models.',
+  },
   deployments: {
     titleKey: 'Deployments',
     tabKey: 'Deployments',
+    descriptionKey: 'Manage deployment endpoints and access.',
   },
 }
 
@@ -125,6 +131,9 @@ function ModelsContent() {
         stackActionsOnMobile={activeSection === 'metadata'}
       >
         <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t(meta.descriptionKey)}
+        </SectionPageLayout.Description>
         <SectionPageLayout.Actions>{actions}</SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>

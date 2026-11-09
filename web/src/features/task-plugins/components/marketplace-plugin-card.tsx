@@ -56,7 +56,7 @@ export function MarketplacePluginCard(props: MarketplacePluginCardProps) {
   const description = resolveLocalizedText(plugin.description, i18n.language)
   const channelTypes = plugin.channelTypes ?? []
   const latestEntry = findMarketplaceVersion(plugin, plugin.latest)
-  const labelClass = 'text-muted-foreground text-[11px] font-medium select-none'
+  const labelClass = 'text-muted-foreground text-xs font-medium select-none'
   const builtInVersion = marketplaceBuiltInVersion(props.installed)
   // Same-origin-as-index rule as the source itself: a logo is only ever
   // fetched from the repository the administrator chose to trust.

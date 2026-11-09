@@ -46,26 +46,24 @@ const STATUS_VARIANT: Record<SystemTaskStatus, 'secondary' | 'destructive'> = {
 }
 
 const STATUS_CLASS_NAME: Record<SystemTaskStatus, string> = {
-  pending:
-    'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  pending: 'bg-warning/10 text-warning dark:bg-warning/15 dark:text-warning',
   running:
-    'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 [&_span]:bg-sky-500',
-  succeeded:
-    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    'bg-info/10 text-info dark:bg-info/15 dark:text-info [&_span]:bg-info',
+  succeeded: 'bg-success/10 text-success dark:bg-success/15 dark:text-success',
   failed: '',
 }
 
 const STATUS_DOT_CLASS_NAME: Record<SystemTaskStatus, string> = {
-  pending: 'bg-amber-500',
-  running: 'bg-sky-500',
-  succeeded: 'bg-emerald-500',
+  pending: 'bg-warning',
+  running: 'bg-info',
+  succeeded: 'bg-success',
   failed: 'bg-destructive',
 }
 
 const PROGRESS_BAR_CLASS_NAME: Record<SystemTaskStatus, string> = {
-  pending: '[&_[data-slot=progress-indicator]]:bg-amber-500',
-  running: '[&_[data-slot=progress-indicator]]:bg-sky-500',
-  succeeded: '[&_[data-slot=progress-indicator]]:bg-emerald-500',
+  pending: '[&_[data-slot=progress-indicator]]:bg-warning',
+  running: '[&_[data-slot=progress-indicator]]:bg-info',
+  succeeded: '[&_[data-slot=progress-indicator]]:bg-success',
   failed: '[&_[data-slot=progress-indicator]]:bg-destructive',
 }
 
@@ -118,7 +116,7 @@ export function SystemTasksTable(props: SystemTasksTableProps) {
                   <div className='font-medium'>
                     {t(SYSTEM_TASK_TYPE_LABEL[task.type] ?? task.type)}
                   </div>
-                  <div className='text-muted-foreground font-mono text-[11px]'>
+                  <div className='text-muted-foreground font-mono text-xs'>
                     {TYPE_DISPLAY_ID[task.type] ?? task.type}
                   </div>
                 </div>

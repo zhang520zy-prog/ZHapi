@@ -24,7 +24,7 @@ export function PolicyDecisionRecord(props: {
           <p
             className={
               event.decision.action === 'stop'
-                ? 'font-medium text-amber-700 dark:text-amber-400'
+                ? 'text-warning font-medium'
                 : 'font-medium'
             }
           >

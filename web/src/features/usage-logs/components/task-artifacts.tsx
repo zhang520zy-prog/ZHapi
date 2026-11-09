@@ -263,7 +263,7 @@ function TaskArtifactCard(props: { artifact: TaskArtifact }) {
             {props.artifact.key}
           </span>
           {props.artifact.mime_type ? (
-            <span className='block truncate font-mono text-[11px]'>
+            <span className='block truncate font-mono text-xs'>
               {props.artifact.mime_type}
             </span>
           ) : null}
@@ -380,8 +380,13 @@ function EmptyTaskArtifacts() {
   return (
     <Empty>
       <EmptyHeader>
-        <EmptyMedia variant='icon'>
-          <HugeiconsIcon icon={File01Icon} strokeWidth={2} aria-hidden='true' />
+        <EmptyMedia>
+          <HugeiconsIcon
+            icon={File01Icon}
+            strokeWidth={2}
+            className='text-muted-foreground size-8'
+            aria-hidden='true'
+          />
         </EmptyMedia>
         <EmptyTitle>{t('Artifacts')}</EmptyTitle>
         <EmptyDescription>{t('None')}</EmptyDescription>

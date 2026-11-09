@@ -28,7 +28,8 @@ export interface CommissionRecord {
   source_type: string
   source_id: number
   base_quota: number
-  paid_money: number
+  /** Backend returns the paid amount as a decimal string (varchar). */
+  paid_money: string
   currency: string
   rate_bps: number
   rate_source: string
@@ -128,7 +129,11 @@ export const getReferralSummary = () =>
     .get<ApiResponse<ReferralSummary>>('/api/user/commission/summary')
     .then((r) => ensure(r, t('Failed to load referral summary')))
 
-export const getReferralRecords = (params: { p: number; page_size: number; status?: string }) =>
+export const getReferralRecords = (params: {
+  p: number
+  page_size: number
+  status?: string
+}) =>
   api
     .get<ApiResponse<{ items: CommissionRecord[]; total: number }>>(
       '/api/user/commission/records',
@@ -144,7 +149,10 @@ export const getReferralInvitees = (params: { p: number; page_size: number }) =>
     )
     .then((r) => ensure(r, t('Failed to load invitees')))
 
-export const getReferralSettlements = (params: { p: number; page_size: number }) =>
+export const getReferralSettlements = (params: {
+  p: number
+  page_size: number
+}) =>
   api
     .get<ApiResponse<{ items: CommissionSettlement[]; total: number }>>(
       '/api/user/commission/settlements',
@@ -166,7 +174,9 @@ export const getCommissionTerms = () =>
 
 export const markTermsRead = () =>
   api
-    .post<ApiResponse<unknown>>('/api/user/commission/terms/read', { doc: 'referral' })
+    .post<ApiResponse<unknown>>('/api/user/commission/terms/read', {
+      doc: 'referral',
+    })
     .then((r) => ensure(r, t('Failed to record terms read')))
 
 // ---------- 管理端 ----------
@@ -185,17 +195,28 @@ export const adminListRecords = (params: {
     )
     .then((r) => ensure(r, t('Failed to load records')))
 
-export const adminConfirmCommissions = (input: { ids: number[]; reason?: string }) =>
+export const adminConfirmCommissions = (input: {
+  ids: number[]
+  reason?: string
+}) =>
   api
     .post<ApiResponse<unknown>>('/api/commission/admin/confirm', input)
     .then((r) => ensure(r, t('Confirmation failed')))
 
 export const adminReverseRecord = (id: number, input: { reason: string }) =>
   api
-    .post<ApiResponse<unknown>>(`/api/commission/admin/records/${id}/reverse`, input)
+    .post<ApiResponse<unknown>>(
+      `/api/commission/admin/records/${id}/reverse`,
+      input
+    )
     .then((r) => ensure(r, t('Reversal failed')))
 
-export const adminListSettlements = (params: { p: number; page_size: number; program: 'referral'; user_id?: number }) =>
+export const adminListSettlements = (params: {
+  p: number
+  page_size: number
+  program: 'referral'
+  user_id?: number
+}) =>
   api
     .get<ApiResponse<{ items: CommissionSettlement[]; total: number }>>(
       '/api/commission/admin/settlements',
@@ -203,7 +224,11 @@ export const adminListSettlements = (params: { p: number; page_size: number; pro
     )
     .then((r) => ensure(r, t('Failed to load settlements')))
 
-export const adminListDebts = (params: { p: number; page_size: number; program: 'referral' }) =>
+export const adminListDebts = (params: {
+  p: number
+  page_size: number
+  program: 'referral'
+}) =>
   api
     .get<ApiResponse<{ items: CommissionDebt[]; total: number }>>(
       '/api/commission/admin/debts',
@@ -211,9 +236,15 @@ export const adminListDebts = (params: { p: number; page_size: number; program: 
     )
     .then((r) => ensure(r, t('Failed to load debts')))
 
-export const adminWaiveDebt = (userId: number, input: { balance_type: string; amount_quota: number; reason: string }) =>
+export const adminWaiveDebt = (
+  userId: number,
+  input: { balance_type: string; amount_quota: number; reason: string }
+) =>
   api
-    .post<ApiResponse<unknown>>(`/api/commission/admin/debts/${userId}/waive`, input)
+    .post<ApiResponse<unknown>>(
+      `/api/commission/admin/debts/${userId}/waive`,
+      input
+    )
     .then((r) => ensure(r, t('Waive failed')))
 
 export const adminBackfill = (input: { topup_ids: number[] }) =>
@@ -221,7 +252,11 @@ export const adminBackfill = (input: { topup_ids: number[] }) =>
     .post<ApiResponse<unknown>>('/api/commission/admin/backfill', input)
     .then((r) => ensure(r, t('Backfill failed')))
 
-export const adminListCampaigns = (params: { p: number; page_size: number; program: 'referral' }) =>
+export const adminListCampaigns = (params: {
+  p: number
+  page_size: number
+  program: 'referral'
+}) =>
   api
     .get<ApiResponse<{ items: CommissionCampaign[]; total: number }>>(
       '/api/commission/admin/campaigns',
@@ -260,7 +295,10 @@ export const adminUpdateCampaign = (
 
 export const adminCancelCampaign = (id: number, expectedVersion: number) =>
   api
-    .post<ApiResponse<unknown>>(`/api/commission/admin/campaigns/${id}/cancel`, {
-      expected_version: expectedVersion,
-    })
+    .post<ApiResponse<unknown>>(
+      `/api/commission/admin/campaigns/${id}/cancel`,
+      {
+        expected_version: expectedVersion,
+      }
+    )
     .then((r) => ensure(r, t('Cancel failed')))

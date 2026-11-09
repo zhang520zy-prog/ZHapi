@@ -49,7 +49,10 @@ function quotaCell(v: number) {
   return <span className='font-mono'>{formatQuotaWithCurrency(v)}</span>
 }
 
-function usePagedQuery<T>(key: unknown[], fetcher: (p: { p: number; page_size: number }) => Promise<T>) {
+function usePagedQuery<T>(
+  key: unknown[],
+  fetcher: (p: { p: number; page_size: number }) => Promise<T>
+) {
   const [page, setPage] = useState(1)
   const query = useQuery({
     queryKey: [...key, page],
@@ -58,14 +61,23 @@ function usePagedQuery<T>(key: unknown[], fetcher: (p: { p: number; page_size: n
   return { page, setPage, query }
 }
 
-function usePageTable<TData>(columns: ColumnDef<TData>[], data: TData[], total: number, page: number, setPage: (p: number) => void) {
+function usePageTable<TData>(
+  columns: ColumnDef<TData>[],
+  data: TData[],
+  total: number,
+  page: number,
+  setPage: (p: number) => void
+) {
   return useDataTable({
     columns,
     data,
     totalCount: total,
     pagination: { pageIndex: page - 1, pageSize: PAGE_SIZE },
     onPaginationChange: (u) => {
-      const n = typeof u === 'function' ? u({ pageIndex: page - 1, pageSize: PAGE_SIZE }) : u
+      const n =
+        typeof u === 'function'
+          ? u({ pageIndex: page - 1, pageSize: PAGE_SIZE })
+          : u
       setPage(n.pageIndex + 1)
     },
     manualPagination: true,
@@ -73,20 +85,23 @@ function usePageTable<TData>(columns: ColumnDef<TData>[], data: TData[], total: 
   })
 }
 
-function recordColumns(t: (k: string) => string): ColumnDef<CommissionRecord>[] {
+function recordColumns(
+  t: (k: string) => string
+): ColumnDef<CommissionRecord>[] {
   return [
     {
       accessorKey: 'created_at',
       header: t('Time'),
-      cell: ({ row }) => dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm'),
+      cell: ({ row }) =>
+        dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm'),
     },
     { accessorKey: 'invitee', header: t('Source') },
     {
       accessorKey: 'paid_money',
       header: t('Actual paid'),
       cell: ({ row }) =>
-        row.original.paid_money > 0
-          ? `${row.original.currency} ${row.original.paid_money.toFixed(2)}`
+        Number.parseFloat(row.original.paid_money) > 0
+          ? `${row.original.currency} ${row.original.paid_money}`
           : '—',
     },
     {
@@ -104,7 +119,11 @@ function recordColumns(t: (k: string) => string): ColumnDef<CommissionRecord>[] 
       header: t('Status'),
       cell: ({ row }) => (
         <Badge variant='outline'>
-          {t(RECORD_STATUS_LABELS[row.original.display_status ?? row.original.status] ?? row.original.status)}
+          {t(
+            RECORD_STATUS_LABELS[
+              row.original.display_status ?? row.original.status
+            ] ?? row.original.status
+          )}
         </Badge>
       ),
     },
@@ -121,9 +140,18 @@ function recordColumns(t: (k: string) => string): ColumnDef<CommissionRecord>[] 
 
 export function RecordsTable() {
   const { t } = useTranslation()
-  const { page, setPage, query } = usePagedQuery(['referral', 'records'], getReferralRecords)
+  const { page, setPage, query } = usePagedQuery(
+    ['referral', 'records'],
+    getReferralRecords
+  )
   const columns = useMemo(() => recordColumns(t), [t])
-  const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
+  const { table } = usePageTable(
+    columns,
+    query.data?.items ?? EMPTY,
+    query.data?.total ?? 0,
+    page,
+    setPage
+  )
   return (
     <DataTablePage
       table={table}
@@ -135,12 +163,15 @@ export function RecordsTable() {
   )
 }
 
-function settlementColumns(t: (k: string) => string): ColumnDef<CommissionSettlement>[] {
+function settlementColumns(
+  t: (k: string) => string
+): ColumnDef<CommissionSettlement>[] {
   return [
     {
       accessorKey: 'created_at',
       header: t('Time'),
-      cell: ({ row }) => dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm'),
+      cell: ({ row }) =>
+        dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm'),
     },
     { accessorKey: 'trigger', header: t('Type') },
     {
@@ -164,9 +195,18 @@ function settlementColumns(t: (k: string) => string): ColumnDef<CommissionSettle
 
 export function SettlementsTable() {
   const { t } = useTranslation()
-  const { page, setPage, query } = usePagedQuery(['referral', 'settlements'], getReferralSettlements)
+  const { page, setPage, query } = usePagedQuery(
+    ['referral', 'settlements'],
+    getReferralSettlements
+  )
   const columns = useMemo(() => settlementColumns(t), [t])
-  const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
+  const { table } = usePageTable(
+    columns,
+    query.data?.items ?? EMPTY,
+    query.data?.total ?? 0,
+    page,
+    setPage
+  )
   return (
     <DataTablePage
       table={table}
@@ -180,14 +220,18 @@ export function SettlementsTable() {
 
 export function InviteesTable() {
   const { t } = useTranslation()
-  const { page, setPage, query } = usePagedQuery(['referral', 'invitees'], getReferralInvitees)
+  const { page, setPage, query } = usePagedQuery(
+    ['referral', 'invitees'],
+    getReferralInvitees
+  )
   const columns = useMemo<ColumnDef<InviteeRow>[]>(
     () => [
       { accessorKey: 'username', header: t('Username') },
       {
         accessorKey: 'created_at',
         header: t('Registered'),
-        cell: ({ row }) => dayjs.unix(row.original.created_at).format('YYYY-MM-DD'),
+        cell: ({ row }) =>
+          dayjs.unix(row.original.created_at).format('YYYY-MM-DD'),
       },
       {
         accessorKey: 'topup_quota',
@@ -197,7 +241,13 @@ export function InviteesTable() {
     ],
     [t]
   )
-  const { table } = usePageTable(columns, query.data?.items ?? EMPTY, query.data?.total ?? 0, page, setPage)
+  const { table } = usePageTable(
+    columns,
+    query.data?.items ?? EMPTY,
+    query.data?.total ?? 0,
+    page,
+    setPage
+  )
   return (
     <DataTablePage
       table={table}

@@ -177,8 +177,8 @@ export function MissingModelsDialog({
           {filteredModels.length === 0 ? (
             <Empty className='border'>
               <EmptyHeader>
-                <EmptyMedia variant='icon'>
-                  <Search className='h-5 w-5' />
+                <EmptyMedia>
+                  <Search className='text-muted-foreground size-8' />
                 </EmptyMedia>
                 <EmptyTitle>{t('No matches found')}</EmptyTitle>
                 <EmptyDescription>

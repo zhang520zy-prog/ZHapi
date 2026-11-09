@@ -30,8 +30,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { hasPermission } from '@/lib/admin-permissions'
 import dayjs from '@/lib/dayjs'
-import { ROLE } from '@/lib/roles'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -47,14 +47,24 @@ function InvoicesTab(props: { canReview: boolean }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const invalidate = () => qc.invalidateQueries({ queryKey: ['invoice-admin'] })
-  const [inputs, setInputs] = useState<Record<number, { note: string; file: string }>>({})
+  const [inputs, setInputs] = useState<
+    Record<number, { note: string; file: string }>
+  >({})
   const [page, setPage] = useState(1)
   const query = useQuery({
     queryKey: ['invoice-admin', 'invoices', page],
     queryFn: () => adminListInvoices({ p: page, page_size: 20 }),
   })
   const review = useMutation({
-    mutationFn: ({ id, action, version }: { id: number; action: 'processing' | 'issued' | 'rejected'; version: number }) =>
+    mutationFn: ({
+      id,
+      action,
+      version,
+    }: {
+      id: number
+      action: 'processing' | 'issued' | 'rejected'
+      version: number
+    }) =>
       adminReviewInvoice(id, {
         action,
         note: inputs[id]?.note || undefined,
@@ -91,9 +101,15 @@ function InvoicesTab(props: { canReview: boolean }) {
       {
         accessorKey: 'status',
         header: t('Status'),
-        cell: ({ row }) => <Badge variant='outline'>{row.original.status}</Badge>,
+        cell: ({ row }) => (
+          <Badge variant='outline'>{row.original.status}</Badge>
+        ),
       },
-      { accessorKey: 'created_at', header: t('Applied'), cell: ({ row }) => ts(row.original.created_at) },
+      {
+        accessorKey: 'created_at',
+        header: t('Applied'),
+        cell: ({ row }) => ts(row.original.created_at),
+      },
       {
         id: 'actions',
         header: t('Actions'),
@@ -101,7 +117,12 @@ function InvoicesTab(props: { canReview: boolean }) {
           const inv = row.original
           if (inv.status !== 'pending' && inv.status !== 'processing') {
             return inv.file_url ? (
-              <a href={inv.file_url} target='_blank' rel='noreferrer' className='text-primary text-sm hover:underline'>
+              <a
+                href={inv.file_url}
+                target='_blank'
+                rel='noreferrer'
+                className='text-primary text-sm hover:underline'
+              >
                 {t('File')}
               </a>
             ) : null
@@ -122,14 +143,30 @@ function InvoicesTab(props: { canReview: boolean }) {
                 onChange={(e) => setInput(inv.id, 'note', e.target.value)}
               />
               {inv.status === 'pending' ? (
-                <Button size='sm' variant='outline' onClick={() => review.mutate({ id: inv.id, action: 'processing', version: inv.version })}>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={() =>
+                    review.mutate({
+                      id: inv.id,
+                      action: 'processing',
+                      version: inv.version,
+                    })
+                  }
+                >
                   {t('Start')}
                 </Button>
               ) : null}
               <Button
                 size='sm'
                 disabled={!(inputs[inv.id]?.file ?? '')}
-                onClick={() => review.mutate({ id: inv.id, action: 'issued', version: inv.version })}
+                onClick={() =>
+                  review.mutate({
+                    id: inv.id,
+                    action: 'issued',
+                    version: inv.version,
+                  })
+                }
               >
                 {t('Issue')}
               </Button>
@@ -137,7 +174,13 @@ function InvoicesTab(props: { canReview: boolean }) {
                 size='sm'
                 variant='destructive'
                 disabled={!(inputs[inv.id]?.note ?? '')}
-                onClick={() => review.mutate({ id: inv.id, action: 'rejected', version: inv.version })}
+                onClick={() =>
+                  review.mutate({
+                    id: inv.id,
+                    action: 'rejected',
+                    version: inv.version,
+                  })
+                }
               >
                 {t('Reject')}
               </Button>
@@ -154,7 +197,8 @@ function InvoicesTab(props: { canReview: boolean }) {
     totalCount: query.data?.total ?? 0,
     pagination: { pageIndex: page - 1, pageSize: 20 },
     onPaginationChange: (u) => {
-      const n = typeof u === 'function' ? u({ pageIndex: page - 1, pageSize: 20 }) : u
+      const n =
+        typeof u === 'function' ? u({ pageIndex: page - 1, pageSize: 20 }) : u
       setPage(n.pageIndex + 1)
     },
     manualPagination: true,
@@ -175,13 +219,20 @@ function InvoicesTab(props: { canReview: boolean }) {
 export function InvoiceAdmin() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
-  if (!user || user.role < ROLE.ADMIN || !hasPermission(user, 'invoice', 'read')) {
+  if (
+    !user ||
+    user.role < ROLE.ADMIN ||
+    !hasPermission(user, 'invoice', 'read')
+  ) {
     return <ErrorState title={t('Invoice permission required')} />
   }
   const canReview = hasPermission(user, 'invoice', 'review')
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Invoice review')}</SectionPageLayout.Title>
+      <SectionPageLayout.Description>
+        {t('Review invoice requests and issue invoices.')}
+      </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <InvoicesTab canReview={canReview} />
       </SectionPageLayout.Content>

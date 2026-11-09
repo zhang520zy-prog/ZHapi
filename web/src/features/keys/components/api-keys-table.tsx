@@ -117,8 +117,8 @@ function ApiKeysMobileList({
       <div className='rounded-lg border p-8'>
         <Empty className='border-none p-0'>
           <EmptyHeader>
-            <EmptyMedia variant='icon'>
-              <Database className='size-6' />
+            <EmptyMedia>
+              <Database className='text-muted-foreground size-8' />
             </EmptyMedia>
             <EmptyTitle>{t('No API Keys Found')}</EmptyTitle>
             <EmptyDescription>

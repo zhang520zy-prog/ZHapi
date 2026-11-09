@@ -45,7 +45,10 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
 }
 
-const STATUS_VARIANTS: Record<string, 'outline' | 'secondary' | 'default' | 'destructive'> = {
+const STATUS_VARIANTS: Record<
+  string,
+  'outline' | 'secondary' | 'default' | 'destructive'
+> = {
   awaiting_payment: 'outline',
   pending: 'secondary',
   processing: 'outline',
@@ -73,7 +76,11 @@ export function InvoicePage() {
   const list = useQuery({
     queryKey: ['invoices', 'list', status, page],
     queryFn: () =>
-      listMyInvoices({ p: page, page_size: PAGE_SIZE, status: status || undefined }),
+      listMyInvoices({
+        p: page,
+        page_size: PAGE_SIZE,
+        status: status || undefined,
+      }),
   })
 
   const columns = useMemo<ColumnDef<InvoiceRequest>[]>(
@@ -96,14 +103,17 @@ export function InvoicePage() {
         accessorKey: 'invoice_type',
         header: t('Type'),
         cell: ({ row }) =>
-          t(TYPE_LABELS[row.original.invoice_type] ?? row.original.invoice_type),
+          t(
+            TYPE_LABELS[row.original.invoice_type] ?? row.original.invoice_type
+          ),
       },
       {
         accessorKey: 'fee_cny',
         header: t('Service fee'),
         cell: ({ row }) => (
           <span className='tabular-nums'>
-            ¥{row.original.fee_cny} ({(row.original.fee_rate_bps / 100).toFixed(0)}%)
+            ¥{row.original.fee_cny} (
+            {(row.original.fee_rate_bps / 100).toFixed(0)}%)
           </span>
         ),
       },
@@ -169,78 +179,81 @@ export function InvoicePage() {
   return (
     <>
       <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>
-        {t('Apply for invoice')}
-      </SectionPageLayout.Title>
-      <SectionPageLayout.Actions>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ['invoices'] })
-          }
-        >
-          {t('Refresh')}
-        </Button>
-        {enabled ? (
+        <SectionPageLayout.Title>
+          {t('Apply for invoice')}
+        </SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t('View your invoices and submit invoice requests.')}
+        </SectionPageLayout.Description>
+        <SectionPageLayout.Actions>
           <Button
+            variant='outline'
             size='sm'
-            disabled={options.isLoading}
-            onClick={() => {
-              if (!options.data) {
-                toast.error(t('Failed to load invoice options'))
-                return
-              }
-              setApplyOpen(true)
+            onClick={() =>
+              queryClient.invalidateQueries({ queryKey: ['invoices'] })
+            }
+          >
+            {t('Refresh')}
+          </Button>
+          {enabled ? (
+            <Button
+              size='sm'
+              disabled={options.isLoading}
+              onClick={() => {
+                if (!options.data) {
+                  toast.error(t('Failed to load invoice options'))
+                  return
+                }
+                setApplyOpen(true)
+              }}
+            >
+              <Plus aria-hidden='true' className='size-4' />
+              {t('Apply for invoice')}
+            </Button>
+          ) : null}
+        </SectionPageLayout.Actions>
+        <SectionPageLayout.Content>
+          <p className='text-muted-foreground mb-4 text-sm'>
+            {t(
+              'A service fee (invoice amount × rate) is deducted from your balance on submission; once issued, the invoice can be downloaded here and is sent to your email.'
+            )}
+          </p>
+          <Tabs
+            value={status}
+            onValueChange={(v) => {
+              setStatus(v)
+              setPage(1)
             }}
           >
-            <Plus aria-hidden='true' className='size-4' />
-            {t('Apply for invoice')}
-          </Button>
-        ) : null}
-      </SectionPageLayout.Actions>
-      <SectionPageLayout.Content>
-        <p className='text-muted-foreground mb-4 text-sm'>
-          {t(
-            'A service fee (invoice amount × rate) is deducted from your balance on submission; once issued, the invoice can be downloaded here and is sent to your email.'
-          )}
-        </p>
-        <Tabs
-          value={status}
-          onValueChange={(v) => {
-            setStatus(v)
-            setPage(1)
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value=''>{t('All')}</TabsTrigger>
-            <TabsTrigger value='pending'>{t('Pending issuance')}</TabsTrigger>
-            <TabsTrigger value='processing'>{t('Processing')}</TabsTrigger>
-            <TabsTrigger value='issued'>{t('Issued')}</TabsTrigger>
-            <TabsTrigger value='rejected'>{t('Rejected')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Card className='mt-4'>
-          <CardContent className='p-3 sm:p-4'>
-            {!list.isLoading && items.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title={t('No invoice requests yet')}
-                description={t(
-                  'Click "Apply for invoice" to submit your first request.'
-                )}
-              />
-            ) : (
-              <DataTablePage
-                table={table}
-                columns={columns}
-                isLoading={list.isLoading}
-                paginationInFooter
-              />
-            )}
-          </CardContent>
-        </Card>
-      </SectionPageLayout.Content>
+            <TabsList>
+              <TabsTrigger value=''>{t('All')}</TabsTrigger>
+              <TabsTrigger value='pending'>{t('Pending issuance')}</TabsTrigger>
+              <TabsTrigger value='processing'>{t('Processing')}</TabsTrigger>
+              <TabsTrigger value='issued'>{t('Issued')}</TabsTrigger>
+              <TabsTrigger value='rejected'>{t('Rejected')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Card className='mt-4'>
+            <CardContent className='p-3 sm:p-4'>
+              {!list.isLoading && items.length === 0 ? (
+                <EmptyState
+                  icon={FileText}
+                  title={t('No invoice requests yet')}
+                  description={t(
+                    'Click "Apply for invoice" to submit your first request.'
+                  )}
+                />
+              ) : (
+                <DataTablePage
+                  table={table}
+                  columns={columns}
+                  isLoading={list.isLoading}
+                  paginationInFooter
+                />
+              )}
+            </CardContent>
+          </Card>
+        </SectionPageLayout.Content>
       </SectionPageLayout>
       {options.data ? (
         <ApplyInvoiceDialog

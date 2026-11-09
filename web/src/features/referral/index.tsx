@@ -17,6 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  AlertCircle,
+  Clock,
+  TrendingUp,
+  Undo2,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +33,7 @@ import { CopyButton } from '@/components/copy-button'
 import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
+import { MetricCard } from '@/components/metric-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -58,35 +67,6 @@ const QUOTA_PER_USD = 500000
 
 function usd(quota: number) {
   return `$${(quota / QUOTA_PER_USD).toFixed(2)}`
-}
-
-function KpiCard(props: { label: string; value: string; note?: string }) {
-  return (
-    <Card className='py-0'>
-      <CardContent className='p-3 sm:p-4'>
-        <div className='text-muted-foreground flex items-baseline justify-between gap-2 text-xs'>
-          <span className='truncate'>{props.label}</span>
-          {props.note ? (
-            <span className='text-muted-foreground/70 shrink-0 text-[10px]'>
-              {props.note}
-            </span>
-          ) : null}
-        </div>
-        <div className='mt-1.5 truncate text-xl font-semibold tabular-nums'>
-          {props.value}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function SectionHeader(props: { title: string; description: string }) {
-  return (
-    <div className='space-y-1 border-b pb-3'>
-      <h3 className='text-sm font-semibold'>{props.title}</h3>
-      <p className='text-muted-foreground text-xs'>{props.description}</p>
-    </div>
-  )
 }
 
 function InviteLinkCard(props: {
@@ -130,10 +110,18 @@ function InviteLinkCard(props: {
           />
         </div>
         <div className='flex items-center gap-2 text-sm'>
-          <span className='text-muted-foreground shrink-0'>{t('Referral code')}:</span>
+          <span className='text-muted-foreground shrink-0'>
+            {t('Referral code')}:
+          </span>
           <span className='font-mono font-semibold'>{code || '—'}</span>
           {code ? (
-            <CopyButton value={code} variant='ghost' className='size-6' iconClassName='size-3.5' aria-label={t('Copy referral code')} />
+            <CopyButton
+              value={code}
+              variant='ghost'
+              className='size-6'
+              iconClassName='size-3.5'
+              aria-label={t('Copy referral code')}
+            />
           ) : null}
         </div>
         <div className='flex flex-wrap gap-2'>
@@ -186,65 +174,83 @@ function ReferralPanel() {
 
   return (
     <div className='space-y-3'>
-      <SectionHeader
-        title={t('Referral rewards')}
-        description={t(
-          'Share your link to invite new users. Referral commissions can only be transferred to your account balance for spending — withdrawal is not supported.'
+      <section aria-labelledby='referral-rewards' className='space-y-3'>
+        <div className='space-y-1'>
+          <h3 id='referral-rewards' className='text-base font-semibold'>
+            {t('Referral rewards')}
+          </h3>
+          <p className='text-muted-foreground text-xs'>
+            {t(
+              'Share your link to invite new users. Referral commissions can only be transferred to your account balance for spending — withdrawal is not supported.'
+            )}
+          </p>
+        </div>
+        <div className='grid gap-3 lg:grid-cols-[minmax(300px,1.1fr)_2fr]'>
+          <InviteLinkCard
+            canTransfer={affQuota > 0}
+            onTransfer={() => setTransferOpen(true)}
+            hint={t(
+              'Referral commission can only be transferred to account balance and cannot be withdrawn.'
+            )}
+          />
+          <div className='grid grid-cols-2 gap-3 sm:grid-cols-3'>
+            <MetricCard
+              icon={Wallet}
+              tone='chart-1'
+              title={t('Available commission')}
+              description={t('Transferable to balance')}
+              value={usd(affQuota)}
+            />
+            <MetricCard
+              icon={Clock}
+              tone='chart-2'
+              title={t('Pending unlock')}
+              description={t('Awaiting settlement')}
+              value={usd(data?.frozen_quota ?? 0)}
+            />
+            <MetricCard
+              icon={TrendingUp}
+              tone='chart-3'
+              title={t('Total earned')}
+              description={t('Lifetime')}
+              value={usd(data?.total_commission ?? 0)}
+            />
+            <MetricCard
+              icon={Undo2}
+              tone='chart-4'
+              title={t('Refunded')}
+              description={t('Clawed back')}
+              value={usd(data?.reversed_quota ?? 0)}
+            />
+            <MetricCard
+              icon={AlertCircle}
+              tone='chart-1'
+              title={t('Outstanding deduction')}
+              description={debtQuota > 0 ? t('Offset first') : undefined}
+              value={usd(debtQuota)}
+            />
+            <MetricCard
+              icon={Users}
+              tone='chart-2'
+              title={t('Registered')}
+              description={t('Invitees')}
+              value={String(data?.invited_count ?? 0)}
+            />
+          </div>
+        </div>
+        {data?.campaign ? (
+          <div className='flex items-center gap-2 text-sm'>
+            <Badge>{t('Campaign rate active')}</Badge>
+            <span className='text-muted-foreground'>
+              {data.campaign.name} · {(data.rate_bps / 100).toFixed(2)}%
+            </span>
+          </div>
+        ) : (
+          <p className='text-muted-foreground text-sm'>
+            {t('Current rate')}: {(data ? data.rate_bps / 100 : 0).toFixed(2)}%
+          </p>
         )}
-      />
-      <div className='grid gap-3 lg:grid-cols-[minmax(300px,1.1fr)_2fr]'>
-        <InviteLinkCard
-          canTransfer={affQuota > 0}
-          onTransfer={() => setTransferOpen(true)}
-          hint={t(
-            'Referral commission can only be transferred to account balance and cannot be withdrawn.'
-          )}
-        />
-        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3'>
-          <KpiCard
-            label={t('Available commission')}
-            note={t('Transferable to balance')}
-            value={usd(affQuota)}
-          />
-          <KpiCard
-            label={t('Pending unlock')}
-            note={t('Awaiting settlement')}
-            value={usd(data?.frozen_quota ?? 0)}
-          />
-          <KpiCard
-            label={t('Total earned')}
-            note={t('Lifetime')}
-            value={usd(data?.total_commission ?? 0)}
-          />
-          <KpiCard
-            label={t('Refunded')}
-            note={t('Clawed back')}
-            value={usd(data?.reversed_quota ?? 0)}
-          />
-          <KpiCard
-            label={t('Outstanding deduction')}
-            note={debtQuota > 0 ? t('Offset first') : undefined}
-            value={usd(debtQuota)}
-          />
-          <KpiCard
-            label={t('Registered')}
-            note={t('Invitees')}
-            value={String(data?.invited_count ?? 0)}
-          />
-        </div>
-      </div>
-      {data?.campaign ? (
-        <div className='flex items-center gap-2 text-sm'>
-          <Badge>{t('Campaign rate active')}</Badge>
-          <span className='text-muted-foreground'>
-            {data.campaign.name} · {(data.rate_bps / 100).toFixed(2)}%
-          </span>
-        </div>
-      ) : (
-        <p className='text-muted-foreground text-sm'>
-          {t('Current rate')}: {(data ? data.rate_bps / 100 : 0).toFixed(2)}%
-        </p>
-      )}
+      </section>
       <Card>
         <CardContent className='p-3 sm:p-4'>
           <Tabs defaultValue='records'>
@@ -366,6 +372,11 @@ export function ReferralPage() {
         <SectionPageLayout.Title>
           {t('Referral rewards')}
         </SectionPageLayout.Title>
+        <SectionPageLayout.Description>
+          {t(
+            'Invite new users with your link and track commissions, settlements and invitees.'
+          )}
+        </SectionPageLayout.Description>
         <PageActions onTerms={termsGate.openTerms} />
         <SectionPageLayout.Content>{content}</SectionPageLayout.Content>
       </SectionPageLayout>

@@ -86,8 +86,8 @@ export function RedemptionsMobileList(props: RedemptionsMobileListProps) {
       <div className='rounded-lg border p-8'>
         <Empty className='border-none p-0'>
           <EmptyHeader>
-            <EmptyMedia variant='icon'>
-              <Database className='size-6' />
+            <EmptyMedia>
+              <Database className='text-muted-foreground size-8' />
             </EmptyMedia>
             <EmptyTitle>{t('No Redemption Codes Found')}</EmptyTitle>
             <EmptyDescription>
@@ -127,7 +127,7 @@ export function RedemptionsMobileList(props: RedemptionsMobileListProps) {
                 <div className='truncate text-sm font-semibold'>
                   {redemption.name}
                 </div>
-                <div className='text-muted-foreground text-[11px]'>
+                <div className='text-muted-foreground text-xs'>
                   {t('Redemption Code')}
                 </div>
               </div>

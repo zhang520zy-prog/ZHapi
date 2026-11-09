@@ -76,14 +76,13 @@ const INSTANCE_SKELETON_KEYS = [
 ]
 
 const STATUS_CLASS_NAME: Record<SystemInstanceStatus, string> = {
-  online:
-    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-  stale: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  online: 'bg-success/10 text-success dark:bg-success/15 dark:text-success',
+  stale: 'bg-warning/10 text-warning dark:bg-warning/15 dark:text-warning',
 }
 
 const STATUS_DOT_CLASS_NAME: Record<SystemInstanceStatus, string> = {
-  online: 'bg-emerald-500',
-  stale: 'bg-amber-500',
+  online: 'bg-success',
+  stale: 'bg-warning',
 }
 
 function roleLabel(instance: SystemInstance) {
@@ -138,9 +137,9 @@ function formatBytes(bytes?: number): string {
 
 function ringColorClass(percent: number | null) {
   if (percent === null) return 'text-muted-foreground/40'
-  if (percent >= 90) return 'text-red-500'
-  if (percent >= 70) return 'text-amber-500'
-  return 'text-emerald-500'
+  if (percent >= 90) return 'text-destructive'
+  if (percent >= 70) return 'text-warning'
+  return 'text-success'
 }
 
 type RingProgressProps = {
@@ -207,7 +206,7 @@ function ResourceCell(props: ResourceCellProps) {
   const content = (
     <div className='flex items-center gap-2'>
       <RingProgress percent={percent} />
-      <span className='font-mono text-[11px] tabular-nums'>
+      <span className='font-mono text-xs tabular-nums'>
         {formatPercent(props.value)}
       </span>
     </div>
@@ -306,7 +305,7 @@ function SystemInstancesList(props: SystemInstancesTableProps) {
                             >
                               <Badge
                                 variant='outline'
-                                className='border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300'
+                                className='border-warning/30 bg-warning/10 text-warning dark:border-warning/30 dark:bg-warning/15 dark:text-warning'
                               >
                                 <AlertTriangle
                                   className='size-3'
@@ -330,7 +329,7 @@ function SystemInstancesList(props: SystemInstancesTableProps) {
                                   <div className='mb-1 font-medium'>
                                     {t('Example')}
                                   </div>
-                                  <code className='bg-muted block rounded-md px-2 py-1.5 font-mono text-[11px] break-all'>
+                                  <code className='bg-muted block rounded-md px-2 py-1.5 font-mono text-xs break-all'>
                                     NODE_NAME=new-api-master-1
                                   </code>
                                 </div>
@@ -344,7 +343,7 @@ function SystemInstancesList(props: SystemInstancesTableProps) {
                           </Popover>
                         )}
                       </div>
-                      <div className='text-muted-foreground truncate font-mono text-[11px]'>
+                      <div className='text-muted-foreground truncate font-mono text-xs'>
                         {instance.info?.host?.hostname || '-'}
                       </div>
                     </div>

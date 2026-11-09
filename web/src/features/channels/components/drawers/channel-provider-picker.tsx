@@ -354,7 +354,7 @@ export function ChannelProviderPicker(props: ChannelProviderPickerProps) {
                           ? 'default'
                           : 'secondary'
                       }
-                      className='shrink-0 rounded-md px-1.5 py-0 text-[10px] font-normal'
+                      className='shrink-0 rounded-md px-1.5 py-0 text-xs font-normal'
                     >
                       {option.id === currentProviderId && t('Current')}
                       {option.id !== currentProviderId &&
@@ -381,12 +381,12 @@ export function ChannelProviderPicker(props: ChannelProviderPickerProps) {
                       </span>
                     )}
                     {option.target.kind === 'builtin' && (
-                      <span className='text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums'>
+                      <span className='text-muted-foreground ml-auto shrink-0 text-xs tabular-nums'>
                         #{option.target.type}
                       </span>
                     )}
                     {option.plugin && (
-                      <span className='text-muted-foreground ml-auto shrink-0 text-[11px]'>
+                      <span className='text-muted-foreground ml-auto shrink-0 text-xs'>
                         {t('{{count}} models', {
                           count: option.plugin.models.length,
                         })}

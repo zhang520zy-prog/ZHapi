@@ -117,7 +117,7 @@ export function RequestChecksSection({
       )
     }
     return (
-      <p className='text-xs text-emerald-600 dark:text-emerald-400'>
+      <p className='text-success text-xs'>
         {t('No current rule matches this text.')}
       </p>
     )
