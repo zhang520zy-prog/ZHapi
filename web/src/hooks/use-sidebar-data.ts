@@ -120,7 +120,7 @@ export function useSidebarData(): SidebarData {
           },
           ...(isAdmin ? [] : [riskEventsItem]),
           {
-            title: t('Profile'),
+            title: t('Personal Settings'),
             url: '/profile',
             icon: User,
           },

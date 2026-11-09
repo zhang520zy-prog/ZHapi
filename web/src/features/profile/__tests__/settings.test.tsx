@@ -195,17 +195,15 @@ describe('user settings saves across profile and security', () => {
 })
 
 it('does not restore chat or playground switches from an old personal configuration', async () => {
-  const get = vi
-    .spyOn(api, 'get')
-    .mockResolvedValue({
+  const get = vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
       data: {
-        success: true,
-        data: {
-          sidebar_modules:
-            '{"chat":{"enabled":true,"chat":true,"playground":true}}',
-        },
+        sidebar_modules:
+          '{"chat":{"enabled":true,"chat":true,"playground":true}}',
       },
-    })
+    },
+  })
   render(<SidebarModulesCard />)
   await waitFor(() => expect(get).toHaveBeenCalledWith('/api/user/self'))
   expect(screen.getByText('Sidebar Personal Settings')).toBeVisible()

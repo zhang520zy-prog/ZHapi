@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Settings } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -61,9 +61,9 @@ export function ProfileSettingsCard({
 
   return (
     <TitledCard
-      title={t('Settings')}
-      description={t('Settings & Preferences')}
-      icon={<Settings className='h-4 w-4' />}
+      title={t('Notifications & alerts')}
+      description={t('Quota warnings and notification channels')}
+      icon={<Bell className='h-4 w-4' />}
       iconTone='info'
       disableHoverEffect
     >

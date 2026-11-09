@@ -209,6 +209,35 @@ describe('merged personal settings page', () => {
     expect(api.get).not.toHaveBeenCalledWith('/api/user/sessions')
   })
 
+  it('highlights the default category on desktop without a section param', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('min-width'),
+          media: query,
+          onchange: null,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          dispatchEvent: () => false,
+        }) as MediaQueryList
+    )
+    await renderPage('/profile')
+    const bindings = await screen.findByRole('link', {
+      name: /Account bindings/,
+    })
+    expect(bindings).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('shows no selected category on mobile without a section param', async () => {
+    await renderPage('/profile')
+    await screen.findByRole('list', { name: 'Account Bindings' })
+    expect(
+      screen.queryByRole('link', { current: 'page' })
+    ).not.toBeInTheDocument()
+  })
+
   it('falls back to the bindings section for an invalid section param', async () => {
     const { router } = await renderPage('/profile?section=bogus')
     expect(
@@ -253,6 +282,14 @@ describe('merged personal settings page', () => {
 
   it('renders notification settings under notifications', async () => {
     await renderPage('/profile?section=notifications')
+    expect(
+      await screen.findByText('Notifications & alerts', {
+        selector: '[data-slot="card-title"]',
+      })
+    ).toBeVisible()
+    expect(
+      screen.queryByText('Settings', { selector: '[data-slot="card-title"]' })
+    ).not.toBeInTheDocument()
     expect(
       await screen.findByRole('button', { name: 'Save Settings' })
     ).toBeVisible()

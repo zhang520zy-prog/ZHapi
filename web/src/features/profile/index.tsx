@@ -55,6 +55,7 @@ import {
   useBoundBindingsCount,
   useSecurityScore,
 } from '@/features/security/hooks/use-security-score'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -98,10 +99,12 @@ export function Profile() {
   const boundCount = useBoundBindingsCount(profile)
 
   const canConfigureSidebar = permissions?.sidebar_settings !== false
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
   const hasExplicitSection = isProfileSection(section)
   const activeSection: ProfileSection = hasExplicitSection
     ? section
     : DEFAULT_PROFILE_SECTION
+  const showSelection = hasExplicitSection || isDesktop
 
   const selectSection = (next: ProfileSection) => {
     void navigate({ to: '/profile', search: { section: next } })
@@ -236,7 +239,7 @@ export function Profile() {
           title={category.title}
           description={category.description}
           badge={category.badge}
-          selected={hasExplicitSection && activeSection === category.key}
+          selected={showSelection && activeSection === category.key}
           render={
             <Link
               to='/profile'

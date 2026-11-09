@@ -88,7 +88,7 @@ describe('security sidebar visibility', () => {
       'Invoices',
       'Referral rewards',
       'Risk events',
-      'Profile',
+      'Personal Settings',
     ])
     expect(
       result.current
@@ -106,7 +106,7 @@ describe('security sidebar visibility', () => {
       expect(
         result.current
           .flatMap((group) => group.items)
-          .some((item) => item.title === 'Profile')
+          .some((item) => item.title === 'Personal Settings')
       ).toBe(true)
       expect(
         result.current
@@ -125,7 +125,7 @@ describe('security sidebar visibility', () => {
       expect(
         result.current
           .flatMap((group) => group.items)
-          .some((item) => item.title === 'Profile')
+          .some((item) => item.title === 'Personal Settings')
       ).toBe(false)
     }
   )
@@ -138,7 +138,7 @@ describe('security sidebar visibility', () => {
     expect(
       result.current
         .flatMap((group) => group.items)
-        .some((item) => item.title === 'Profile')
+        .some((item) => item.title === 'Personal Settings')
     ).toBe(true)
   })
 })

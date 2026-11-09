@@ -121,7 +121,7 @@ function MobileUserProfile({ user, onNavigate }: MobileUserProfileProps) {
           className='text-primary/60 hover:text-primary/80 border-border flex items-center gap-2.5 border-b p-2.5 transition-colors'
         >
           <User className='size-4' />
-          {t('Profile')}
+          {t('Personal Settings')}
         </Link>
 
         {isSecurityVisible && (
