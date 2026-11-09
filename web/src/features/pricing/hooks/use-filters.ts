@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMemo, useCallback, useState } from 'react'
 
 import { useDebounce } from '@/hooks/use-debounce'
@@ -33,10 +33,11 @@ import {
 import { filterAndSortModels, extractAllTags } from '../lib/filters'
 import type { PricingModel, TokenUnit } from '../types'
 
-type FilterState = {
+export type PricingFilterState = {
   search?: string
   sort?: string
-  vendor?: string
+  vendors?: string[]
+  types?: string[]
   group?: string
   quotaType?: string
   endpointType?: string
@@ -46,6 +47,11 @@ type FilterState = {
   rechargePrice?: boolean
 }
 
+/** Search params as parsed by the route schema (includes legacy `vendor`). */
+export type PricingSearchParams = PricingFilterState & {
+  vendor?: string
+}
+
 function normalizeViewMode(value: unknown): ViewMode {
   if (value === VIEW_MODES.TABLE) {
     return VIEW_MODES.TABLE
@@ -53,12 +59,28 @@ function normalizeViewMode(value: unknown): ViewMode {
   return VIEW_MODES.CARD
 }
 
-export function useFilters(models: PricingModel[]) {
-  const search = useSearch({ from: '/pricing/' })
-  const [filterState, setFilterState] = useState<FilterState>(() => ({
+function toggleInList(list: string[], value: string): string[] {
+  return list.includes(value)
+    ? list.filter((item) => item !== value)
+    : [...list, value]
+}
+
+/**
+ * Build the initial filter state from parsed search params. The legacy
+ * single-value `vendor` param is merged into `vendors`.
+ */
+export function resolveInitialFilters(
+  search: PricingSearchParams
+): PricingFilterState {
+  const vendors = [...(search.vendors ?? [])]
+  if (search.vendor && !vendors.includes(search.vendor)) {
+    vendors.push(search.vendor)
+  }
+  return {
     search: search.search,
     sort: search.sort,
-    vendor: search.vendor,
+    vendors: vendors.length > 0 ? vendors : undefined,
+    types: search.types && search.types.length > 0 ? search.types : undefined,
     group: search.group,
     quotaType: search.quotaType,
     endpointType: search.endpointType,
@@ -66,12 +88,54 @@ export function useFilters(models: PricingModel[]) {
     tokenUnit: search.tokenUnit,
     view: search.view,
     rechargePrice: search.rechargePrice,
-  }))
+  }
+}
+
+/** Serialize filter state to URL search params (defaults/empty are dropped). */
+export function filtersToSearchParams(
+  state: PricingFilterState
+): PricingSearchParams {
+  const params: PricingSearchParams = {}
+  if (state.search) params.search = state.search
+  if (state.sort && state.sort !== SORT_OPTIONS.NAME) params.sort = state.sort
+  if (state.vendors && state.vendors.length > 0) {
+    params.vendors = state.vendors
+  }
+  if (state.types && state.types.length > 0) params.types = state.types
+  if (state.group && state.group !== FILTER_ALL) params.group = state.group
+  if (state.quotaType && state.quotaType !== QUOTA_TYPES.ALL) {
+    params.quotaType = state.quotaType
+  }
+  if (state.endpointType && state.endpointType !== ENDPOINT_TYPES.ALL) {
+    params.endpointType = state.endpointType
+  }
+  if (state.tag && state.tag !== FILTER_ALL) params.tag = state.tag
+  if (state.tokenUnit && state.tokenUnit !== DEFAULT_TOKEN_UNIT) {
+    params.tokenUnit = state.tokenUnit
+  }
+  if (state.view && state.view !== VIEW_MODES.CARD) params.view = state.view
+  if (state.rechargePrice) params.rechargePrice = true
+  return params
+}
+
+export function useFilters(models: PricingModel[]) {
+  const search = useSearch({ from: '/pricing/' })
+  const navigate = useNavigate({ from: '/pricing/' })
+  const [filterState, setFilterState] = useState<PricingFilterState>(() =>
+    resolveInitialFilters(search)
+  )
 
   const searchInput = filterState.search || ''
   const debouncedSearchInput = useDebounce(searchInput, 200)
   const sortBy = filterState.sort || SORT_OPTIONS.NAME
-  const vendorFilter = filterState.vendor || FILTER_ALL
+  const vendorFilters = useMemo(
+    () => filterState.vendors ?? [],
+    [filterState.vendors]
+  )
+  const typeFilters = useMemo(
+    () => filterState.types ?? [],
+    [filterState.types]
+  )
   const groupFilter = filterState.group || FILTER_ALL
   const quotaTypeFilter = filterState.quotaType || QUOTA_TYPES.ALL
   const endpointTypeFilter = filterState.endpointType || ENDPOINT_TYPES.ALL
@@ -81,17 +145,26 @@ export function useFilters(models: PricingModel[]) {
   const viewMode = normalizeViewMode(filterState.view)
   const showRechargePrice = filterState.rechargePrice === true
 
-  const updateFilters = useCallback((updates: Record<string, unknown>) => {
-    setFilterState((prev) => {
-      const next: Record<string, unknown> = { ...prev, ...updates }
-      for (const key of Object.keys(next)) {
-        if (next[key] === undefined || next[key] === null) {
-          delete next[key]
+  const updateFilters = useCallback(
+    (updates: Partial<PricingFilterState>) => {
+      setFilterState((prev) => {
+        const next: PricingFilterState = { ...prev, ...updates }
+        for (const key of Object.keys(next) as (keyof PricingFilterState)[]) {
+          const value = next[key]
+          if (
+            value === undefined ||
+            value === null ||
+            (Array.isArray(value) && value.length === 0)
+          ) {
+            delete next[key]
+          }
         }
-      }
-      return next as FilterState
-    })
-  }, [])
+        navigate({ search: filtersToSearchParams(next), replace: true })
+        return next
+      })
+    },
+    [navigate]
+  )
 
   const setSearchInput = useCallback(
     (v: string) => updateFilters({ search: v || undefined }),
@@ -102,8 +175,22 @@ export function useFilters(models: PricingModel[]) {
       updateFilters({ sort: v === SORT_OPTIONS.NAME ? undefined : v }),
     [updateFilters]
   )
-  const setVendorFilter = useCallback(
-    (v: string) => updateFilters({ vendor: v === FILTER_ALL ? undefined : v }),
+  const toggleVendorFilter = useCallback(
+    (vendor: string) =>
+      updateFilters({ vendors: toggleInList(vendorFilters, vendor) }),
+    [updateFilters, vendorFilters]
+  )
+  const toggleTypeFilter = useCallback(
+    (typeId: string) =>
+      updateFilters({ types: toggleInList(typeFilters, typeId) }),
+    [updateFilters, typeFilters]
+  )
+  const clearVendorFilters = useCallback(
+    () => updateFilters({ vendors: undefined }),
+    [updateFilters]
+  )
+  const clearTypeFilters = useCallback(
+    () => updateFilters({ types: undefined }),
     [updateFilters]
   )
   const setGroupFilter = useCallback(
@@ -113,13 +200,6 @@ export function useFilters(models: PricingModel[]) {
   const setQuotaTypeFilter = useCallback(
     (v: string) =>
       updateFilters({ quotaType: v === QUOTA_TYPES.ALL ? undefined : v }),
-    [updateFilters]
-  )
-  const setEndpointTypeFilter = useCallback(
-    (v: string) =>
-      updateFilters({
-        endpointType: v === ENDPOINT_TYPES.ALL ? undefined : v,
-      }),
     [updateFilters]
   )
   const setTagFilter = useCallback(
@@ -151,7 +231,8 @@ export function useFilters(models: PricingModel[]) {
 
     return filterAndSortModels(models, {
       search: debouncedSearchInput,
-      vendor: vendorFilter,
+      vendors: vendorFilters,
+      types: typeFilters,
       group: groupFilter,
       quotaType: quotaTypeFilter,
       endpointType: endpointTypeFilter,
@@ -161,7 +242,8 @@ export function useFilters(models: PricingModel[]) {
   }, [
     models,
     debouncedSearchInput,
-    vendorFilter,
+    vendorFilters,
+    typeFilters,
     groupFilter,
     quotaTypeFilter,
     endpointTypeFilter,
@@ -171,27 +253,44 @@ export function useFilters(models: PricingModel[]) {
 
   const hasActiveFilters = useMemo(
     () =>
-      vendorFilter !== FILTER_ALL ||
+      vendorFilters.length > 0 ||
+      typeFilters.length > 0 ||
       groupFilter !== FILTER_ALL ||
       quotaTypeFilter !== QUOTA_TYPES.ALL ||
       endpointTypeFilter !== ENDPOINT_TYPES.ALL ||
       tagFilter !== FILTER_ALL,
-    [vendorFilter, groupFilter, quotaTypeFilter, endpointTypeFilter, tagFilter]
+    [
+      vendorFilters,
+      typeFilters,
+      groupFilter,
+      quotaTypeFilter,
+      endpointTypeFilter,
+      tagFilter,
+    ]
   )
 
   const activeFilterCount = useMemo(
     () =>
-      (vendorFilter !== FILTER_ALL ? 1 : 0) +
+      vendorFilters.length +
+      typeFilters.length +
       (groupFilter !== FILTER_ALL ? 1 : 0) +
       (quotaTypeFilter !== QUOTA_TYPES.ALL ? 1 : 0) +
       (endpointTypeFilter !== ENDPOINT_TYPES.ALL ? 1 : 0) +
       (tagFilter !== FILTER_ALL ? 1 : 0),
-    [vendorFilter, groupFilter, quotaTypeFilter, endpointTypeFilter, tagFilter]
+    [
+      vendorFilters,
+      typeFilters,
+      groupFilter,
+      quotaTypeFilter,
+      endpointTypeFilter,
+      tagFilter,
+    ]
   )
 
   const clearFilters = useCallback(() => {
     updateFilters({
-      vendor: undefined,
+      vendors: undefined,
+      types: undefined,
       group: undefined,
       quotaType: undefined,
       endpointType: undefined,
@@ -206,7 +305,8 @@ export function useFilters(models: PricingModel[]) {
   return {
     searchInput,
     sortBy,
-    vendorFilter,
+    vendorFilters,
+    typeFilters,
     groupFilter,
     quotaTypeFilter,
     endpointTypeFilter,
@@ -216,10 +316,12 @@ export function useFilters(models: PricingModel[]) {
     showRechargePrice,
     setSearchInput,
     setSortBy,
-    setVendorFilter,
+    toggleVendorFilter,
+    toggleTypeFilter,
+    clearVendorFilters,
+    clearTypeFilters,
     setGroupFilter,
     setQuotaTypeFilter,
-    setEndpointTypeFilter,
     setTagFilter,
     setTokenUnit,
     setViewMode,

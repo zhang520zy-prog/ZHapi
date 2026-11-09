@@ -40,10 +40,11 @@ import type {
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
-import type { UptimeDayPoint } from '../lib/mock-stats'
+import type { UptimeDayPoint } from '../lib/perf-series'
 import type { PricingModel } from '../types'
 import { LatencyTrendChart, UptimeTrendChart } from './model-details-charts'
 import { UptimeSparkline } from './model-details-uptime-sparkline'
+import { ModelPerfBadge } from './model-perf-badge'
 
 function StatCard(props: {
   icon: React.ComponentType<{ className?: string }>
@@ -55,7 +56,7 @@ function StatCard(props: {
   const Icon = props.icon
   return (
     <div className='bg-background flex flex-col gap-1 rounded-lg border p-3'>
-      <span className='text-muted-foreground inline-flex items-center gap-1.5 text-[10px] font-medium tracking-wider uppercase'>
+      <span className='text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium tracking-wider uppercase'>
         <Icon className='size-3' />
         {props.label}
       </span>
@@ -68,9 +69,7 @@ function StatCard(props: {
         {props.value}
       </span>
       {props.hint && (
-        <span className='text-muted-foreground/70 text-[11px]'>
-          {props.hint}
-        </span>
+        <span className='text-muted-foreground/70 text-xs'>{props.hint}</span>
       )}
     </div>
   )
@@ -201,6 +200,20 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
         />
       </div>
 
+      {summary && (
+        <ModelPerfBadge
+          perf={{
+            avg_latency_ms: avgLatency,
+            success_rate: successRate,
+            avg_tps: avgTps,
+            recent_success_series: series,
+            window_start: metricsQuery.data?.data.window_start,
+            window_end: metricsQuery.data?.data.window_end,
+          }}
+          className='rounded-lg border px-3 py-2'
+        />
+      )}
+
       <section>
         <SectionHeader
           icon={HeartPulse}
@@ -277,7 +290,7 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
           )}
           accent={
             incidentCount > 0 ? (
-              <span className='inline-flex items-center gap-1 text-amber-600 dark:text-amber-400'>
+              <span className='text-warning inline-flex items-center gap-1'>
                 <AlertTriangle className='size-3.5' />
                 {t('{{count}} incidents', {
                   count: incidentCount,

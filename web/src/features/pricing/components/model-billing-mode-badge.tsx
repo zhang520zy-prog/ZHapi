@@ -18,11 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { StatusBadge, type StatusVariant } from '@/components/status-badge'
+import { StatusBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
 
 import { getBillingModeLabelKey } from '../lib/billing-mode'
-import { isDynamicPricingModel } from '../lib/dynamic-price'
 import type { PricingModel } from '../types'
 
 interface ModelBillingModeBadgeProps {
@@ -36,18 +35,11 @@ export function ModelBillingModeBadge(props: ModelBillingModeBadgeProps) {
   const labelKey = getBillingModeLabelKey(props.model)
   const label = t(labelKey)
   const isCaption = props.appearance === 'caption'
-  let variant: StatusVariant = 'purple'
-
-  if (isDynamicPricingModel(props.model)) {
-    variant = 'warning'
-  } else if (labelKey === 'Token-based') {
-    variant = 'info'
-  }
 
   return (
     <StatusBadge
       label={label}
-      variant={variant}
+      variant='neutral'
       type={isCaption ? 'text' : undefined}
       copyable={false}
       size='sm'

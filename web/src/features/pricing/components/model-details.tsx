@@ -67,6 +67,11 @@ import { usePricingData } from '../hooks/use-pricing-data'
 import type { ParsedTaskTier } from '../lib/billing-expr'
 import { formatBillingCondition } from '../lib/billing-expression/condition-display'
 import {
+  CAPABILITY_LABEL_KEYS,
+  MODALITY_LABEL_KEYS,
+  normalizeCatalogItems,
+} from '../lib/catalog'
+import {
   formatTaskUsageUnitPrice,
   getDynamicPriceEntries,
   getDynamicPriceUnitLabelKey,
@@ -183,29 +188,6 @@ function UnconfiguredTaskPricingNotice(props: { model: PricingModel }) {
   )
 }
 
-const CAPABILITY_LABEL_KEYS: Record<ModelCapability, string> = {
-  function_calling: 'Function calling',
-  streaming: 'Streaming',
-  vision: 'Vision',
-  json_mode: 'JSON mode',
-  structured_output: 'Structured output',
-  reasoning: 'Reasoning',
-  tools: 'Tools',
-  system_prompt: 'System prompt',
-  web_search: 'Web search',
-  code_interpreter: 'Code interpreter',
-  caching: 'Prompt caching',
-  embeddings: 'Embeddings',
-}
-
-const MODALITY_LABEL_KEYS: Record<string, string> = {
-  text: 'Text',
-  image: 'Image',
-  audio: 'Audio',
-  video: 'Video',
-  file: 'File',
-}
-
 const TOKEN_FORMAT = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 })
@@ -232,11 +214,6 @@ function formatCatalogYearMonth(value?: string): string {
   return date.toLocaleString(undefined, { year: 'numeric', month: 'short' })
 }
 
-function normalizeCatalogItems(items?: readonly string[]): string[] {
-  if (!items) return []
-  return items.filter((item) => item.trim().length > 0)
-}
-
 function OverviewMetric(props: {
   icon: React.ComponentType<{ className?: string }>
   label: string
@@ -249,7 +226,7 @@ function OverviewMetric(props: {
     <div className='flex min-w-0 items-center gap-2 px-3 py-2'>
       <Icon className='text-muted-foreground/70 size-3.5 shrink-0' />
       <div className='min-w-0 flex-1'>
-        <div className='text-muted-foreground truncate text-[10px] font-medium tracking-wider uppercase'>
+        <div className='text-muted-foreground truncate text-xs font-medium tracking-wider uppercase'>
           {props.label}
         </div>
         <div
@@ -327,7 +304,7 @@ function CatalogTextValue(props: { children: React.ReactNode }) {
 function CatalogInfoCell(props: { label: string; children: React.ReactNode }) {
   return (
     <div className='bg-card flex min-w-0 flex-col gap-1 px-3 py-2.5'>
-      <span className='text-muted-foreground text-[10px] font-medium tracking-wider uppercase'>
+      <span className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
         {props.label}
       </span>
       {props.children}
@@ -434,7 +411,7 @@ function ModelBackendQuickStats(props: { model: PricingModel }) {
             key={stat.key}
             className='bg-background flex min-w-0 flex-col gap-0.5 px-3 py-2.5'
           >
-            <span className='text-muted-foreground inline-flex min-w-0 items-center gap-1 text-[10px] font-medium tracking-wider uppercase'>
+            <span className='text-muted-foreground inline-flex min-w-0 items-center gap-1 text-xs font-medium tracking-wider uppercase'>
               <Icon className='size-3 shrink-0' />
               <span className='truncate'>{stat.label}</span>
             </span>
@@ -442,7 +419,7 @@ function ModelBackendQuickStats(props: { model: PricingModel }) {
               {stat.value}
             </span>
             {stat.hint && (
-              <span className='text-muted-foreground/60 truncate text-[10px]'>
+              <span className='text-muted-foreground/60 truncate text-xs'>
                 {stat.hint}
               </span>
             )}
@@ -717,8 +694,8 @@ function PriceSection(props: {
       return (
         <section>
           <SectionTitle>{t('Base Price')}</SectionTitle>
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
+          <div className='border-warning/40 bg-warning/10 rounded-lg p-3'>
+            <div className='text-warning text-sm font-medium'>
               {t('Special billing expression')}
             </div>
             <p className='text-muted-foreground mt-1 text-xs'>
@@ -730,7 +707,7 @@ function PriceSection(props: {
               )}
             </p>
             <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
+              <div className='text-muted-foreground mb-1 text-xs font-medium tracking-wider uppercase'>
                 {t('Raw expression')}
               </div>
               <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
@@ -1127,8 +1104,8 @@ function ProviderGroupPricingSection(
             <SectionTitle>{t('Pricing by Group')}</SectionTitle>
           )}
           <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
+          <div className='border-warning/40 bg-warning/10 rounded-lg p-3'>
+            <div className='text-warning text-sm font-medium'>
               {t('Special billing expression')}
             </div>
             <p className='text-muted-foreground mt-1 text-xs'>
@@ -1140,7 +1117,7 @@ function ProviderGroupPricingSection(
               )}
             </p>
             <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
+              <div className='text-muted-foreground mb-1 text-xs font-medium tracking-wider uppercase'>
                 {t('Raw expression')}
               </div>
               <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
@@ -1287,7 +1264,7 @@ function ProviderGroupPricingSection(
                 />
                 {usageExampleRows.length > 0 ? (
                   <div className='border-t'>
-                    <div className='text-muted-foreground px-3 pt-2 text-[10px] font-medium tracking-wider uppercase'>
+                    <div className='text-muted-foreground px-3 pt-2 text-xs font-medium tracking-wider uppercase'>
                       {t('Price examples')}
                     </div>
                     <StaticDataTable
@@ -1320,7 +1297,7 @@ function ProviderGroupPricingSection(
                         },
                       ]}
                     />
-                    <p className='text-muted-foreground/40 px-3 pb-2 text-[10px]'>
+                    <p className='text-muted-foreground/40 px-3 pb-2 text-xs'>
                       {t('Approximate prices for common specs.')}
                     </p>
                   </div>
@@ -1328,7 +1305,7 @@ function ProviderGroupPricingSection(
               </div>
             )
           })}
-          <p className='text-muted-foreground/40 mt-1.5 text-[10px]'>
+          <p className='text-muted-foreground/40 mt-1.5 text-xs'>
             {dynamicTiers.some(
               (tier) => 'unitPrices' in tier || tier.billingUnit === 'request'
             )
@@ -1435,7 +1412,7 @@ function ProviderGroupPricingSection(
       />
       <div className='-mx-4 sm:mx-0'>
         {isTokenBased && (
-          <p className='text-muted-foreground/40 mt-1.5 px-4 text-[10px] sm:px-0'>
+          <p className='text-muted-foreground/40 mt-1.5 px-4 text-xs sm:px-0'>
             {t('Prices shown per')} {tokenUnitLabel} tokens
           </p>
         )}

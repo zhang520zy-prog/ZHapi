@@ -16,14 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import {
-  ChevronRight,
-  Gauge,
-  KeyRound,
-  ScrollText,
-  Sigma,
-  Zap,
-} from 'lucide-react'
+import { ChevronRight, Gauge, KeyRound, ScrollText, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BundledLanguage } from 'shiki/bundle/web'
@@ -36,17 +29,11 @@ import {
   StaticDataTable,
   staticDataTableClassNames as tableStyles,
 } from '@/components/data-table'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
 
-import {
-  buildRateLimits,
-  buildSupportedParameters,
-  formatRateLimit,
-  type SupportedParameter,
-} from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
+import { buildRateLimits, formatRateLimit } from '../lib/perf-series'
 import type { PricingModel } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -85,9 +72,6 @@ type SampleContext = {
 function buildChatSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
   const isResponses = ctx.endpointType === 'openai-response'
-  const isReasoning = /^o[1-4]|reasoning|thinking|deepseek-r/i.test(
-    ctx.modelName
-  )
   const userMessage = 'Explain quantum entanglement in one paragraph.'
 
   const bodyJson = isResponses
@@ -96,7 +80,7 @@ function buildChatSample(lang: Lang, ctx: SampleContext): string {
         {
           model: ctx.modelName,
           messages: [{ role: 'user', content: userMessage }],
-          ...(isReasoning ? {} : { temperature: 0.7 }),
+          temperature: 0.7,
         },
         null,
         2
@@ -540,133 +524,13 @@ function CodeSamplesSection(props: {
 
       <p className='text-muted-foreground mt-2 text-xs'>
         {t('Replace')}{' '}
-        <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
+        <code className='bg-muted rounded px-1 py-0.5 font-mono text-xs'>
           {'<YOUR_API_KEY>'}
         </code>{' '}
         {t('with the API key from your token settings.')}
       </p>
     </section>
   )
-}
-
-// ---------------------------------------------------------------------------
-// Supported parameters table
-// ---------------------------------------------------------------------------
-
-function SupportedParametersSection(props: { model: PricingModel }) {
-  const { t } = useTranslation()
-  const params = useMemo(
-    () => buildSupportedParameters(props.model),
-    [props.model]
-  )
-
-  if (params.length === 0) return null
-
-  return (
-    <section>
-      <SectionTitle icon={Sigma}>
-        {t('Common parameter reference')}
-      </SectionTitle>
-      <p className='text-muted-foreground mb-3 text-xs leading-relaxed'>
-        {t(
-          'These are common request fields for this endpoint. Actual support depends on the selected upstream model and deployment configuration.'
-        )}
-      </p>
-      <StaticDataTable
-        className={tableStyles.sectionContainer}
-        headerRowClassName={tableStyles.mutedHeaderRow}
-        data={params}
-        getRowKey={(param) => param.name}
-        getRowClassName={() => 'hover:bg-muted/20'}
-        columns={[
-          {
-            id: 'parameter',
-            header: t('Parameter'),
-            className: 'h-9 w-44',
-            cellClassName: tableStyles.topCell,
-            cell: (p) => (
-              <div className='flex items-center gap-1.5'>
-                <code className='font-mono text-sm font-medium'>{p.name}</code>
-                {p.required && (
-                  <Badge
-                    variant='outline'
-                    className='h-6 border-rose-500/40 px-2 text-sm text-rose-600 dark:text-rose-400'
-                  >
-                    {t('required')}
-                  </Badge>
-                )}
-              </div>
-            ),
-          },
-          {
-            id: 'type',
-            header: t('Type'),
-            className: 'h-9 w-24',
-            cellClassName: tableStyles.topCell,
-            cell: (p) => (
-              <Badge
-                variant='secondary'
-                className='h-7 rounded-full px-2.5 font-mono text-sm font-normal'
-              >
-                {p.type}
-              </Badge>
-            ),
-          },
-          {
-            id: 'range',
-            header: t('Default / range'),
-            className: 'h-9 w-32',
-            cellClassName: tableStyles.topCell,
-            cell: (p) => <ParamRangeCell param={p} />,
-          },
-          {
-            id: 'description',
-            header: t('Description'),
-            className: 'h-9',
-            cellClassName: tableStyles.topMutedCell,
-            cell: (p) => t(p.descriptionKey),
-          },
-        ]}
-      />
-    </section>
-  )
-}
-
-function ParamRangeCell(props: { param: SupportedParameter }) {
-  const { defaultValue, range, enumValues } = props.param
-  if (defaultValue !== undefined) {
-    return (
-      <div className='flex flex-wrap items-center gap-1'>
-        <span className='text-muted-foreground text-sm'>=</span>
-        <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-sm'>
-          {String(defaultValue)}
-        </code>
-        {range && (
-          <span className='text-muted-foreground text-sm'>{range}</span>
-        )}
-      </div>
-    )
-  }
-  if (range) {
-    return (
-      <span className='text-muted-foreground font-mono text-sm'>{range}</span>
-    )
-  }
-  if (enumValues && enumValues.length > 0) {
-    return (
-      <div className='flex flex-wrap gap-0.5'>
-        {enumValues.map((v) => (
-          <code
-            key={v}
-            className='bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-sm'
-          >
-            {v}
-          </code>
-        ))}
-      </div>
-    )
-  }
-  return <span className='text-muted-foreground/60 text-sm'>—</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -733,7 +597,7 @@ function RateLimitsSection(props: { model: PricingModel }) {
           },
         ]}
       />
-      <p className='text-muted-foreground mt-2 text-[11px] leading-relaxed'>
+      <p className='text-muted-foreground mt-2 text-xs leading-relaxed'>
         {t(
           'RPM = requests per minute, TPM = tokens per minute, RPD = requests per day. Limits apply per token group.'
         )}
@@ -756,11 +620,11 @@ function AuthSection() {
         <div className='space-y-1.5 text-xs leading-relaxed'>
           <p>
             {t('All requests must include')}{' '}
-            <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
+            <code className='bg-muted rounded px-1 py-0.5 font-mono text-xs'>
               Authorization: Bearer &lt;TOKEN&gt;
             </code>{' '}
             {t('header. Anthropic-formatted endpoints accept the')}{' '}
-            <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
+            <code className='bg-muted rounded px-1 py-0.5 font-mono text-xs'>
               x-api-key
             </code>{' '}
             {t('header instead.')}
@@ -788,7 +652,6 @@ export function ModelDetailsApi(props: {
     <div className='space-y-6'>
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
       <AuthSection />
-      <SupportedParametersSection model={props.model} />
       <RateLimitsSection model={props.model} />
     </div>
   )

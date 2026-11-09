@@ -32,7 +32,7 @@ import {
 } from '@/features/performance-metrics/lib/format'
 import { cn } from '@/lib/utils'
 
-import { aggregateUptime, type UptimeDayPoint } from '../lib/mock-stats'
+import { aggregateUptime, type UptimeDayPoint } from '../lib/perf-series'
 
 // ---------------------------------------------------------------------------
 // Uptime sparkline
@@ -159,18 +159,18 @@ export function UptimeStatusRow(props: {
   }, [summary.uptime_pct])
 
   let StatusIcon = AlertCircle
-  let statusColour = 'text-rose-600 dark:text-rose-400'
+  let statusColour = 'text-destructive'
   let statusLabel = t('Significant outages detected')
   if (status === 'operational') {
     StatusIcon = CheckCircle2
-    statusColour = 'text-emerald-600 dark:text-emerald-400'
+    statusColour = 'text-success'
     statusLabel = t('All systems operational')
   } else if (status === 'minor') {
     StatusIcon = Activity
-    statusColour = 'text-emerald-600 dark:text-emerald-400'
+    statusColour = 'text-success'
     statusLabel = t('Minor blips in the last 30 days')
   } else if (status === 'degraded') {
-    statusColour = 'text-amber-600 dark:text-amber-400'
+    statusColour = 'text-warning'
     statusLabel = t('Degraded performance recently')
   }
 

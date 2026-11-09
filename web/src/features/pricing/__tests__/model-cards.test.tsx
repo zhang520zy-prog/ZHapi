@@ -17,19 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createJSONStorage } from 'zustand/middleware'
 
-import { api } from '@/lib/api'
 import {
   DEFAULT_CURRENCY_CONFIG,
   useSystemConfigStore,
@@ -38,6 +30,7 @@ import {
 import { CachedPriceCell } from '../components/cached-price-cell'
 import { ModelCard } from '../components/model-card'
 import { ModelCardGrid } from '../components/model-card-grid'
+import { ModelPerfBadge } from '../components/model-perf-badge'
 import type { PricingModel } from '../types'
 
 function pricingModel(overrides: Partial<PricingModel> = {}): PricingModel {
@@ -156,26 +149,41 @@ describe('model cards', () => {
     expect(onClick).toHaveBeenCalledWith(name)
   })
 
-  it('retains a neutral health strip and missing values when metrics are unavailable', () => {
+  it('retains a neutral availability placeholder when metrics are unavailable', () => {
     render(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
-    const metrics = screen.getByLabelText(
-      'Performance metrics for the last 24 hours'
-    )
-    expect(within(metrics).getByText('—')).toBeVisible()
-    expect(within(metrics).getByText('—s')).toBeVisible()
-    expect(within(metrics).getByText('—t/s')).toBeVisible()
-    expect(within(metrics).queryByText(/100/)).not.toBeInTheDocument()
-    expect(
-      within(metrics).getByRole('img', {
-        name: 'Recent success-rate samples; gray bars indicate missing data.',
-      })
-    ).toBeVisible()
+    expect(screen.getByText('No data')).toBeVisible()
     expect(screen.getByText('No description available.')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Details' })).toBeEnabled()
   })
 
+  it('opens details from keyboard focus on the whole card', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(<ModelCard model={pricingModel()} onClick={onClick} />)
+    const card = screen.getByRole('button', { name: 'example-model' })
+    card.focus()
+    await user.keyboard('{Enter}')
+    expect(onClick).toHaveBeenCalledWith('example-model')
+  })
+
+  it('shows capability badges only when the backend provides them', () => {
+    const { rerender } = render(
+      <ModelCard
+        model={pricingModel({ capabilities: ['reasoning', 'vision'] })}
+        onClick={vi.fn()}
+      />
+    )
+    const caps = screen.getByRole('group', { name: 'Capabilities' })
+    expect(within(caps).getByText('Reasoning')).toBeVisible()
+    expect(within(caps).getByText('Vision')).toBeVisible()
+    rerender(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
+    expect(
+      screen.queryByRole('group', { name: 'Capabilities' })
+    ).not.toBeInTheDocument()
+  })
+
   it('uses fixed spacing between hourly status bars', () => {
-    render(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
+    render(<ModelPerfBadge perf={undefined} />)
     const statusStrip = screen.getByRole('img', {
       name: 'Recent success-rate samples; gray bars indicate missing data.',
     })
@@ -221,9 +229,9 @@ describe('model cards', () => {
     ).toHaveAttribute('title', endpoints.join(', '))
     expect(within(endpointField).getByText('+3')).toBeVisible()
     expect(
-      within(tagField).getByText('video-generation, high-resolution')
+      within(tagField).getByText('video-generation, high-resolution, fast')
     ).toHaveAttribute('title', tags.join(', '))
-    expect(within(tagField).getByText('+4')).toBeVisible()
+    expect(within(tagField).getByText('+3')).toBeVisible()
     expect(
       within(screen.getByRole('group', { name: 'Pricing' })).getByText(
         'Token-based'
@@ -253,9 +261,7 @@ describe('model cards', () => {
     'shows $expected for the reported request success rate $success_rate',
     ({ success_rate, expected }) => {
       render(
-        <ModelCard
-          model={pricingModel()}
-          onClick={vi.fn()}
+        <ModelPerfBadge
           perf={{ avg_latency_ms: 1200, avg_tps: 42, success_rate }}
         />
       )
@@ -419,29 +425,16 @@ describe('model cards', () => {
     expect(screen.getByText(expression)).toBeVisible()
   })
 
-  it('keeps browsing and neutral health placeholders available after the metrics request fails', async () => {
-    const request = vi
-      .spyOn(api, 'get')
-      .mockRejectedValue(new Error('metrics unavailable'))
+  it('keeps browsing and the availability placeholder when no perf data is shared', async () => {
     const onModelClick = vi.fn()
     render(
-      <QueryClientProvider client={queryClient}>
-        <ModelCardGrid models={[pricingModel()]} onModelClick={onModelClick} />
-      </QueryClientProvider>
+      <ModelCardGrid
+        models={[pricingModel()]}
+        onModelClick={onModelClick}
+        perfMap={new Map()}
+      />
     )
-    await waitFor(() =>
-      expect(
-        queryClient.getQueryState(['perf-metrics-summary', 24])?.status
-      ).toBe('error')
-    )
-    expect(request).toHaveBeenCalledWith('/api/perf-metrics/summary', {
-      params: { hours: 24 },
-    })
-    expect(
-      within(
-        screen.getByLabelText('Performance metrics for the last 24 hours')
-      ).getAllByText(/^—/)
-    ).toHaveLength(3)
+    expect(screen.getByText('No data')).toBeVisible()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Details' }))
     expect(onModelClick).toHaveBeenCalledWith('example-model')
@@ -495,9 +488,7 @@ describe('model cards', () => {
     const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
 
     render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
+      <ModelPerfBadge
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -533,9 +524,7 @@ describe('model cards', () => {
     const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
 
     render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
+      <ModelPerfBadge
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -562,9 +551,7 @@ describe('model cards', () => {
 
   it('keeps all 24 slots gray when recent_success_series is undefined', () => {
     render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
+      <ModelPerfBadge
         perf={{ avg_latency_ms: 1200, avg_tps: 42, success_rate: 100 }}
       />
     )
@@ -586,9 +573,7 @@ describe('model cards', () => {
     const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
 
     render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
+      <ModelPerfBadge
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,

@@ -20,10 +20,12 @@ For commercial licensing, please contact support@quantumnous.com
 // Pricing Lib Exports
 // ----------------------------------------------------------------------------
 
+export * from './availability'
+export * from './catalog'
 export * from './filters'
+export * from './model-types'
 export * from './price'
 export * from './model-helpers'
+export * from './perf-series'
 export * from './billing-expr'
 export * from './tier-expr'
-export * from './mock-stats'
-export * from './seed'

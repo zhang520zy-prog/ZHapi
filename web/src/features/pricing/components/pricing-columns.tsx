@@ -31,14 +31,19 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 import { parseTags } from '../lib/filters'
 import type { PricingModel } from '../types'
 import { CachedPriceCell } from './cached-price-cell'
+import { ModelAvailabilityBadge } from './model-availability-badge'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
+import type { ModelPerfBadgeData } from './model-perf-badge'
 import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
 // ----------------------------------------------------------------------------
 
-export type PricingColumnsOptions = ModelPriceCellOptions
+export type PricingColumnsOptions = ModelPriceCellOptions & {
+  /** Shared 24h perf summary map (single query owned by the page). */
+  perfMap?: Map<string, ModelPerfBadgeData>
+}
 
 export function usePricingColumns(
   options: PricingColumnsOptions = {}
@@ -101,6 +106,19 @@ export function usePricingColumns(
       header: t('Cached'),
       cell: ({ row }) => (
         <CachedPriceCell model={row.original} options={options} />
+      ),
+      size: 110,
+      enableSorting: false,
+    },
+
+    // 24h availability column
+    {
+      id: 'availability_24h',
+      header: t('24h availability'),
+      cell: ({ row }) => (
+        <ModelAvailabilityBadge
+          perf={options.perfMap?.get(row.original.model_name || '')}
+        />
       ),
       size: 110,
       enableSorting: false,

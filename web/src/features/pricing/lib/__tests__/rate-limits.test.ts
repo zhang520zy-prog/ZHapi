@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { expect, test } from 'vitest'
 
 import type { PricingModel } from '../../types'
-import { buildRateLimits } from '../mock-stats'
+import { buildRateLimits } from '../perf-series'
 
 const model: PricingModel = {
   id: 1,

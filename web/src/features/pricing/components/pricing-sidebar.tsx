@@ -27,19 +27,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-import {
-  ENDPOINT_TYPES,
-  FILTER_ALL,
-  QUOTA_TYPES,
-  getEndpointTypeLabels,
-  getQuotaTypeLabels,
-} from '../constants'
+import { FILTER_ALL, QUOTA_TYPES, getQuotaTypeLabels } from '../constants'
 import { hasTaskUsageSchema } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
-import type { PricingModel, PricingVendor } from '../types'
+import type { PricingModel } from '../types'
 
 type FilterOption = {
   value: string
@@ -58,16 +51,11 @@ type FilterSectionProps = {
 
 export interface PricingSidebarProps {
   quotaTypeFilter: string
-  endpointTypeFilter: string
-  vendorFilter: string
   groupFilter: string
   tagFilter: string
   onQuotaTypeChange: (value: string) => void
-  onEndpointTypeChange: (value: string) => void
-  onVendorChange: (value: string) => void
   onGroupChange: (value: string) => void
   onTagChange: (value: string) => void
-  vendors: PricingVendor[]
   groups: string[]
   groupRatios?: Record<string, number>
   tags: string[]
@@ -107,7 +95,7 @@ function FilterChip(props: {
       {(props.option.suffix || props.option.count != null) && (
         <span
           className={cn(
-            'rounded-md px-1.5 py-0.5 text-[12px]',
+            'rounded-md px-1.5 py-0.5 text-xs',
             props.active
               ? 'bg-background text-foreground'
               : 'bg-muted text-muted-foreground'
@@ -153,24 +141,13 @@ export const PricingSidebar = memo(function PricingSidebar(
 ) {
   const { t } = useTranslation()
   const counts = useMemo(() => {
-    const vendors = new Map<string, number>()
     const tags = new Map<string, number>()
-    const endpoints = new Map<string, number>()
     const quotas = { token: 0, request: 0, task: 0 }
     for (const model of props.models) {
-      if (model.vendor_name) {
-        vendors.set(
-          model.vendor_name,
-          (vendors.get(model.vendor_name) ?? 0) + 1
-        )
-      }
       for (const tag of new Set(
         parseTags(model.tags).map((tag) => tag.toLowerCase())
       )) {
         tags.set(tag, (tags.get(tag) ?? 0) + 1)
-      }
-      for (const endpoint of new Set(model.supported_endpoint_types ?? [])) {
-        endpoints.set(endpoint, (endpoints.get(endpoint) ?? 0) + 1)
       }
       if (hasTaskUsageSchema(model)) {
         quotas.task++
@@ -180,26 +157,9 @@ export const PricingSidebar = memo(function PricingSidebar(
         quotas.request++
       }
     }
-    return { vendors, tags, endpoints, quotas }
+    return { tags, quotas }
   }, [props.models])
   const quotaTypeLabels = getQuotaTypeLabels(t)
-  const endpointTypeLabels = getEndpointTypeLabels(t)
-
-  const vendorOptions: FilterOption[] = [
-    {
-      value: FILTER_ALL,
-      label: t('All Vendors'),
-      count: props.models.length,
-    },
-    ...props.vendors
-      .map((vendor) => ({
-        value: vendor.name,
-        label: vendor.name,
-        count: counts.vendors.get(vendor.name) ?? 0,
-        icon: vendor.icon ? getLobeIcon(vendor.icon, 14) : undefined,
-      }))
-      .filter((vendor) => vendor.count > 0),
-  ]
 
   const groupOptions: FilterOption[] = [
     {
@@ -249,28 +209,13 @@ export const PricingSidebar = memo(function PricingSidebar(
     })),
   ]
 
-  const endpointOptions: FilterOption[] = [
-    {
-      value: ENDPOINT_TYPES.ALL,
-      label: endpointTypeLabels[ENDPOINT_TYPES.ALL],
-      count: props.models.length,
-    },
-    ...Object.entries(endpointTypeLabels)
-      .filter(([value]) => value !== ENDPOINT_TYPES.ALL)
-      .map(([value, label]) => ({
-        value,
-        label,
-        count: counts.endpoints.get(value) ?? 0,
-      })),
-  ]
-
   return (
     <aside className={cn('bg-card rounded-xl border p-3', props.className)}>
       <div className='mb-2.5 flex items-center justify-between gap-2'>
         <div>
           <h2 className='text-foreground text-sm font-bold'>{t('Filter')}</h2>
           <p className='text-muted-foreground mt-1 text-xs'>
-            {t('Refine models by provider, group, type, and tags.')}
+            {t('Refine models by group, pricing type, and tags.')}
           </p>
         </div>
         <Button
@@ -300,12 +245,6 @@ export const PricingSidebar = memo(function PricingSidebar(
           onChange={props.onGroupChange}
         />
         <FilterSection
-          title={t('All Vendors')}
-          value={props.vendorFilter}
-          options={vendorOptions}
-          onChange={props.onVendorChange}
-        />
-        <FilterSection
           title={t('Model Tags')}
           value={props.tagFilter}
           options={tagOptions}
@@ -316,12 +255,6 @@ export const PricingSidebar = memo(function PricingSidebar(
           value={props.quotaTypeFilter}
           options={quotaOptions}
           onChange={props.onQuotaTypeChange}
-        />
-        <FilterSection
-          title={t('Endpoint Type')}
-          value={props.endpointTypeFilter}
-          options={endpointOptions}
-          onChange={props.onEndpointTypeChange}
         />
       </div>
     </aside>

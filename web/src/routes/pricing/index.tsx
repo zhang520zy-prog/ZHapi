@@ -23,10 +23,22 @@ import { Pricing } from '@/features/pricing'
 import { getModuleAccessForGuard } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
+const stringArrayParam = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((value) => {
+    if (value === undefined) return undefined
+    if (Array.isArray(value)) return value
+    return [value]
+  })
+
 const pricingSearchSchema = z.object({
   search: z.string().optional(),
   sort: z.string().optional(),
+  /** Legacy single-vendor param; merged into `vendors` by the filter hook. */
   vendor: z.string().optional(),
+  vendors: stringArrayParam,
+  types: stringArrayParam,
   group: z.string().optional(),
   quotaType: z.string().optional(),
   endpointType: z.string().optional(),

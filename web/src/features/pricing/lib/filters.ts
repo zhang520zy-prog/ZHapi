@@ -25,6 +25,7 @@ import {
 } from '../constants'
 import type { PricingModel } from '../types'
 import { hasTaskUsageSchema } from './dynamic-price'
+import { matchesTypeFilter } from './model-types'
 
 // ----------------------------------------------------------------------------
 // Filter Utilities
@@ -50,7 +51,7 @@ export function filterBySearch(
 }
 
 /**
- * Filter models by vendor
+ * Filter models by vendor (single value; kept for legacy callers)
  */
 export function filterByVendor(
   models: PricingModel[],
@@ -58,6 +59,31 @@ export function filterByVendor(
 ): PricingModel[] {
   if (vendor === FILTER_ALL) return models
   return models.filter((m) => m.vendor_name === vendor)
+}
+
+/**
+ * Filter models by a set of selected vendors (intersection with other filters)
+ */
+export function filterByVendors(
+  models: PricingModel[],
+  vendors: string[]
+): PricingModel[] {
+  if (vendors.length === 0) return models
+  return models.filter(
+    (m) => m.vendor_name != null && vendors.includes(m.vendor_name)
+  )
+}
+
+/**
+ * Filter models by selected type-chip ids (chat/image/video/...).
+ * A model passes when it belongs to at least one selected type.
+ */
+export function filterByModelTypes(
+  models: PricingModel[],
+  typeIds: string[]
+): PricingModel[] {
+  if (typeIds.length === 0) return models
+  return models.filter((m) => matchesTypeFilter(m, typeIds))
 }
 
 /**
@@ -145,7 +171,8 @@ export function filterAndSortModels(
   models: PricingModel[],
   filters: {
     search: string
-    vendor: string
+    vendors: string[]
+    types: string[]
     group: string
     quotaType: string
     endpointType: string
@@ -154,7 +181,8 @@ export function filterAndSortModels(
   }
 ): PricingModel[] {
   let result = filterBySearch(models, filters.search)
-  result = filterByVendor(result, filters.vendor)
+  result = filterByVendors(result, filters.vendors)
+  result = filterByModelTypes(result, filters.types)
   result = filterByGroup(result, filters.group)
   result = filterByQuotaType(result, filters.quotaType)
   result = filterByEndpointType(result, filters.endpointType)
@@ -190,7 +218,7 @@ export function extractAllTags(models: PricingModel[]): string[] {
     }
   })
 
-  return Array.from(tagSet).sort((a, b) => a.localeCompare(b))
+  return [...tagSet].sort((a, b) => a.localeCompare(b))
 }
 
 /**

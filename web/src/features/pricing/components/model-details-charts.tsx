@@ -27,7 +27,15 @@ import { useChartTheme } from '@/lib/use-chart-theme'
 import { cn } from '@/lib/utils'
 import { VCHART_OPTION } from '@/lib/vchart'
 
-import type { LatencyTimePoint, UptimeDayPoint } from '../lib/mock-stats'
+import type { LatencyTimePoint, UptimeDayPoint } from '../lib/perf-series'
+
+/** Resolve a design-token CSS var at render time (charts need raw colors). */
+function chartCssVar(name: string): string {
+  if (typeof window === 'undefined') return ''
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim()
+}
 
 function formatHourLabel(iso: string): string {
   const date = new Date(iso)
@@ -117,7 +125,7 @@ export function LatencyTrendChart(props: {
       smooth: true,
       point: {
         visible: true,
-        style: { size: 5, stroke: '#ffffff', lineWidth: 1.5 },
+        style: { size: 5, stroke: chartCssVar('--card'), lineWidth: 1.5 },
       },
       line: {
         style: { lineWidth: 2 },
@@ -224,13 +232,13 @@ export function UptimeTrendChart(props: {
       yField: 'uptime',
       smooth: true,
       line: {
-        style: { stroke: '#10b981', lineWidth: 2 },
+        style: { stroke: chartCssVar('--success'), lineWidth: 2 },
       },
       point: {
         visible: true,
         style: {
           size: 5,
-          stroke: '#ffffff',
+          stroke: chartCssVar('--card'),
           lineWidth: 1.5,
           fill: (datum: { uptime: number }) =>
             getSuccessRateColor(datum.uptime),
@@ -347,7 +355,7 @@ export function ThroughputBarChart(props: {
       yField: 'group',
       bar: {
         style: {
-          fill: '#6366f1',
+          fill: chartCssVar('--chart-1'),
           ...(barRadius == null ? {} : { cornerRadius: barRadius }),
         },
       },
