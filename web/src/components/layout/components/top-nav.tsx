@@ -17,8 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useLocation } from '@tanstack/react-router'
-import { Menu } from 'lucide-react'
-import { useMemo } from 'react'
+import {
+  Check,
+  Languages,
+  Menu,
+  Moon,
+  Search as SearchIcon,
+  Sun,
+} from 'lucide-react'
+import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -26,9 +33,21 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useSearch } from '@/context/search-provider'
+import { useTheme } from '@/context/theme-provider'
+import {
+  INTERFACE_LANGUAGE_OPTIONS,
+  normalizeInterfaceLanguage,
+} from '@/i18n/languages'
+import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 import type { TopNavLink } from '../types'
 
@@ -129,9 +148,27 @@ export function TopNav({
  * breakpoint.
  */
 export function TopNavMenu({ links }: { links: TopNavLink[] }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const normalizedLinks = useNormalizedLinks(links)
   const pathname = useLocation({ select: (location) => location.pathname })
+  const { setOpen: setSearchOpen } = useSearch()
+  const { theme, setTheme } = useTheme()
+  const user = useAuthStore((s) => s.auth.user)
+  const currentLanguage = normalizeInterfaceLanguage(i18n.language)
+  const handleChangeLanguage = useCallback(
+    async (code: string) => {
+      await i18n.changeLanguage(code)
+      if (user) {
+        try {
+          await api.put('/api/user/self', { language: code })
+        } catch {
+          // Best-effort persistence; don't block the UI on failure
+        }
+      }
+    },
+    [i18n, user]
+  )
+  const ThemeIcon = theme === 'dark' ? Moon : Sun
 
   return (
     <DropdownMenu modal={false}>
@@ -176,6 +213,68 @@ export function TopNavMenu({ links }: { links: TopNavLink[] }) {
             />
           )
         })}
+        {/* Phone-only entries for the header controls hidden below `sm`:
+            search, interface language, and theme. */}
+        <DropdownMenuSeparator className='sm:hidden' />
+        <DropdownMenuItem
+          className='sm:hidden'
+          onClick={() => setSearchOpen(true)}
+        >
+          <SearchIcon aria-hidden='true' />
+          {t('Search')}
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className='sm:hidden'>
+            <Languages aria-hidden='true' />
+            {t('Interface Language')}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {INTERFACE_LANGUAGE_OPTIONS.map((lang) => (
+              <DropdownMenuItem
+                key={lang.code}
+                onClick={() => handleChangeLanguage(lang.code)}
+              >
+                {lang.label}
+                <Check
+                  size={14}
+                  className={cn(
+                    'ms-auto',
+                    currentLanguage !== lang.code && 'hidden'
+                  )}
+                />
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className='sm:hidden'>
+            <ThemeIcon aria-hidden='true' className='size-4' />
+            {t('Theme')}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem onClick={() => setTheme('light')}>
+              {t('Light')}
+              <Check
+                size={14}
+                className={cn('ms-auto', theme !== 'light' && 'hidden')}
+              />
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme('dark')}>
+              {t('Dark')}
+              <Check
+                size={14}
+                className={cn('ms-auto', theme !== 'dark' && 'hidden')}
+              />
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme('system')}>
+              {t('System')}
+              <Check
+                size={14}
+                className={cn('ms-auto', theme !== 'system' && 'hidden')}
+              />
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   )

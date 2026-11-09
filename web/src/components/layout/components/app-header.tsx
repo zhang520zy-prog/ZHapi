@@ -137,7 +137,7 @@ export function AppHeader({
             </div>
           )}
           {showSearch && (
-            <Search className='w-8 flex-none [&>span]:hidden sm:[&>span]:inline' />
+            <Search className='hidden w-8 flex-none sm:block [&>span]:hidden sm:[&>span]:inline' />
           )}
           {showNotifications && (
             <NotificationPopover
@@ -152,9 +152,13 @@ export function AppHeader({
               loading={notifications.loading}
             />
           )}
-          <ThemeSwitch />
-          <LanguageSwitcher />
-          {showConfigDrawer && <ConfigDrawer />}
+          {/* Secondary controls fold into the hamburger menu on phones so
+              the brand stays readable. */}
+          <span className='hidden sm:contents'>
+            <ThemeSwitch />
+            <LanguageSwitcher />
+            {showConfigDrawer && <ConfigDrawer />}
+          </span>
           {showProfileDropdown && <ProfileDropdown />}
         </div>
       )}

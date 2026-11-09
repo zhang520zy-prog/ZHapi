@@ -60,7 +60,10 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
                 'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
               )}
             >
-              {props.children ?? <AnimatedOutlet />}
+              {/* Content area: 1440px cap, 24px gutter desktop / 12px mobile. */}
+              <div className='mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col px-3 sm:px-6'>
+                {props.children ?? <AnimatedOutlet />}
+              </div>
             </SidebarInset>
           </div>
         </SidebarProvider>
