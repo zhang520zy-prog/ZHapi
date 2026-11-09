@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -19,10 +20,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { ArrowDown, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from '@tanstack/react-router'
 
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
+import { useTheme } from '@/context/theme-provider'
 import { toIntlLocale } from '@/i18n/languages'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -116,14 +117,33 @@ export function MobiusHome() {
 
   // Scope html-level styles (smooth scroll, scroll padding) to this page only;
   // the attribute is removed on unmount so the console keeps its own behaviour.
+  // The page is always dark: force the class while mounted so SPA navigation
+  // into `/` (where ThemeProvider's effect does not re-run) cannot leave the
+  // stored light preference behind the Mobius palette during lazy loading.
+  // On unmount, restore the user's own resolved theme — `resolvedTheme` is
+  // not usable here because the provider pins it to `dark` while on `/`.
+  const { theme } = useTheme()
   useEffect(() => {
     const element = document.documentElement
     element.dataset.mobiusPage = 'true'
+    element.classList.remove('light')
+    element.classList.add('dark')
+    element.style.colorScheme = 'dark'
     return () => {
       delete element.dataset.mobiusPage
       delete element.dataset.autoplay
+      const systemDark = window.matchMedia(
+        '(prefers-color-scheme: dark)'
+      ).matches
+      let resolved = theme
+      if (theme === 'system') {
+        resolved = systemDark ? 'dark' : 'light'
+      }
+      element.classList.remove('light', 'dark')
+      element.classList.add(resolved)
+      element.style.colorScheme = resolved
     }
-  }, [])
+  }, [theme])
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')

@@ -17,17 +17,25 @@
     <meta
       name="theme-color"
       media="(prefers-color-scheme: light)"
-      content="#eef4f1"
+      content="#f1f2eb"
     />
     <meta
       name="theme-color"
       media="(prefers-color-scheme: dark)"
-      content="#0b1512"
+      content="#090c0b"
     />
+    <!--umami-->
+    <!--Google Analytics-->
+  </head>
+
+  <body>
     <script>
-      // Resolve the theme before first paint so the page never flashes the
-      // wrong background. The Mobius homepage is always dark; other pages
-      // follow the stored preference (same semantics as ThemeProvider).
+      // Resolve theme before first paint so the page never flashes the wrong
+      // background. Mirrors ThemeProvider / ThemeCustomizationProvider:
+      // - mode: stored 'dark' | 'light' | 'system'; default 'dark'
+      // - preset: stored preset id; default 'relaydesk' (has its own CSS
+      //   block, so the body attribute must exist before styled content)
+      // The Mobius homepage is always dark.
       try {
         var pathname = window.location.pathname
         var dark
@@ -36,19 +44,32 @@
         } else {
           var mode = window.localStorage.getItem('newapi:theme:v1:mode')
           dark =
-            mode === 'dark' ||
-            (mode !== 'light' &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches)
+            mode === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+              : mode !== 'light'
         }
         document.documentElement.classList.add(dark ? 'dark' : 'light')
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        var preset = window.localStorage.getItem('newapi:theme:v1:preset')
+        var VALID_PRESETS = {
+          default: 1,
+          anthropic: 1,
+          'simple-large': 1,
+          underground: 1,
+          'rose-garden': 1,
+          'lake-view': 1,
+          'sunset-glow': 1,
+          'forest-whisper': 1,
+          'ocean-breeze': 1,
+          'lavender-dream': 1,
+          relaydesk: 1,
+        }
+        if (!preset || !VALID_PRESETS[preset]) {
+          preset = 'relaydesk'
+        }
+        document.body.dataset.themePreset = preset
       } catch (error) {}
     </script>
-    <!--umami-->
-    <!--Google Analytics-->
-  </head>
-
-  <body>
     <div id="root" translate="no" class="notranslate"></div>
   </body>
 </html>

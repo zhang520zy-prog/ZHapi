@@ -128,10 +128,10 @@ export function ThemeCustomizationProvider(props: {
   // Mirror state to the <body> via data-* attributes so theme-presets.css can
   // override CSS variables at the right cascade layer.
   useEffect(() => {
-    applyAttribute(
-      'data-theme-preset',
-      preset === DEFAULT_THEME_CUSTOMIZATION.preset ? null : preset
-    )
+    // Unlike radius/scale/layout, the preset attribute must always be
+    // written: the default preset (RelayDesk) has its own CSS block, so
+    // eliding the attribute would fall back to the `:root` palette.
+    applyAttribute('data-theme-preset', preset)
   }, [preset])
 
   // Font is the one axis where we resolve before writing the attribute:

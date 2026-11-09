@@ -122,7 +122,13 @@ export function Home() {
   }
 
   return (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        // Keep the Mobius deep background while its chunk loads so the
+        // themed body never flashes through behind it.
+        <div className='bg-mobius-page fixed inset-0' aria-hidden='true' />
+      }
+    >
       <MobiusHome />
     </Suspense>
   )

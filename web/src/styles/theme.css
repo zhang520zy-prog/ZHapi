@@ -18,6 +18,19 @@ For commercial licensing, please contact support@quantumnous.com
 */
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  /* Mobius homepage palette — keep in sync with the `.mobius-page`
+   * variables in styles/home-mobius.css and the RelayDesk preset's dark
+   * set in styles/theme-presets.css. These tokens serve surfaces that
+   * share the homepage's always-dark brand look regardless of the
+   * active theme (currently the auth brand panel). */
+  --color-mobius-page: #090c0b;
+  --color-mobius-ink: #eeefe7;
+  --color-mobius-muted: #a0a79f;
+  --color-mobius-line: #ffffff21;
+  --color-mobius-accent: #c4f58b;
+}
+
 @theme inline {
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,

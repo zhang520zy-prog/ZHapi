@@ -20,8 +20,8 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSystemConfig } from '@/hooks/use-system-config'
 import { GlyphStream } from '@/features/home/components/glyph-stream'
+import { useSystemConfig } from '@/hooks/use-system-config'
 
 type AuthLayoutProps = {
   children: React.ReactNode
@@ -31,12 +31,14 @@ const BRAND_FEATURES = [
   {
     num: '01',
     title: 'Models and pricing',
-    description: 'Compare models, supported endpoints, groups, and current prices.',
+    description:
+      'Compare models, supported endpoints, groups, and current prices.',
   },
   {
     num: '02',
     title: 'API keys',
-    description: 'Create keys and manage access, model limits, and usage quotas.',
+    description:
+      'Create keys and manage access, model limits, and usage quotas.',
   },
   {
     num: '03',
@@ -54,7 +56,10 @@ function BrandMark() {
   const { t } = useTranslation()
   const { systemName, logo, loading } = useSystemConfig()
   return (
-    <Link to='/' className='flex items-center gap-2 transition-opacity hover:opacity-80'>
+    <Link
+      to='/'
+      className='flex items-center gap-2 transition-opacity hover:opacity-80'
+    >
       <div className='relative h-9 w-9'>
         {loading ? (
           <Skeleton className='absolute inset-0 rounded-full' />
@@ -81,28 +86,28 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className='bg-muted/30 relative flex min-h-svh items-center justify-center p-4 sm:p-6'>
       <div className='bg-card grid w-full max-w-5xl overflow-hidden rounded-2xl border shadow-sm lg:grid-cols-2'>
-        <aside className='relative hidden flex-col justify-between gap-10 overflow-hidden border-r bg-zinc-950 p-10 text-zinc-100 lg:flex'>
+        <aside className='bg-mobius-page text-mobius-ink relative hidden flex-col justify-between gap-10 overflow-hidden border-r p-10 lg:flex'>
           <div
             aria-hidden='true'
-            className='absolute inset-0 opacity-45 [&_.glyph-stream]:absolute [&_.glyph-stream]:inset-0 [&_.glyph-stream]:m-0 [&_.glyph-stream-canvas]:h-full [&_.glyph-stream-canvas]:w-full [&_.glyph-static-word]:text-zinc-500'
+            className='[&_.glyph-static-word]:text-mobius-muted absolute inset-0 opacity-45 [&_.glyph-stream]:absolute [&_.glyph-stream]:inset-0 [&_.glyph-stream]:m-0 [&_.glyph-stream-canvas]:h-full [&_.glyph-stream-canvas]:w-full'
           >
             <GlyphStream paused={false} />
           </div>
           <div
             aria-hidden='true'
-            className='absolute inset-0 bg-gradient-to-b from-zinc-950/60 via-zinc-950/55 to-zinc-950/80'
+            className='from-mobius-page/60 via-mobius-page/55 to-mobius-page/80 absolute inset-0 bg-gradient-to-b'
           />
           <div className='relative'>
             <BrandMark />
           </div>
           <div className='relative space-y-5'>
-            <span className='inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-emerald-300'>
+            <span className='bg-mobius-accent/15 text-mobius-accent inline-flex items-center rounded-full px-3 py-1 text-xs font-medium'>
               {t('AI model access')}
             </span>
             <h1 className='text-3xl leading-tight font-semibold tracking-tight'>
               {t('One gateway for your AI workflow')}
             </h1>
-            <p className='text-sm leading-relaxed text-zinc-300'>
+            <p className='text-mobius-muted text-sm leading-relaxed'>
               {t(
                 'Explore available models and prices, create API keys, and review usage in one place.'
               )}
@@ -112,13 +117,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             {BRAND_FEATURES.map((item) => (
               <li
                 key={item.num}
-                className='rounded-lg border border-white/10 bg-white/5 p-3 backdrop-blur-sm'
+                className='border-mobius-line bg-mobius-ink/5 rounded-lg border p-3 backdrop-blur-sm'
               >
-                <div className='font-mono text-xs text-emerald-300/80'>
+                <div className='text-mobius-accent/80 font-mono text-xs'>
                   {item.num}
                 </div>
                 <div className='mt-1 text-sm font-medium'>{t(item.title)}</div>
-                <div className='mt-1 text-xs leading-relaxed text-zinc-400'>
+                <div className='text-mobius-muted mt-1 text-xs leading-relaxed'>
                   {t(item.description)}
                 </div>
               </li>

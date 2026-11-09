@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -146,7 +147,10 @@ export function RechargeFormCard({
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
-  const redemptionEnabled = topupInfo?.enable_redemption === true
+  // Gate on the same sidebar_modules switch that controls the redemption
+  // admin menu — `enable_redemption` in topup info is driven by payment
+  // compliance and would keep the input visible in production.
+  const redemptionEnabled = useIsSidebarModuleVisible('/redemption-codes')
 
   if (loading) {
     return (

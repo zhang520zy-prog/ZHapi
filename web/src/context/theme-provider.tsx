@@ -34,7 +34,7 @@ import {
 type Theme = 'dark' | 'light' | 'system'
 type ResolvedTheme = Exclude<Theme, 'system'>
 
-const DEFAULT_THEME = 'system'
+const DEFAULT_THEME = 'dark'
 const THEMES = new Set<Theme>(['dark', 'light', 'system'])
 
 type ThemeProviderProps = {
@@ -90,10 +90,17 @@ export function ThemeProvider({
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
     const applyTheme = () => {
+      // The Mobius homepage is always dark: the first-paint script in
+      // index.html forces `dark` on `/`, and this effect must not undo it
+      // for users whose stored preference resolves to light.
+      const onHome =
+        window.location.pathname === '/' ||
+        window.location.pathname === '/index.html'
       const nextResolvedTheme = theme === 'system' ? getSystemTheme() : theme
+      const effectiveTheme = onHome ? 'dark' : nextResolvedTheme
       root.classList.remove('light', 'dark')
-      root.classList.add(nextResolvedTheme)
-      setResolvedTheme(nextResolvedTheme)
+      root.classList.add(effectiveTheme)
+      setResolvedTheme(effectiveTheme)
     }
 
     applyTheme()
