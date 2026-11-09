@@ -119,8 +119,8 @@ export function AnalyticsTabsCard(props: AnalyticsTabsCardProps) {
     ]
     if (props.isAdmin) {
       tabs.push(
-        { value: 'users', labelKey: 'User Analytics' },
-        { value: 'flow', labelKey: 'Flow' }
+        { value: 'users', labelKey: 'User analytics' },
+        { value: 'flow', labelKey: 'Traffic analysis' }
       )
     }
     return tabs

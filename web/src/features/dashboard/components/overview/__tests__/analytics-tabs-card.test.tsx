@@ -82,17 +82,21 @@ describe('analytics tabs card', () => {
       screen.getByRole('tab', { name: 'Call Count Ranking' })
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('tab', { name: 'User Analytics' })
+      screen.queryByRole('tab', { name: 'User analytics' })
     ).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Flow' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('tab', { name: 'Traffic analysis' })
+    ).not.toBeInTheDocument()
   })
 
   it('shows user analytics and flow tabs to admins', () => {
     renderTabs(true)
     expect(
-      screen.getByRole('tab', { name: 'User Analytics' })
+      screen.getByRole('tab', { name: 'User analytics' })
     ).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Flow' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('tab', { name: 'Traffic analysis' })
+    ).toBeInTheDocument()
   })
 
   it('shows an empty state instead of a chart when there is no data', () => {

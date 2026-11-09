@@ -140,7 +140,7 @@ export function DashboardMetricCards(props: DashboardMetricCardsProps) {
       <MetricCard
         icon={Wallet}
         tone='chart-4'
-        title={t('Remaining quota')}
+        title={t('Remaining balance')}
         value={formatQuotaWithCurrency(props.remainQuota)}
         description={
           props.runwayLoading

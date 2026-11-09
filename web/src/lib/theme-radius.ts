@@ -29,7 +29,9 @@ export function resolveThemeRadiusPx(
   probe.style.position = 'absolute'
   probe.style.visibility = 'hidden'
 
-  document.documentElement.appendChild(probe)
+  // Theme preset tokens live on <body data-theme-preset>; appending the
+  // probe under <html> would miss preset overrides like --radius-md.
+  ;(document.body ?? document.documentElement).appendChild(probe)
   const resolvedRadius = getComputedStyle(probe).borderTopLeftRadius
   probe.remove()
 

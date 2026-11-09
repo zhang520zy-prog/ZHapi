@@ -64,7 +64,7 @@ describe('dashboard metric cards', () => {
     expect(screen.getByText('Performance metrics')).toBeInTheDocument()
     expect(screen.getByText('Historical consumption')).toBeInTheDocument()
     expect(screen.getByText('Request Count')).toBeInTheDocument()
-    expect(screen.getByText('Remaining quota')).toBeInTheDocument()
+    expect(screen.getByText('Remaining balance')).toBeInTheDocument()
   })
 
   it('shows lifetime consumption and lifetime request count, not range sums', async () => {

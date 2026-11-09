@@ -17,23 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import {
-  BookOpen,
-  FileText,
-  KeyRound,
-  RadioTower,
-  ShieldCheck,
-  Timer,
-  type LucideIcon,
-} from 'lucide-react'
 import { useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { IconBadgeTone } from '@/components/ui/icon-badge'
 import { getApiKeys } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
 import { getUserModels } from '@/lib/api'
-import { ROLE } from '@/lib/roles'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -42,26 +31,13 @@ import { useApiInfo } from './use-status-data'
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
 
-export type DashboardActionPath =
-  | '/keys'
-  | '/wallet'
-  | '/channels'
-  | '/usage-logs'
-  | '/pricing'
+export type DashboardActionPath = '/keys' | '/wallet' | '/usage-logs'
 
 export interface StartStep {
   title: string
   description: string
   to: DashboardActionPath
   completed: boolean
-}
-
-export interface QuickAction {
-  title: string
-  description: string
-  to: DashboardActionPath
-  icon: LucideIcon
-  adminOnly?: boolean
 }
 
 export interface RequestExample {
@@ -71,13 +47,6 @@ export interface RequestExample {
   keyId?: number
   displayKey: string
   ready: boolean
-}
-
-export interface HeroSignal {
-  label: string
-  value: string
-  icon: LucideIcon
-  tone: IconBadgeTone
 }
 
 function getSavedSetupGuideExpanded(): boolean | null {
@@ -139,7 +108,6 @@ export function useSetupGuideState() {
   const requestCount = Number(user?.request_count ?? 0)
   const remainQuota = Number(user?.quota ?? 0)
   const usedQuota = Number(user?.used_quota ?? 0)
-  const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
 
   const apiKeysQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'api-keys'],
@@ -190,69 +158,6 @@ export function useSetupGuideState() {
     [preferredKey, remainQuota, requestCount, t, usedQuota]
   )
 
-  const quickActions = useMemo<QuickAction[]>(
-    () => [
-      {
-        title: t('API Keys'),
-        description: t('Create a key for your app or service'),
-        to: '/keys',
-        icon: KeyRound,
-      },
-      {
-        title: t('Channels'),
-        description: t('Configure upstream providers and routing.'),
-        to: '/channels',
-        icon: RadioTower,
-        adminOnly: true,
-      },
-      {
-        title: t('Usage Logs'),
-        description: t('Inspect requests, errors, and billing details'),
-        to: '/usage-logs',
-        icon: FileText,
-      },
-      {
-        title: t('Pricing'),
-        description: t('Review model rates before scaling traffic'),
-        to: '/pricing',
-        icon: BookOpen,
-      },
-    ],
-    [t]
-  )
-
-  const visibleQuickActions = useMemo(
-    () => quickActions.filter((action) => !action.adminOnly || isAdmin),
-    [isAdmin, quickActions]
-  )
-
-  const heroSignals = useMemo<HeroSignal[]>(() => {
-    const signals: HeroSignal[] = [
-      {
-        label: t('Route active'),
-        value: apiInfoItems.length > 0 ? t('Online') : t('Current domain'),
-        icon: RadioTower,
-        tone: 'info',
-      },
-      {
-        label: t('Auth configured'),
-        value: preferredKey ? t('Secured') : t('Needs API key'),
-        icon: ShieldCheck,
-        tone: 'success',
-      },
-    ]
-    const model = modelsQuery.data?.[0]
-    if (model) {
-      signals.push({
-        label: t('Model selected'),
-        value: model,
-        icon: Timer,
-        tone: 'chart-4',
-      })
-    }
-    return signals
-  }, [apiInfoItems.length, modelsQuery.data, preferredKey, t])
-
   const requestExample = useMemo<RequestExample>(() => {
     const endpoint = normalizeEndpoint(apiInfoItems[0]?.url)
     const model = modelsQuery.data?.[0]
@@ -295,9 +200,7 @@ export function useSetupGuideState() {
     handleSetupGuideToggle,
     startSteps,
     completedStepCount,
-    visibleQuickActions,
     requestExample,
-    heroSignals,
   }
 }
 

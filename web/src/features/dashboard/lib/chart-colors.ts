@@ -46,9 +46,11 @@ const FALLBACK_FOREGROUND = '#1f2430'
 
 function readCssVar(name: string): string {
   if (typeof window === 'undefined') return ''
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim()
+  // Theme presets define tokens on <body data-theme-preset>; the default
+  // theme defines them on :root. Reading <body> resolves both via
+  // inheritance, while documentElement misses preset overrides.
+  const target = document.body ?? document.documentElement
+  return getComputedStyle(target).getPropertyValue(name).trim()
 }
 
 let alphaProbe: HTMLSpanElement | null = null

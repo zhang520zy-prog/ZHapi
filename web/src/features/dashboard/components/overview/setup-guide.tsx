@@ -42,8 +42,6 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import type {
-  HeroSignal,
-  QuickAction,
   RequestExample,
   SetupGuideState,
   StartStep,
@@ -94,10 +92,7 @@ function StartStepItem(props: { step: StartStep; index: number }) {
   )
 }
 
-function RequestPreview(props: {
-  example: RequestExample
-  signals: HeroSignal[]
-}) {
+function RequestPreview(props: { example: RequestExample }) {
   const { t } = useTranslation()
   const [isCopying, setIsCopying] = useState(false)
   const { copyToClipboard } = useCopyToClipboard({ notify: false })
@@ -197,72 +192,7 @@ function RequestPreview(props: {
           ))}
         </div>
       </div>
-
-      <div className='grid gap-2'>
-        {props.signals.map((signal) => {
-          const Icon = signal.icon
-
-          return (
-            <div
-              key={signal.label}
-              className='flex flex-wrap items-center justify-between gap-3 border-t py-2.5'
-            >
-              <span className='flex min-w-0 items-center gap-2'>
-                <IconBadge tone={signal.tone} size='xs'>
-                  <Icon />
-                </IconBadge>
-                <span className='truncate text-xs font-medium'>
-                  {signal.label}
-                </span>
-              </span>
-              <span className='text-muted-foreground shrink-0 text-xs'>
-                {signal.value}
-              </span>
-            </div>
-          )
-        })}
-      </div>
     </div>
-  )
-}
-
-function QuickActionItem(props: { action: QuickAction }) {
-  const Icon = props.action.icon
-
-  return (
-    <Button
-      variant='ghost'
-      className='h-auto justify-start rounded-none px-0 py-3 text-left'
-      render={<Link to={props.action.to} />}
-    >
-      <span className='text-primary flex size-8 shrink-0 items-center justify-center'>
-        <Icon className='size-4' aria-hidden='true' />
-      </span>
-      <span className='flex min-w-0 flex-1 flex-col gap-0.5'>
-        <span className='truncate text-sm font-medium'>
-          {props.action.title}
-        </span>
-        <span className='text-muted-foreground line-clamp-2 text-xs leading-relaxed'>
-          {props.action.description}
-        </span>
-      </span>
-    </Button>
-  )
-}
-
-function CompactQuickAction(props: { action: QuickAction }) {
-  const Icon = props.action.icon
-
-  return (
-    <Button
-      variant='outline'
-      size='sm'
-      className='bg-background/70 h-8 min-w-24 gap-1.5 px-2.5'
-      render={<Link to={props.action.to} />}
-    >
-      <Icon data-icon='inline-start' />
-      <span>{props.action.title}</span>
-    </Button>
   )
 }
 
@@ -330,29 +260,8 @@ export function SetupGuide(props: { state: SetupGuideState }) {
                   </div>
 
                   {state.requestExample.model && (
-                    <RequestPreview
-                      example={state.requestExample}
-                      signals={state.heroSignals}
-                    />
+                    <RequestPreview example={state.requestExample} />
                   )}
-                </div>
-              </div>
-            </CardStaggerItem>
-
-            <CardStaggerItem className='border-b pb-5'>
-              <div className='flex h-full flex-col gap-4'>
-                <div className='flex flex-col gap-1'>
-                  <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
-                    {t('Recommended actions')}
-                  </div>
-                  <h3 className='text-lg font-semibold tracking-tight'>
-                    {t('Keep the platform ready')}
-                  </h3>
-                </div>
-                <div className='grid gap-x-6 sm:grid-cols-2 xl:grid-cols-4'>
-                  {state.visibleQuickActions.map((action) => (
-                    <QuickActionItem key={action.title} action={action} />
-                  ))}
                 </div>
               </div>
             </CardStaggerItem>
@@ -387,9 +296,6 @@ export function SetupGuide(props: { state: SetupGuideState }) {
                 </div>
 
                 <div className='flex flex-wrap items-center gap-2'>
-                  {state.visibleQuickActions.map((action) => (
-                    <CompactQuickAction key={action.title} action={action} />
-                  ))}
                   <Button
                     variant='outline'
                     size='sm'

@@ -178,7 +178,9 @@ describe('overview setup guide', () => {
       })
     ).toBeVisible()
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /^API Keys/ })).toBeVisible()
+      expect(
+        screen.getByRole('button', { name: 'Create API Key' })
+      ).toBeVisible()
     )
 
     await user.keyboard(' ')
@@ -224,7 +226,9 @@ describe('overview setup guide', () => {
     expect(
       screen.getByText('Setup guide is collapsed. Expand it anytime.')
     ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'API Keys' })).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'API Keys' })
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Setup guide' })
     ).not.toBeInTheDocument()
