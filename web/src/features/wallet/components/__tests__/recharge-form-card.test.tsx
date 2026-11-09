@@ -100,6 +100,14 @@ describe('wallet redemption input visibility', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('renders no redemption hint when the sidebar module is off (H-2)', () => {
+    renderCard('')
+
+    expect(
+      screen.queryByText(/Redemption codes are disabled/i)
+    ).not.toBeInTheDocument()
+  })
+
   it('shows the redemption input when the admin enables the redemption sidebar module', () => {
     renderCard(JSON.stringify({ admin: { redemption: true } }))
 
