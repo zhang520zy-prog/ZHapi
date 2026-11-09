@@ -26,6 +26,21 @@ For commercial licensing, please contact support@quantumnous.com
 export const DEFAULT_QUOTA_WARNING_THRESHOLD = 500000
 
 /**
+ * Merged personal-settings page sections (URL `section` search param).
+ * `bindings` is the default; an absent/invalid param falls back to it on
+ * desktop while mobile shows the category list.
+ */
+export const PROFILE_SECTIONS = [
+  'bindings',
+  'security',
+  'notifications',
+  'preferences',
+  'privacy',
+] as const
+export type ProfileSection = (typeof PROFILE_SECTIONS)[number]
+export const DEFAULT_PROFILE_SECTION: ProfileSection = 'bindings'
+
+/**
  * Notification methods
  */
 export const NOTIFICATION_METHODS = [

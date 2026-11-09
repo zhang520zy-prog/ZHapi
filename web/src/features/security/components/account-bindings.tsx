@@ -16,13 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mail, Shield, Send, Link2, Unlink } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SiGithub, SiWechat, SiLinux } from 'react-icons/si'
 import { toast } from 'sonner'
 
-import { IconDiscord } from '@/assets/brand-icons'
+import { IconDiscord, IconGoogle } from '@/assets/brand-icons'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
@@ -33,7 +34,7 @@ import {
 } from '@/features/auth/lib/oauth-popup'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import type { CustomOAuthProviderInfo } from '@/features/auth/types'
-import { getSelfOAuthBindings, unbindCustomOAuth } from '@/features/profile/api'
+import { unbindCustomOAuth } from '@/features/profile/api'
 import type {
   UserProfile,
   BindingItem,
@@ -53,7 +54,13 @@ import {
   authResult,
 } from '@/lib/secure-verification'
 
+import { customOAuthBindingsQueryOptions } from '../hooks/queries'
 import { useAccountSecurity } from '../hooks/use-account-security'
+import {
+  BUILTIN_BINDING_DEFS,
+  isBindingEnabled,
+  type BuiltinBindingId,
+} from '../lib/binding-defs'
 import { EmailBindDialog } from './dialogs/email-bind-dialog'
 import { WeChatBindDialog } from './dialogs/wechat-bind-dialog'
 
@@ -65,6 +72,8 @@ interface AccountBindingsProps {
   profile: UserProfile | null
   onUpdate: () => void
 }
+
+const NO_CUSTOM_BINDINGS: CustomOAuthBinding[] = []
 
 type DialogKey = 'email' | 'wechat'
 
@@ -78,7 +87,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
   const { t } = useTranslation()
   const dialogs = useDialogs<DialogKey>()
   const { status, loading } = useStatus()
-  const [customBindings, setCustomBindings] = useState<CustomOAuthBinding[]>([])
+  const queryClient = useQueryClient()
   const [unbindTarget, setUnbindTarget] = useState<CustomOAuthBinding | null>(
     null
   )
@@ -92,6 +101,11 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
   const customProviders = status?.custom_oauth_providers as
     | CustomOAuthProviderInfo[]
     | undefined
+  const customBindingsQuery = useQuery({
+    ...customOAuthBindingsQueryOptions,
+    enabled: Boolean(customProviders?.length),
+  })
+  const customBindings = customBindingsQuery.data ?? NO_CUSTOM_BINDINGS
   const customBindingsByProviderId = useMemo(
     () => indexCustomOAuthBindings(customBindings),
     [customBindings]
@@ -99,19 +113,10 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
 
   const fetchCustomBindings = useCallback(async () => {
     if (!customProviders || customProviders.length === 0) return
-    try {
-      const res = await getSelfOAuthBindings()
-      if (res.success && res.data) {
-        setCustomBindings(res.data)
-      }
-    } catch {
-      // ignore
-    }
-  }, [customProviders])
-
-  useEffect(() => {
-    fetchCustomBindings()
-  }, [fetchCustomBindings])
+    await queryClient.invalidateQueries({
+      queryKey: customOAuthBindingsQueryOptions.queryKey,
+    })
+  }, [customProviders, queryClient])
 
   const handleUnbindCustom = async () => {
     if (!unbindTarget) return
@@ -225,91 +230,64 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
 
   if (!profile || !status || loading) return null
 
-  const bindings: BindingItem[] = [
-    {
-      id: 'email',
+  const meta: Record<
+    BuiltinBindingId,
+    Pick<BindingItem, 'icon' | 'label' | 'onBind'>
+  > = {
+    email: {
       label: t('Email'),
       icon: Mail,
-      value: profile.email,
-      isBound: Boolean(profile.email),
-      isEnabled: true,
       onBind: () => dialogs.open('email'),
     },
-    {
-      id: 'wechat',
+    wechat: {
       label: t('WeChat'),
       icon: SiWechat as React.ComponentType<{ className?: string }>,
-      value: undefined,
-      isBound: Boolean(
-        (profile as unknown as Record<string, unknown>).wechat_id
-      ),
-      isEnabled: status?.wechat_login || false,
       onBind: () => dialogs.open('wechat'),
     },
-    {
-      id: 'github',
+    github: {
       label: t('GitHub'),
       icon: SiGithub,
-      value: (profile as unknown as Record<string, unknown>).github_id as
-        | string
-        | undefined,
-      isBound: Boolean(
-        (profile as unknown as Record<string, unknown>).github_id
-      ),
-      isEnabled: status?.github_oauth || false,
       onBind: () => void startOAuthBinding('github'),
     },
-    {
-      id: 'discord',
+    google: {
+      label: t('Google'),
+      icon: IconGoogle,
+      onBind: () => void startOAuthBinding('google'),
+    },
+    discord: {
       label: t('Discord'),
       icon: IconDiscord,
-      value: (profile as unknown as Record<string, unknown>).discord_id as
-        | string
-        | undefined,
-      isBound: Boolean(
-        (profile as unknown as Record<string, unknown>).discord_id
-      ),
-      isEnabled: status?.discord_oauth || false,
       onBind: () => void startOAuthBinding('discord'),
     },
-    {
-      id: 'oidc',
+    oidc: {
       label: t('OIDC'),
       icon: Shield,
-      value: (profile as unknown as Record<string, unknown>).oidc_id as
-        | string
-        | undefined,
-      isBound: Boolean((profile as unknown as Record<string, unknown>).oidc_id),
-      isEnabled: status?.oidc_enabled || false,
       onBind: () => void startOAuthBinding('oidc'),
     },
-    {
-      id: 'telegram',
+    telegram: {
       label: t('Telegram'),
       icon: Send,
-      value: (profile as unknown as Record<string, unknown>).telegram_id as
-        | string
-        | undefined,
-      isBound: Boolean(
-        (profile as unknown as Record<string, unknown>).telegram_id
-      ),
-      isEnabled: status?.telegram_oauth || false,
       onBind: () => void startOAuthBinding('telegram'),
     },
-    {
-      id: 'linuxdo',
+    linuxdo: {
       label: t('LinuxDO'),
       icon: SiLinux as React.ComponentType<{ className?: string }>,
-      value: (profile as unknown as Record<string, unknown>).linux_do_id as
-        | string
-        | undefined,
-      isBound: Boolean(
-        (profile as unknown as Record<string, unknown>).linux_do_id
-      ),
-      isEnabled: status?.linuxdo_oauth || false,
       onBind: () => void startOAuthBinding('linuxdo'),
     },
-  ].filter((binding) => binding.isEnabled)
+  }
+
+  const bindings: BindingItem[] = BUILTIN_BINDING_DEFS.filter((def) =>
+    isBindingEnabled(def, status)
+  ).map((def) => {
+    const value = profile[def.field]
+    return {
+      id: def.id,
+      ...meta[def.id],
+      value: typeof value === 'string' ? value : undefined,
+      isBound: Boolean(value),
+      isEnabled: true,
+    }
+  })
 
   return (
     <>

@@ -16,12 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 import type { TwoFAStatus } from '@/features/profile/types'
 import { AuthOperationError } from '@/lib/secure-verification'
 
-import { get2FAStatus } from '../api'
+import { twoFAStatusQueryOptions } from './queries'
 
 // ============================================================================
 // Two-FA Hook
@@ -34,32 +35,22 @@ const DEFAULT_STATUS: TwoFAStatus = {
 }
 
 export function useTwoFA(enabled = true) {
-  const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<TwoFAStatus>(DEFAULT_STATUS)
-  const [error, setError] = useState<string>()
+  const queryClient = useQueryClient()
+  const query = useQuery({ ...twoFAStatusQueryOptions, enabled })
 
-  const fetchStatus = useCallback(async () => {
+  const refetch = useCallback(async () => {
     if (!enabled) return
-
-    try {
-      setLoading(true)
-      setError(undefined)
-      setStatus(await get2FAStatus())
-    } catch (error) {
-      setError(AuthOperationError.from(error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [enabled])
-
-  useEffect(() => {
-    fetchStatus()
-  }, [fetchStatus])
+    await queryClient.invalidateQueries({
+      queryKey: twoFAStatusQueryOptions.queryKey,
+    })
+  }, [enabled, queryClient])
 
   return {
-    status,
-    loading,
-    error,
-    refetch: fetchStatus,
+    status: query.data ?? DEFAULT_STATUS,
+    loading: query.isFetching,
+    error: query.error
+      ? AuthOperationError.from(query.error).message
+      : undefined,
+    refetch,
   }
 }

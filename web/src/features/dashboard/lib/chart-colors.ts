@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
+import { readCssVar } from '@/lib/css-var'
+
 /**
  * Dashboard chart palette resolved from design tokens at render time.
  * Canvas charts need concrete color strings; the palette is read from CSS
@@ -43,15 +45,6 @@ const FALLBACK_SERIES = [
 ]
 const FALLBACK_MUTED = '#8a919c'
 const FALLBACK_FOREGROUND = '#1f2430'
-
-function readCssVar(name: string): string {
-  if (typeof window === 'undefined') return ''
-  // Theme presets define tokens on <body data-theme-preset>; the default
-  // theme defines them on :root. Reading <body> resolves both via
-  // inheritance, while documentElement misses preset overrides.
-  const target = document.body ?? document.documentElement
-  return getComputedStyle(target).getPropertyValue(name).trim()
-}
 
 let alphaProbe: HTMLSpanElement | null = null
 

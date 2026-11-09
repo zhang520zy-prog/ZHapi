@@ -74,7 +74,7 @@ function sidebarFor(admin?: object, user?: object, canConfigure = true) {
 }
 
 describe('security sidebar visibility', () => {
-  it('old configurations show Security & Access immediately after Profile and keep API Keys', () => {
+  it('old configurations show the merged Profile entry and keep API Keys', () => {
     const { result } = sidebarFor(
       { personal: { enabled: true, personal: true, topup: true } },
       { personal: { enabled: true, personal: true } }
@@ -89,7 +89,6 @@ describe('security sidebar visibility', () => {
       'Referral rewards',
       'Risk events',
       'Profile',
-      'Security & Access',
     ])
     expect(
       result.current
@@ -99,17 +98,34 @@ describe('security sidebar visibility', () => {
   })
   it.each([
     [{ personal: { enabled: true, security: false } }, undefined],
-    [{ personal: { enabled: false } }, { personal: { security: true } }],
     [undefined, { personal: { enabled: true, security: false } }],
-    [undefined, { personal: { enabled: false } }],
   ])(
-    'admin or user disablement hides Security & Access (%j, %j)',
+    'security module off keeps the merged Profile entry (%j, %j)',
     (admin, user) => {
       const { result } = sidebarFor(admin, user)
       expect(
         result.current
           .flatMap((group) => group.items)
+          .some((item) => item.title === 'Profile')
+      ).toBe(true)
+      expect(
+        result.current
+          .flatMap((group) => group.items)
           .some((item) => item.title === 'Security & Access')
+      ).toBe(false)
+    }
+  )
+  it.each([
+    [{ personal: { enabled: false } }, { personal: { security: true } }],
+    [undefined, { personal: { enabled: false } }],
+  ])(
+    'disabling the personal section hides Profile entirely (%j, %j)',
+    (admin, user) => {
+      const { result } = sidebarFor(admin, user)
+      expect(
+        result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.title === 'Profile')
       ).toBe(false)
     }
   )
@@ -122,7 +138,7 @@ describe('security sidebar visibility', () => {
     expect(
       result.current
         .flatMap((group) => group.items)
-        .some((item) => item.title === 'Security & Access')
+        .some((item) => item.title === 'Profile')
     ).toBe(true)
   })
 })

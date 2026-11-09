@@ -22,22 +22,13 @@ import { useTranslation } from 'react-i18next'
 
 import { useThemeCustomization } from '@/context/theme-customization-provider'
 import { getSuccessRateColor } from '@/features/performance-metrics/lib/format'
+import { readCssVar } from '@/lib/css-var'
 import { useThemeRadiusPx } from '@/lib/theme-radius'
 import { useChartTheme } from '@/lib/use-chart-theme'
 import { cn } from '@/lib/utils'
 import { VCHART_OPTION } from '@/lib/vchart'
 
 import type { LatencyTimePoint, UptimeDayPoint } from '../lib/perf-series'
-
-/** Resolve a design-token CSS var at render time (charts need raw colors). */
-function chartCssVar(name: string): string {
-  if (typeof window === 'undefined') return ''
-  // Theme presets define tokens on <body data-theme-preset>; the default
-  // theme defines them on :root. Reading <body> resolves both via
-  // inheritance, while documentElement misses preset overrides.
-  const target = document.body ?? document.documentElement
-  return getComputedStyle(target).getPropertyValue(name).trim()
-}
 
 function formatHourLabel(iso: string): string {
   const date = new Date(iso)
@@ -127,7 +118,7 @@ export function LatencyTrendChart(props: {
       smooth: true,
       point: {
         visible: true,
-        style: { size: 5, stroke: chartCssVar('--card'), lineWidth: 1.5 },
+        style: { size: 5, stroke: readCssVar('--card'), lineWidth: 1.5 },
       },
       line: {
         style: { lineWidth: 2 },
@@ -234,13 +225,13 @@ export function UptimeTrendChart(props: {
       yField: 'uptime',
       smooth: true,
       line: {
-        style: { stroke: chartCssVar('--success'), lineWidth: 2 },
+        style: { stroke: readCssVar('--success'), lineWidth: 2 },
       },
       point: {
         visible: true,
         style: {
           size: 5,
-          stroke: chartCssVar('--card'),
+          stroke: readCssVar('--card'),
           lineWidth: 1.5,
           fill: (datum: { uptime: number }) =>
             getSuccessRateColor(datum.uptime),
@@ -357,7 +348,7 @@ export function ThroughputBarChart(props: {
       yField: 'group',
       bar: {
         style: {
-          fill: chartCssVar('--chart-1'),
+          fill: readCssVar('--chart-1'),
           ...(barRadius == null ? {} : { cornerRadius: barRadius }),
         },
       },

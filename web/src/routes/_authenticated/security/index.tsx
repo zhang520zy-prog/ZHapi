@@ -18,8 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { Security } from '@/features/security'
+import { redirectToSecuritySection } from '@/features/profile/lib/profile-search'
 
 export const Route = createFileRoute('/_authenticated/security/')({
-  component: Security,
+  beforeLoad: () => {
+    redirectToSecuritySection()
+  },
 })

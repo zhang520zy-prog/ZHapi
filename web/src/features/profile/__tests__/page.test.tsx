@@ -35,11 +35,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Profile } from '@/features/profile'
+import {
+  profileSearchSchema,
+  redirectToSecuritySection,
+} from '@/features/profile/lib/profile-search'
 import type { UserProfile } from '@/features/profile/types'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
-
-import { Security } from '../index'
 
 const profile: UserProfile = {
   id: 1,
@@ -103,6 +105,9 @@ beforeEach(() => {
     if (url === '/api/user/sessions') {
       return { data: { success: true, data: [] } }
     }
+    if (url === '/api/user/oauth/bindings') {
+      return { data: { success: true, data: [] } }
+    }
     throw new Error(`Unexpected GET ${url}`)
   })
 })
@@ -114,7 +119,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function renderPage(path = '/security') {
+async function renderPage(path = '/profile') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -122,7 +127,9 @@ async function renderPage(path = '/security') {
     checkin_enabled: false,
     wechat_login: true,
     github_oauth: true,
+    google_oauth: true,
     oidc_enabled: true,
+    passkey_login: true,
     custom_oauth_providers: [
       {
         id: 1,
@@ -135,18 +142,36 @@ async function renderPage(path = '/security') {
     ],
   })
   const root = createRootRoute()
-  const security = createRoute({
+  const authenticated = createRoute({
     getParentRoute: () => root,
-    path: '/security',
-    component: Security,
+    id: '_authenticated',
+  })
+  // Mirror the profile/index.tsx file-route shape (layout + index child) so
+  // the index route id '/_authenticated/profile/' matches useSearch({ from }).
+  const profileLayout = createRoute({
+    getParentRoute: () => authenticated,
+    path: 'profile',
   })
   const personal = createRoute({
-    getParentRoute: () => root,
-    path: '/profile',
+    getParentRoute: () => profileLayout,
+    path: '/',
+    validateSearch: profileSearchSchema,
     component: Profile,
   })
+  const legacy = createRoute({
+    getParentRoute: () => authenticated,
+    path: 'security',
+    beforeLoad: () => {
+      redirectToSecuritySection()
+    },
+  })
   const router = createRouter({
-    routeTree: root.addChildren([security, personal]),
+    routeTree: root.addChildren([
+      authenticated.addChildren([
+        profileLayout.addChildren([personal]),
+        legacy,
+      ]),
+    ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   })
   await router.load()
@@ -158,78 +183,87 @@ async function renderPage(path = '/security') {
   return { ...rendered, router }
 }
 
-describe('security page migration', () => {
-  it('places account management on the left and verification and privacy on the right', async () => {
-    await renderPage()
-    const login = await screen.findByRole('region', {
-      name: 'Login & Authentication',
-    })
-    expect(
-      screen
-        .getAllByRole('region')
-        .map((region) => within(region).getAllByRole('heading')[0].textContent)
-    ).toEqual([
-      'Login & Authentication',
-      'Sessions & Access',
-      'Account Actions',
-      'Privacy',
-    ])
-    expect(
-      within(login).getByRole('button', { name: 'Change Password' })
-    ).toBeVisible()
-    expect(within(login).getByText('Account Bindings')).toBeVisible()
-    const verification = screen.getByRole('complementary', {
-      name: 'Security verification',
-    })
-    expect(await within(verification).findByText('Passkey Login')).toBeVisible()
-    expect(
-      await within(verification).findByText('Two-Factor Authentication')
-    ).toBeVisible()
-    expect(
-      within(verification).getByRole('switch', { name: 'Record IP Address' })
-    ).toBeVisible()
-    expect(verification).toHaveClass('xl:sticky', 'xl:top-0')
-    expect(verification.parentElement).toHaveClass(
-      'grid',
-      'xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.46fr)]'
-    )
-    const access = screen.getByRole('region', { name: 'Sessions & Access' })
-    expect(
-      within(access).getByRole('heading', { name: 'Access Token' })
-    ).toBeVisible()
-    expect(
-      await within(access).findByText('No active login sessions')
-    ).toBeVisible()
-    expect(
-      screen.getByRole('switch', { name: 'Record IP Address' })
-    ).toBeVisible()
-    expect(
-      within(screen.getByRole('region', { name: 'Account Actions' })).getByRole(
-        'button',
-        { name: 'Delete Account' }
-      )
-    ).toBeVisible()
-  })
-
-  it('built-in and custom bindings share one compact responsive grid', async () => {
-    await renderPage()
+describe('merged personal settings page', () => {
+  it('shows account bindings by default without mounting security controls', async () => {
+    await renderPage('/profile')
     const bindings = await screen.findByRole('list', {
       name: 'Account Bindings',
     })
-    expect(within(bindings).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(bindings).getByText('GitHub')).toBeVisible()
+    expect(
+      within(bindings).getByText('Google', { selector: 'p' })
+    ).toBeVisible()
     expect(within(bindings).getByText('Gitea')).toBeVisible()
-    expect(bindings).toHaveClass(
-      'grid-cols-1',
-      'sm:grid-cols-2',
-      'lg:grid-cols-3',
-      'gap-2'
-    )
-    expect(screen.queryByText('Custom OAuth')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Security settings/ })
+    ).toBeVisible()
+    expect(screen.getByText('Security score')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Change Password' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete Account' })
+    ).not.toBeInTheDocument()
+    // The score card shares the passkey/2FA queries; sessions only load on the
+    // security section.
+    expect(api.get).not.toHaveBeenCalledWith('/api/user/sessions')
   })
 
-  it('the password action opens the existing dialog by keyboard and Escape closes it', async () => {
+  it('falls back to the bindings section for an invalid section param', async () => {
+    const { router } = await renderPage('/profile?section=bogus')
+    expect(
+      await screen.findByRole('list', { name: 'Account Bindings' })
+    ).toBeVisible()
+    expect(router.state.location.pathname).toBe('/profile')
+  })
+
+  it('redirects the legacy /security URL to the security section', async () => {
+    const { router } = await renderPage('/security')
+    expect(
+      await screen.findByRole('button', { name: 'Change Password' })
+    ).toBeVisible()
+    expect(router.state.location.pathname).toBe('/profile')
+    expect(router.state.location.search).toEqual({ section: 'security' })
+  })
+
+  it('renders the security controls under the security section', async () => {
+    await renderPage('/profile?section=security')
+    expect(
+      await screen.findByRole('button', { name: 'Change Password' })
+    ).toBeVisible()
+    expect(await screen.findByText('Passkey Login')).toBeVisible()
+    expect(await screen.findByText('Two-Factor Authentication')).toBeVisible()
+    expect(await screen.findByText('No active login sessions')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Access Token' })).toBeVisible()
+    expect(
+      screen.queryByRole('switch', { name: 'Record IP Address' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders privacy controls and account deletion under privacy', async () => {
+    await renderPage('/profile?section=privacy')
+    expect(
+      await screen.findByRole('switch', { name: 'Record IP Address' })
+    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Delete Account' })).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Change Password' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders notification settings under notifications', async () => {
+    await renderPage('/profile?section=notifications')
+    expect(
+      await screen.findByRole('button', { name: 'Save Settings' })
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Change Password' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('opens the password dialog by keyboard and closes it with Escape', async () => {
     const user = userEvent.setup()
-    await renderPage()
+    await renderPage('/profile?section=security')
     const action = await screen.findByRole('button', {
       name: 'Change Password',
     })
@@ -248,33 +282,31 @@ describe('security page migration', () => {
     )
   })
 
-  it('Profile retains preferences and no longer mounts security controls or requests', async () => {
-    await renderPage('/profile')
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Save Settings' })
-      ).toBeVisible()
-    )
-    expect(
-      screen.queryByRole('button', { name: 'Change Password' })
-    ).not.toBeInTheDocument()
-    expect(screen.queryByText('Account Bindings')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('switch', { name: 'Record IP Address' })
-    ).not.toBeInTheDocument()
-    expect(api.get).not.toHaveBeenCalledWith('/api/user/passkey')
-    expect(api.get).not.toHaveBeenCalledWith('/api/user/2fa/status')
-    expect(api.get).not.toHaveBeenCalledWith('/api/user/sessions')
-  })
-
-  it('a failed profile load offers retry before exposing account actions', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: false } })
+  it('offers retry before exposing account actions when the profile fails', async () => {
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url === '/api/user/self') {
+        return { data: { success: false } }
+      }
+      return { data: { success: true, data: {} } }
+    })
     const user = userEvent.setup()
-    await renderPage()
+    await renderPage('/profile?section=privacy')
     expect(await screen.findByText('Failed to load profile')).toBeVisible()
     expect(
       screen.queryByRole('button', { name: 'Delete Account' })
     ).not.toBeInTheDocument()
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url === '/api/user/self') {
+        return { data: { success: true, data: profile } }
+      }
+      if (url === '/api/user/sessions') {
+        return { data: { success: true, data: [] } }
+      }
+      if (url === '/api/user/oauth/bindings') {
+        return { data: { success: true, data: [] } }
+      }
+      return { data: { success: true, data: {} } }
+    })
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(
       await screen.findByRole('button', { name: 'Delete Account' })

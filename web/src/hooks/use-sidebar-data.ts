@@ -124,11 +124,6 @@ export function useSidebarData(): SidebarData {
             url: '/profile',
             icon: User,
           },
-          {
-            title: t('Security & Access'),
-            url: '/security',
-            icon: ShieldCheck,
-          },
         ],
       },
       {

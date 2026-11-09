@@ -26,6 +26,7 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -89,6 +90,10 @@ afterEach(() => {
   } else Reflect.deleteProperty(navigator, 'credentials')
 })
 
+function renderCard(ui: ReactNode) {
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
+
 it.each(['2fa', 'passkey'] as const)(
   'blocks %s enrollment and explains missing Telegram configuration',
   async (factor) => {
@@ -110,7 +115,7 @@ it.each(['2fa', 'passkey'] as const)(
     }))
     const post = vi.spyOn(api, 'post')
     const user = userEvent.setup()
-    render(
+    renderCard(
       factor === '2fa' ? (
         <TwoFACard loading={false} />
       ) : (
@@ -260,7 +265,7 @@ it('shows a retry when the 2FA status query fails instead of offering enrollment
     .spyOn(api, 'get')
     .mockRejectedValue(new Error('Status unavailable'))
   const user = userEvent.setup()
-  render(<TwoFACard loading={false} />)
+  renderCard(<TwoFACard loading={false} />)
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Status unavailable'
   )
@@ -458,7 +463,7 @@ it('reports registration failure without treating a successful password check as
   const success = vi.spyOn(toast, 'success')
   const failure = vi.spyOn(toast, 'error')
   const user = userEvent.setup()
-  render(<PasskeyCard loading={false} />)
+  renderCard(<PasskeyCard loading={false} />)
   const enable = await screen.findByRole('button', { name: 'Enable Passkey' })
   await waitFor(() => expect(enable).toBeEnabled())
   await user.click(enable)
@@ -558,7 +563,7 @@ it.each(['proof', 'setup'] as const)(
     const user = userEvent.setup()
     const info = vi.spyOn(toast, 'info')
     const success = vi.spyOn(toast, 'success')
-    render(<TwoFACard loading={false} />)
+    renderCard(<TwoFACard loading={false} />)
     await user.click(await screen.findByRole('button', { name: 'Enable' }))
     await user.type(
       await screen.findByLabelText('Password', { selector: 'input' }),
@@ -682,7 +687,7 @@ it.each(['wrong code', 'response lost'] as const)(
       throw new Error(`Unexpected POST ${url}`)
     })
     const user = userEvent.setup()
-    render(<TwoFACard loading={false} />)
+    renderCard(<TwoFACard loading={false} />)
     await user.click(await screen.findByRole('button', { name: 'Enable' }))
     await user.type(
       await screen.findByLabelText('Password', { selector: 'input' }),

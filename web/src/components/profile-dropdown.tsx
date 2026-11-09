@@ -119,7 +119,11 @@ export function ProfileDropdown() {
           </DropdownMenuItem>
 
           {isSecurityVisible && (
-            <DropdownMenuItem onClick={() => navigate({ to: '/security' })}>
+            <DropdownMenuItem
+              onClick={() =>
+                navigate({ to: '/profile', search: { section: 'security' } })
+              }
+            >
               <ShieldCheck className='size-4' />
               {t('Security & Access')}
             </DropdownMenuItem>
