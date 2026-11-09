@@ -30,7 +30,7 @@ import {
   staticDataTableClassNames as tableStyles,
 } from '@/components/data-table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useStatus } from '@/hooks/use-status'
+import { useServerAddress } from '@/hooks/use-server-address'
 
 import { replaceModelInPath } from '../lib/model-helpers'
 import { buildRateLimits, formatRateLimit } from '../lib/perf-series'
@@ -430,20 +430,7 @@ function CodeSamplesSection(props: {
   endpointMap: Record<string, { path?: string; method?: string }>
 }) {
   const { t } = useTranslation()
-  const { status } = useStatus()
-
-  const baseUrl = useMemo(() => {
-    const candidate =
-      (status as Record<string, unknown> | null)?.server_address ??
-      (status as Record<string, unknown> | null)?.serverAddress ??
-      (status?.data as Record<string, unknown> | undefined)?.server_address ??
-      (status?.data as Record<string, unknown> | undefined)?.serverAddress
-    if (candidate && typeof candidate === 'string') {
-      return candidate.replace(/\/$/, '')
-    }
-    if (typeof window !== 'undefined') return window.location.origin
-    return 'https://api.example.com'
-  }, [status])
+  const baseUrl = useServerAddress()
 
   const endpoints = useMemo(() => {
     const types = props.model.supported_endpoint_types || []

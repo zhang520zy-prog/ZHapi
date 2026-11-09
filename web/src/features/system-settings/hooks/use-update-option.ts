@@ -31,6 +31,7 @@ const STATUS_RELATED_KEYS = new Set([
   'HeaderNavModules',
   'SidebarModulesAdmin',
   'Notice',
+  'console_setting.docs_guide_extra',
   'CustomerService',
   'LogConsumeEnabled',
   'QuotaPerUnit',

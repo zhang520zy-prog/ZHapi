@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useApiInfo } from '@/features/dashboard/hooks/use-status-data'
+import { useServerAddress } from '@/hooks/use-server-address'
 import { useStatus } from '@/hooks/use-status'
 
 import { useApiKeys } from './api-keys-provider'
@@ -46,16 +47,18 @@ export function ApiKeysPrimaryButtons() {
   const { setOpen } = useApiKeys()
   const { status, loading } = useStatus()
   const { items } = useApiInfo()
-  const serverAddress =
-    (typeof status?.server_address === 'string' &&
-      status.server_address.trim()) ||
-    ''
+  const hasServerAddress =
+    typeof status?.server_address === 'string' &&
+    status.server_address.trim() !== ''
+  const serverAddress = useServerAddress()
   const addresses = items.length
     ? items
     : [
         {
-          url: serverAddress || window.location.origin,
-          route: serverAddress ? t('Default API address') : t('Current domain'),
+          url: serverAddress,
+          route: hasServerAddress
+            ? t('Default API address')
+            : t('Current domain'),
           description: '',
         },
       ]
