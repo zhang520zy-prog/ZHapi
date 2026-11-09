@@ -56,7 +56,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     enabled: true,
     channel: true,
     models: true,
-    redemption: true,
+    redemption: false,
     user: true,
     setting: true,
     subscription: true,

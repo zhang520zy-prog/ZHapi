@@ -146,7 +146,7 @@ export function RechargeFormCard({
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
-  const redemptionEnabled = topupInfo?.enable_redemption !== false
+  const redemptionEnabled = topupInfo?.enable_redemption === true
 
   if (loading) {
     return (
@@ -321,10 +321,10 @@ export function RechargeFormCard({
                 {quote && !calculating && (
                   <dl className='bg-muted/30 mt-2 space-y-1 rounded-md border px-3 py-2 text-xs'>
                     <div className='flex items-center justify-between'>
-                      <dt className='text-muted-foreground'>
-                        {t('Credited')}
-                      </dt>
-                      <dd>{formatQuoteMoney(quote.credited_money, quote.currency)}</dd>
+                      <dt className='text-muted-foreground'>{t('Credited')}</dt>
+                      <dd>
+                        {formatQuoteMoney(quote.credited_money, quote.currency)}
+                      </dd>
                     </div>
                     <div className='flex items-center justify-between'>
                       <dt className='text-muted-foreground'>

@@ -152,7 +152,8 @@ describe('audit log sidebar entry', () => {
       result.current.find((group) => group.id === 'admin')?.items ?? []
     expect(
       adminItems.some(
-        (item) => item.title === 'Audit Logs' && item.url === '/usage-logs/audit'
+        (item) =>
+          item.title === 'Audit Logs' && item.url === '/usage-logs/audit'
       )
     ).toBe(true)
     const selected = adminItems.filter((item) =>
@@ -233,6 +234,53 @@ describe('risk events sidebar placement', () => {
       adminItems.some(
         (item) => item.title === 'Risk events' && item.url === '/risk-events'
       )
+    ).toBe(true)
+  })
+})
+
+describe('redemption codes sidebar entry', () => {
+  function adminSidebarFor(admin?: object) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    client.setQueryData(['status'], {
+      SidebarModulesAdmin: admin ? JSON.stringify(admin) : '',
+    })
+    useAuthStore.getState().auth.setUser({
+      id: 1,
+      username: 'root',
+      role: 10,
+      sidebar_modules: '',
+    })
+    function Wrapper(props: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={client}>
+          {props.children}
+        </QueryClientProvider>
+      )
+    }
+    return renderHook(() => useSidebarConfig(useSidebarData().navGroups), {
+      wrapper: Wrapper,
+    })
+  }
+
+  it('hides Redemption Codes by default', () => {
+    const { result } = adminSidebarFor()
+    expect(
+      result.current
+        .flatMap((group) => group.items)
+        .some((item) => item.url === '/redemption-codes')
+    ).toBe(false)
+  })
+
+  it('shows Redemption Codes when the admin config opts in', () => {
+    const { result } = adminSidebarFor({
+      admin: { enabled: true, redemption: true },
+    })
+    expect(
+      result.current
+        .flatMap((group) => group.items)
+        .some((item) => item.url === '/redemption-codes')
     ).toBe(true)
   })
 })
