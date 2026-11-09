@@ -646,12 +646,14 @@ For commercial licensing, please contact support@quantumnous.com
   --primary-foreground: #ffffff;
   --rd-accent-hover: #2f520c;
 
-  /* Secondary button: transparent fill + hairline border. */
-  --secondary: transparent;
-  --secondary-foreground: #111610;
-
-  --muted: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  /* Secondary surface: the neutral muted step (buttons, collapsed-sidebar
+   * active item, badges). The transparent+hairline secondary *button* look
+   * is a component variant, not this token. srgb mixing — oklch renders
+   * near-achromatic pairs with a red hue. */
+  --muted: color-mix(in srgb, var(--foreground) 5%, var(--background));
   --muted-foreground: #525a4e;
+  --secondary: var(--muted);
+  --secondary-foreground: #111610;
   /* Accent tint for selected backgrounds and chips (≈ #3f6a121a). */
   --accent: color-mix(in oklch, var(--primary) 10%, transparent);
   --accent-foreground: var(--primary);
@@ -693,20 +695,23 @@ For commercial licensing, please contact support@quantumnous.com
   --sidebar-ring: var(--ring);
 
   /* Skeleton: foreground at 6% opacity per the design rules. */
-  --skeleton-base: color-mix(in oklch, var(--foreground) 6%, transparent);
+  --skeleton-base: color-mix(in srgb, var(--foreground) 6%, transparent);
   --skeleton-highlight: color-mix(
-    in oklch,
+    in srgb,
     var(--foreground) 11%,
     transparent
   );
 
   /* Fixed top bar: page background at 90% + backdrop blur. */
-  --rd-header-bg: color-mix(in oklch, var(--background) 90%, transparent);
+  --rd-header-bg: color-mix(in srgb, var(--background) 90%, transparent);
   /* Scrim for dialogs/drawers. */
   --rd-overlay: rgb(0 0 0 / 0.4);
 
-  /* Controls (inputs, buttons, dropdowns) land at 10px radius. */
+  /* Controls (inputs, buttons, dropdowns) land at 10px radius via
+   * rounded-lg; cards/dialogs/drawers at 16px, option cards at 12px. */
   --radius: 0.625rem;
+  --rd-radius-card: 1rem;
+  --rd-radius-option: 0.75rem;
 }
 .dark [data-theme-preset='relaydesk'] {
   /* Dark set — the homepage's own colors, verbatim. */
@@ -722,11 +727,10 @@ For commercial licensing, please contact support@quantumnous.com
   --primary-foreground: #090c0b;
   --rd-accent-hover: #d6f9ae;
 
-  --secondary: transparent;
-  --secondary-foreground: #eeefe7;
-
-  --muted: color-mix(in oklch, var(--foreground) 7%, var(--card));
+  --muted: color-mix(in srgb, var(--foreground) 7%, var(--card));
   --muted-foreground: #a0a79f;
+  --secondary: var(--muted);
+  --secondary-foreground: #eeefe7;
   /* ≈ #c4f58b24 */
   --accent: color-mix(in oklch, var(--primary) 14%, transparent);
   --accent-foreground: var(--primary);
@@ -765,15 +769,18 @@ For commercial licensing, please contact support@quantumnous.com
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
-  --skeleton-base: color-mix(in oklch, var(--foreground) 6%, transparent);
+  --skeleton-base: color-mix(in srgb, var(--foreground) 6%, transparent);
   --skeleton-highlight: color-mix(
-    in oklch,
+    in srgb,
     var(--foreground) 11%,
     transparent
   );
 
-  --rd-header-bg: color-mix(in oklch, var(--background) 90%, transparent);
+  --rd-header-bg: color-mix(in srgb, var(--background) 90%, transparent);
   --rd-overlay: rgb(0 0 0 / 0.6);
+
+  --rd-radius-card: 1rem;
+  --rd-radius-option: 0.75rem;
 }
 
 /* ── Font axis ────────────────────────────────────────────────────────────
