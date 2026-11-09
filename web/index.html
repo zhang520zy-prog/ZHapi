@@ -14,7 +14,36 @@
       content="Unified AI API gateway and admin dashboard."
     />
 
-    <meta name="theme-color" content="#fff" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#eef4f1"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#0b1512"
+    />
+    <script>
+      // Resolve the theme before first paint so the page never flashes the
+      // wrong background. The Mobius homepage is always dark; other pages
+      // follow the stored preference (same semantics as ThemeProvider).
+      try {
+        var pathname = window.location.pathname
+        var dark
+        if (pathname === '/' || pathname === '/index.html') {
+          dark = true
+        } else {
+          var mode = window.localStorage.getItem('newapi:theme:v1:mode')
+          dark =
+            mode === 'dark' ||
+            (mode !== 'light' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+        }
+        document.documentElement.classList.add(dark ? 'dark' : 'light')
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+      } catch (error) {}
+    </script>
     <!--umami-->
     <!--Google Analytics-->
   </head>
