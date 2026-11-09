@@ -101,7 +101,7 @@ export function useSidebarData(): SidebarData {
       },
       {
         id: 'account',
-        title: t('Account'),
+        title: t('Account settings'),
         items: [
           {
             title: t('Wallet'),

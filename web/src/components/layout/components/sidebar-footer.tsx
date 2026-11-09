@@ -33,6 +33,7 @@ import {
 import { SidebarFooter } from '@/components/ui/sidebar'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { resolveDocsLink } from '@/hooks/use-top-nav-links'
 import { getNotice } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
@@ -51,16 +52,16 @@ function useNoticeContent() {
 function DocsLink(props: { docsLink?: string }) {
   const { t } = useTranslation()
   const label = t('Docs')
-  const docsHref: string = '/docs'
-  const render = props.docsLink ? (
+  const docs = resolveDocsLink(props.docsLink)
+  const render = docs.external ? (
     <a
-      href={props.docsLink}
+      href={docs.href}
       target='_blank'
       rel='noopener noreferrer'
       aria-label={label}
     />
   ) : (
-    <Link to={docsHref} aria-label={label} />
+    <Link to={docs.href} aria-label={label} />
   )
   return (
     <Button
@@ -102,7 +103,7 @@ export function AppSidebarFooter() {
         />
         <div className='min-w-0'>
           <div className='truncate text-xs font-medium'>{name}</div>
-          <div className='text-muted-foreground truncate text-[11px]'>
+          <div className='text-muted-foreground truncate text-xs'>
             {t('Powerful API Management Platform')}
           </div>
         </div>
@@ -134,7 +135,7 @@ export function AppSidebarFooter() {
         )}
       </div>
 
-      <div className='text-muted-foreground px-2 pb-1 text-[11px] group-data-[collapsible=icon]:hidden'>
+      <div className='text-muted-foreground px-2 pb-1 text-xs group-data-[collapsible=icon]:hidden'>
         &copy; {year} {name}
       </div>
 

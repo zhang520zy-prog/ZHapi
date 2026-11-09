@@ -95,4 +95,30 @@ describe('sidebar footer', () => {
       await screen.findByRole('button', { name: 'Announcements' })
     ).toBeInTheDocument()
   })
+
+  it.each([
+    ['empty', { docs_link: '' }, '/docs'],
+    [
+      'upstream default',
+      { docs_link: 'https://docs.newapi.pro' },
+      '/docs',
+    ],
+  ])(
+    'points the docs button at %s docs_link to %s',
+    async (_label, status, href) => {
+      const { container, unmount } = await renderFooter(status)
+      expect(container.querySelector(`a[href="${href}"]`)).not.toBeNull()
+      unmount()
+    }
+  )
+
+  it('uses a customised docs_link as an external link', async () => {
+    const { container } = await renderFooter({
+      docs_link: 'https://docs.example.com',
+    })
+    const anchor = container.querySelector(
+      'a[href="https://docs.example.com"][target="_blank"]'
+    )
+    expect(anchor).not.toBeNull()
+  })
 })

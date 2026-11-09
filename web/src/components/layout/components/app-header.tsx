@@ -107,9 +107,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   // Prioritize dynamically generated links from backend
   const dynamicLinks = useTopNavLinks()
-  const links = (dynamicLinks.length > 0 ? dynamicLinks : navLinks).filter(
-    (link) => !link.href.includes('docs.newapi.pro')
-  )
+  const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
 
   // Notifications hook
   const notifications = useNotifications()

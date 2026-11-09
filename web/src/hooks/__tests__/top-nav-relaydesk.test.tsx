@@ -26,7 +26,7 @@ import {
   normalizeInterfaceLanguage,
 } from '@/i18n/languages'
 
-import { useTopNavLinks } from '../use-top-nav-links'
+import { resolveDocsLink, useTopNavLinks } from '../use-top-nav-links'
 
 describe('RelayDesk console navigation', () => {
   it('offers exactly Home, Model Square, Console and Docs', () => {
@@ -73,6 +73,53 @@ describe('RelayDesk console navigation', () => {
       ['Docs', 'https://docs.example.com'],
     ])
     expect(result.current.at(-1)?.external).toBe(true)
+  })
+
+  it.each([
+    ['empty', undefined, '/docs', false],
+    ['whitespace', '   ', '/docs', false],
+    ['upstream default', 'https://docs.newapi.pro', '/docs', false],
+    [
+      'upstream default with trailing slash',
+      'https://docs.newapi.pro/',
+      '/docs',
+      false,
+    ],
+    [
+      'customised',
+      'https://docs.example.com',
+      'https://docs.example.com',
+      true,
+    ],
+  ])(
+    'resolveDocsLink maps %s docs_link to %s (external %s)',
+    (_label, docsLink, href, external) => {
+      expect(resolveDocsLink(docsLink)).toEqual({ href, external })
+    }
+  )
+
+  it('renders an in-app docs item when docs_link is the upstream default', () => {
+    const client = new QueryClient()
+    client.setQueryData(['status'], {
+      HeaderNavModules: '',
+      docs_link: 'https://docs.newapi.pro',
+    })
+    function Wrapper(props: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={client}>
+          {props.children}
+        </QueryClientProvider>
+      )
+    }
+
+    const { result } = renderHook(() => useTopNavLinks(), { wrapper: Wrapper })
+    expect(result.current.map((link) => [link.title, link.href])).toEqual([
+      ['Home', '/'],
+      ['Model Square', '/pricing'],
+      ['Console', '/dashboard'],
+      ['Docs', '/docs'],
+    ])
+    expect(result.current.at(-1)?.external).toBe(false)
   })
 
   it('offers only simplified Chinese, traditional Chinese, and English', () => {

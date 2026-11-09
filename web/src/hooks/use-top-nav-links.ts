@@ -26,6 +26,26 @@ import { useAuthStore } from '@/stores/auth-store'
 
 export type { TopNavLink } from '@/components/layout/types'
 
+const UPSTREAM_DOCS_LINK = 'https://docs.newapi.pro'
+
+/**
+ * Resolve the developer-docs destination shared by the capsule nav and the
+ * sidebar footer. An empty `docs_link` or the untouched upstream default
+ * (`https://docs.newapi.pro`) means "not configured": both surfaces then
+ * point at the in-app `/docs` page. Only a customised value becomes an
+ * external link.
+ */
+export function resolveDocsLink(docsLink: string | null | undefined): {
+  href: string
+  external: boolean
+} {
+  const trimmed = (docsLink ?? '').trim()
+  if (trimmed === '' || trimmed.replace(/\/+$/, '') === UPSTREAM_DOCS_LINK) {
+    return { href: '/docs', external: false }
+  }
+  return { href: trimmed, external: true }
+}
+
 /**
  * Console capsule navigation: Home / Model Square / Console / Docs.
  *
@@ -70,13 +90,10 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Console'), href: '/dashboard' })
   }
 
-  // Docs (supports external links)
+  // Docs (customised external link, otherwise the in-app page)
   if (modules?.docs !== false) {
-    if (docsLink) {
-      links.push({ title: t('Docs'), href: docsLink, external: true })
-    } else {
-      links.push({ title: t('Docs'), href: '/docs' })
-    }
+    const docs = resolveDocsLink(docsLink)
+    links.push({ title: t('Docs'), href: docs.href, external: docs.external })
   }
 
   return links
