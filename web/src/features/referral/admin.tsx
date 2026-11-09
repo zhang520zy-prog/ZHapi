@@ -760,8 +760,9 @@ function BackfillTab(props: { canSettle: boolean }) {
     onSuccess: () => toast.success(t('Backfill done')),
     onError: (e) => handleServerError(e, t('Backfill failed')),
   })
-  if (!props.canSettle)
+  if (!props.canSettle) {
     return <ErrorState title={t('Settle permission required')} />
+  }
   return (
     <div className='space-y-3'>
       <p className='text-muted-foreground text-sm'>
