@@ -54,8 +54,8 @@ export function EmptyState(props: EmptyStateProps) {
         )}
       >
         <EmptyHeader>
-          <EmptyMedia variant='icon'>
-            <Icon className='size-6' />
+          <EmptyMedia>
+            <Icon className='text-muted-foreground size-8' />
           </EmptyMedia>
           <EmptyTitle>{props.title ?? t('No Data')}</EmptyTitle>
           {props.description != null && (

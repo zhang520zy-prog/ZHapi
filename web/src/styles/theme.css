@@ -99,6 +99,13 @@ For commercial licensing, please contact support@quantumnous.com
 :root {
   --radius: 0.375rem;
   --app-header-height: 4rem;
+  /* RelayDesk console tokens. Defaults preserve the pre-preset look so other
+   * palettes keep working; the relaydesk preset overrides each value. */
+  --rd-accent-hover: color-mix(in srgb, var(--primary) 80%, transparent);
+  --rd-header-bg: var(--background);
+  --rd-overlay: rgb(0 0 0 / 0.1);
+  --rd-radius-card: var(--radius-xl);
+  --rd-radius-option: var(--radius-lg);
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
   /* Currently active body font. The font axis swaps this between

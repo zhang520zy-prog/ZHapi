@@ -1,0 +1,171 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import type { LucideIcon } from 'lucide-react'
+import { type ReactNode, useId } from 'react'
+
+import { StatusBadge, type StatusVariant } from '@/components/status-badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+
+export interface MetricCardStatus {
+  label: ReactNode
+  variant?: StatusVariant
+}
+
+export interface MetricCardProps {
+  icon?: LucideIcon
+  iconTone?: IconBadgeTone
+  title: ReactNode
+  /** Pre-formatted value; callers should apply @/lib/currency / @/lib/format. */
+  value: ReactNode
+  description?: ReactNode
+  /** Optional area-trend sparkline rendered under the value. */
+  trend?: number[]
+  /** Optional status chip shown on the title row. */
+  status?: MetricCardStatus
+  action?: ReactNode
+  loading?: boolean
+  className?: string
+}
+
+const TREND_WIDTH = 120
+const TREND_HEIGHT = 32
+const TREND_PADDING = 3
+
+function MetricTrend(props: { values: number[] }) {
+  const gradientId = `metric-trend-${useId().replaceAll(':', '')}`
+  const sanitized = props.values.map((value) => Math.max(0, Number(value) || 0))
+  const max = Math.max(...sanitized)
+  const min = Math.min(...sanitized)
+  const range = max - min
+
+  const points = sanitized.map((value, index) => {
+    const x =
+      sanitized.length === 1
+        ? TREND_WIDTH / 2
+        : (index / (sanitized.length - 1)) * TREND_WIDTH
+    let normalized = 0.5
+    if (range > 0) {
+      normalized = (value - min) / range
+    } else if (max <= 0) {
+      normalized = 0
+    }
+    const y =
+      TREND_HEIGHT -
+      TREND_PADDING -
+      normalized * (TREND_HEIGHT - TREND_PADDING * 2)
+    return { x, y }
+  })
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ')
+  const firstPoint = points.at(0)
+  const lastPoint = points.at(-1)
+  if (!firstPoint || !lastPoint) return null
+  const areaPath = `${linePath} L ${lastPoint.x} ${TREND_HEIGHT} L ${firstPoint.x} ${TREND_HEIGHT} Z`
+
+  return (
+    <svg
+      viewBox={`0 0 ${TREND_WIDTH} ${TREND_HEIGHT}`}
+      preserveAspectRatio='none'
+      className='text-primary h-8 w-full'
+      aria-hidden='true'
+    >
+      <defs>
+        <linearGradient id={gradientId} x1='0' x2='0' y1='0' y2='1'>
+          <stop offset='0%' stopColor='currentColor' stopOpacity='0.2' />
+          <stop offset='100%' stopColor='currentColor' stopOpacity='0' />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} />
+      <path
+        d={linePath}
+        fill='none'
+        stroke='currentColor'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        strokeWidth='2'
+        vectorEffect='non-scaling-stroke'
+      />
+    </svg>
+  )
+}
+
+/**
+ * Common metric card: icon + title row, large tabular value, subtitle,
+ * optional area trend and optional status chip. Values are pre-formatted by
+ * the caller via @/lib/currency or @/lib/format helpers.
+ */
+export function MetricCard(props: MetricCardProps) {
+  const Icon = props.icon
+  return (
+    <Card
+      data-slot='metric-card'
+      className={cn('gap-0 py-0', props.className)}
+    >
+      <CardContent className='flex flex-col gap-2 p-4 sm:p-5'>
+        <div className='flex items-center gap-2'>
+          {Icon != null && (
+            <IconBadge size='sm' tone={props.iconTone ?? 'primary'}>
+              <Icon />
+            </IconBadge>
+          )}
+          <div className='text-muted-foreground min-w-0 flex-1 truncate text-xs font-medium sm:text-sm'>
+            {props.title}
+          </div>
+          {props.status != null && (
+            <StatusBadge
+              size='sm'
+              showDot
+              copyable={false}
+              variant={props.status.variant ?? 'neutral'}
+              label={typeof props.status.label === 'string' ? props.status.label : undefined}
+            >
+              {props.status.label}
+            </StatusBadge>
+          )}
+          {props.action}
+        </div>
+        {props.loading ? (
+          <div className='flex flex-col gap-2'>
+            <Skeleton className='h-7 w-24' />
+            <Skeleton className='h-4 w-32' />
+          </div>
+        ) : (
+          <div className='flex flex-col gap-1'>
+            <div className='text-foreground font-mono text-xl font-semibold tracking-tight break-all tabular-nums sm:text-2xl'>
+              {props.value}
+            </div>
+            {props.description != null && (
+              <p className='text-muted-foreground line-clamp-1 text-xs leading-relaxed sm:text-sm'>
+                {props.description}
+              </p>
+            )}
+          </div>
+        )}
+        {props.trend != null && props.trend.length > 0 && (
+          <MetricTrend values={props.trend} />
+        )}
+      </CardContent>
+    </Card>
+  )
+}

@@ -241,7 +241,11 @@ function SidebarMenuCollapsedDropdown({
                 render={
                   <Link
                     to={sub.url}
-                    className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
+                    className={
+                      checkIsActive(href, sub)
+                        ? 'bg-accent text-accent-foreground shadow-[inset_3px_0_0_var(--primary)]'
+                        : ''
+                    }
                   />
                 }
               >

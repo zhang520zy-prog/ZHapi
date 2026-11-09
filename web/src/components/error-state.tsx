@@ -49,8 +49,8 @@ export function ErrorState(props: ErrorStateProps) {
     <FadeIn>
       <Empty className={cn('min-h-[300px]', props.className)}>
         <EmptyHeader>
-          <EmptyMedia variant='icon'>
-            <Icon className='text-destructive size-6' />
+          <EmptyMedia>
+            <Icon className='text-destructive size-8' />
           </EmptyMedia>
           <EmptyTitle>
             {props.title ?? t('Oops! Something went wrong')}

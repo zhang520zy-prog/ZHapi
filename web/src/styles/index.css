@@ -179,7 +179,8 @@ For commercial licensing, please contact support@quantumnous.com
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton-shimmer,
-  .auto-skeleton-fade [class^='skeleton-'] {
+  .auto-skeleton-fade [class^='skeleton-'],
+  [data-slot='skeleton'] {
     animation: none !important;
     background: var(--skeleton-base) !important;
   }

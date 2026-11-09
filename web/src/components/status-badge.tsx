@@ -66,6 +66,32 @@ export const dotColorMap = {
   yellow: 'bg-warning',
 } as const
 
+/** Status badge fills: status color at 12% opacity, per the console design
+ * rules — never a solid status block with white text. */
+export const bgColorMap = {
+  success: 'bg-success/12',
+  warning: 'bg-warning/12',
+  danger: 'bg-destructive/12',
+  info: 'bg-info/12',
+  neutral: 'bg-neutral/12',
+  purple: 'bg-chart-4/12',
+  amber: 'bg-warning/12',
+  blue: 'bg-chart-1/12',
+  cyan: 'bg-chart-2/12',
+  green: 'bg-success/12',
+  grey: 'bg-neutral/12',
+  indigo: 'bg-chart-1/12',
+  'light-blue': 'bg-info/12',
+  'light-green': 'bg-emerald-400/12',
+  lime: 'bg-chart-3/12',
+  orange: 'bg-warning/12',
+  pink: 'bg-chart-5/12',
+  red: 'bg-destructive/12',
+  teal: 'bg-chart-2/12',
+  violet: 'bg-chart-4/12',
+  yellow: 'bg-warning/12',
+} as const
+
 export const textColorMap = {
   success: 'text-success',
   warning: 'text-warning',
@@ -105,9 +131,9 @@ export const StatusBadgeTypeContext =
   React.createContext<StatusBadgeType>('badge')
 
 const sizeMap = {
-  sm: 'h-5 gap-1 px-1.5 text-sm leading-none',
-  md: 'h-5 gap-1 px-1.5 text-sm leading-none',
-  lg: 'h-6 gap-1.5 px-2 text-sm leading-none',
+  sm: 'h-5.5 gap-1 px-2 text-xs leading-none',
+  md: 'h-5.5 gap-1 px-2 text-xs leading-none',
+  lg: 'h-6 gap-1.5 px-2.5 text-xs leading-none',
 } as const
 
 const textSizeMap = {
@@ -184,7 +210,11 @@ export function StatusBadge({
       className={cn(
         'inline-flex w-fit max-w-full min-w-0 shrink items-center font-medium tracking-normal whitespace-nowrap transition-colors',
         isBadge
-          ? cn('rounded-4xl', sizeMap[size ?? 'sm'])
+          ? cn(
+              'rounded-full',
+              sizeMap[size ?? 'sm'],
+              bgColorMap[computedVariant]
+            )
           : cn(
               textSizeMap[size ?? 'sm'],
               type === 'underline' && 'border-b border-current pb-px'

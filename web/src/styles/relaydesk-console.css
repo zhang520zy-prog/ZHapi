@@ -13,7 +13,7 @@
 }
 
 .relaydesk-console [data-slot='sidebar-menu-button'][data-active] {
-  box-shadow: inset 2px 0 0 var(--primary);
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .relaydesk-console [data-slot='card'] {
