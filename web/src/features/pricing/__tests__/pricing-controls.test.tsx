@@ -192,10 +192,9 @@ describe('pricing toolbar', () => {
       'aria-pressed',
       'true'
     )
-    expect(screen.getByRole('button', { name: 'Standard' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    )
+    expect(
+      screen.getByRole('button', { name: 'Standard price' })
+    ).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('selects price sorting from the shared dropdown', async () => {

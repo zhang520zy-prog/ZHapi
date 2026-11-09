@@ -172,7 +172,7 @@ export function Pricing() {
       <PageTransition className='mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
         <header className='mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6'>
           <div className='min-w-0'>
-            <h1 className='text-2xl font-bold tracking-tight sm:text-3xl'>
+            <h1 className='text-[18px]/[26px] font-semibold tracking-tight sm:text-[22px]/[30px]'>
               {t('Model Square')}
             </h1>
             <p className='text-muted-foreground mt-1.5 text-sm'>

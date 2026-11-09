@@ -44,7 +44,6 @@ import type { UptimeDayPoint } from '../lib/perf-series'
 import type { PricingModel } from '../types'
 import { LatencyTrendChart, UptimeTrendChart } from './model-details-charts'
 import { UptimeSparkline } from './model-details-uptime-sparkline'
-import { ModelPerfBadge } from './model-perf-badge'
 
 function StatCard(props: {
   icon: React.ComponentType<{ className?: string }>
@@ -199,20 +198,6 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
           valueClassName={getSuccessRateTextClass(successRate)}
         />
       </div>
-
-      {summary && (
-        <ModelPerfBadge
-          perf={{
-            avg_latency_ms: avgLatency,
-            success_rate: successRate,
-            avg_tps: avgTps,
-            recent_success_series: series,
-            window_start: metricsQuery.data?.data.window_start,
-            window_end: metricsQuery.data?.data.window_end,
-          }}
-          className='rounded-lg border px-3 py-2'
-        />
-      )}
 
       <section>
         <SectionHeader

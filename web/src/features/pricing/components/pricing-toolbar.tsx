@@ -116,7 +116,9 @@ export function PricingToolbar(props: PricingToolbarProps) {
           size='sm'
           aria-label={t('Price display mode')}
         >
-          <ToggleGroupItem value='standard'>{t('Standard')}</ToggleGroupItem>
+          <ToggleGroupItem value='standard'>
+            {t('Standard price')}
+          </ToggleGroupItem>
           <ToggleGroupItem value='recharge'>{t('Recharge')}</ToggleGroupItem>
         </ToggleGroup>
 
