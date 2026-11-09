@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Link } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 import { Menu } from 'lucide-react'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -29,102 +30,153 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-import { type TopNavLink } from '../types'
+import type { TopNavLink } from '../types'
 
-type TopNavProps = React.HTMLAttributes<HTMLElement> & {
-  links: TopNavLink[]
+type NormalizedTopNavLink = TopNavLink & {
+  disabled: boolean
+  external: boolean
 }
 
-/**
- * 顶部导航栏组件
- * 在大屏幕显示水平导航，在小屏幕显示下拉菜单
- */
-export function TopNav({ className, links, ...props }: TopNavProps) {
-  // 规范化链接，确保所有可选属性都有默认值
-  const normalizedLinks = useMemo(
+function useNormalizedLinks(links: TopNavLink[]): NormalizedTopNavLink[] {
+  return useMemo(
     () =>
       links.map((link) => ({
-        isActive: false,
         disabled: false,
         external: false,
         ...link,
       })),
     [links]
   )
+}
+
+/**
+ * The console capsule marks the section the user is currently in: Home is
+ * exact-match only, the Console covers every other console page, and the
+ * remaining entries highlight on their own path prefix.
+ */
+function isNavLinkActive(link: NormalizedTopNavLink, pathname: string) {
+  if (link.external) return false
+  if (link.href === '/') return pathname === '/'
+  if (link.href === '/dashboard') {
+    return (
+      pathname !== '/' &&
+      !pathname.startsWith('/pricing') &&
+      !pathname.startsWith('/docs')
+    )
+  }
+  return pathname === link.href || pathname.startsWith(`${link.href}/`)
+}
+
+const capsuleLinkClass =
+  'inline-flex h-7 items-center rounded-full px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
+/**
+ * Capsule navigation rendered in the middle of the console top bar. Current
+ * item gets a solid accent fill; the rest stay muted until hovered.
+ */
+export function TopNav({
+  className,
+  links,
+  ...props
+}: React.HTMLAttributes<HTMLElement> & { links: TopNavLink[] }) {
+  const normalizedLinks = useNormalizedLinks(links)
+  const pathname = useLocation({ select: (location) => location.pathname })
 
   return (
-    <>
-      {/* 移动端下拉菜单 */}
-      <div className='lg:hidden'>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger
-            render={<Button size='icon' variant='outline' className='size-7' />}
+    <nav
+      className={cn(
+        'border-border inline-flex items-center gap-0.5 rounded-full border p-1',
+        className
+      )}
+      {...props}
+    >
+      {normalizedLinks.map((link) => {
+        const active = isNavLinkActive(link, pathname)
+        const linkClass = cn(
+          capsuleLinkClass,
+          active
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:text-foreground'
+        )
+        return link.external ? (
+          <a
+            key={`${link.title}-${link.href}`}
+            href={link.href}
+            target='_blank'
+            rel='noopener noreferrer'
+            className={linkClass}
           >
-            <Menu />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side='bottom' align='start'>
-            {normalizedLinks.map(
-              ({ title, href, isActive, disabled, external }) => (
-                <DropdownMenuItem
-                  key={`${title}-${href}`}
-                  render={
-                    external ? (
-                      <a
-                        href={href}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className={!isActive ? 'text-muted-foreground' : ''}
-                      >
-                        {title}
-                      </a>
-                    ) : (
-                      <Link
-                        to={href}
-                        className={!isActive ? 'text-muted-foreground' : ''}
-                        disabled={disabled}
-                      >
-                        {title}
-                      </Link>
-                    )
-                  }
-                ></DropdownMenuItem>
-              )
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            {link.title}
+          </a>
+        ) : (
+          <Link
+            key={`${link.title}-${link.href}`}
+            to={link.href}
+            disabled={link.disabled}
+            aria-current={active ? 'page' : undefined}
+            className={linkClass}
+          >
+            {link.title}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
 
-      {/* 桌面端水平导航 */}
-      <nav
-        className={cn(
-          'hidden items-center space-x-4 lg:flex lg:space-x-4 xl:space-x-6',
-          className
-        )}
-        {...props}
+/**
+ * Hamburger menu that collapses the capsule navigation below the lg
+ * breakpoint.
+ */
+export function TopNavMenu({ links }: { links: TopNavLink[] }) {
+  const { t } = useTranslation()
+  const normalizedLinks = useNormalizedLinks(links)
+  const pathname = useLocation({ select: (location) => location.pathname })
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            size='icon'
+            variant='ghost'
+            className='size-8'
+            aria-label={t('Open navigation menu')}
+          />
+        }
       >
-        {normalizedLinks.map(({ title, href, isActive, disabled, external }) =>
-          external ? (
-            <a
-              key={`${title}-${href}`}
-              href={href}
-              target='_blank'
-              rel='noopener noreferrer'
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
-            >
-              {title}
-            </a>
-          ) : (
-            <Link
-              key={`${title}-${href}`}
-              to={href}
-              disabled={disabled}
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
-            >
-              {title}
-            </Link>
+        <Menu className='size-4' />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side='bottom' align='end'>
+        {normalizedLinks.map((link) => {
+          const active = isNavLinkActive(link, pathname)
+          return (
+            <DropdownMenuItem
+              key={`${link.title}-${link.href}`}
+              render={
+                link.external ? (
+                  <a
+                    href={link.href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className={active ? '' : 'text-muted-foreground'}
+                  >
+                    {link.title}
+                  </a>
+                ) : (
+                  <Link
+                    to={link.href}
+                    className={active ? '' : 'text-muted-foreground'}
+                    disabled={link.disabled}
+                  >
+                    {link.title}
+                  </Link>
+                )
+              }
+            />
           )
-        )}
-      </nav>
-    </>
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

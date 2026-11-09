@@ -702,7 +702,8 @@ For commercial licensing, please contact support@quantumnous.com
     transparent
   );
 
-  /* Fixed top bar: page background at 90% + backdrop blur. */
+  /* Fixed top bar: 56px, page background at 90% + backdrop blur. */
+  --app-header-height: 3.5rem;
   --rd-header-bg: color-mix(in srgb, var(--background) 90%, transparent);
   /* Scrim for dialogs/drawers. */
   --rd-overlay: rgb(0 0 0 / 0.4);
@@ -776,6 +777,7 @@ For commercial licensing, please contact support@quantumnous.com
     transparent
   );
 
+  --app-header-height: 3.5rem;
   --rd-header-bg: color-mix(in srgb, var(--background) 90%, transparent);
   --rd-overlay: rgb(0 0 0 / 0.6);
 

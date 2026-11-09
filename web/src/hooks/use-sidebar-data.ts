@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Activity,
   Box,
   ClipboardList,
   CreditCard,
@@ -38,7 +37,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import type { SidebarData } from '@/components/layout/types'
+import type { NavLink, SidebarData } from '@/components/layout/types'
 import { hasPermission } from '@/lib/admin-permissions'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
@@ -52,25 +51,28 @@ import { useAuthStore } from '@/stores/auth-store'
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
-  const canReferralAdmin =
-    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'referral', 'read')
-  const canInvoiceAdmin =
-    (user?.role ?? 0) >= ROLE.ADMIN && hasPermission(user, 'invoice', 'read')
+  const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
+  const canReferralAdmin = isAdmin && hasPermission(user, 'referral', 'read')
+  const canInvoiceAdmin = isAdmin && hasPermission(user, 'invoice', 'read')
+
+  // Regular users only see their own risk events; the admin view of the
+  // same page lives in the Admin group below.
+  const riskEventsItem: NavLink = {
+    title: t('Risk events'),
+    url: '/risk-events',
+    icon: ShieldCheck,
+  }
 
   return {
     navGroups: [
       {
-        id: 'general',
-        title: t('General'),
+        id: 'core',
+        title: t('Core controls'),
         items: [
           {
-            title: t('Overview'),
-            url: '/dashboard/overview',
-            icon: Activity,
-          },
-          {
             title: t('Dashboard'),
-            url: '/dashboard/models',
+            url: '/dashboard/overview',
+            activeUrls: ['/dashboard'],
             icon: LayoutDashboard,
           },
           {
@@ -79,19 +81,14 @@ export function useSidebarData(): SidebarData {
             icon: Key,
           },
           {
+            title: t('Model Square'),
+            url: '/pricing',
+            icon: Box,
+          },
+          {
             title: t('Usage Logs'),
             url: '/usage-logs/common',
             icon: FileText,
-          },
-          {
-            title: t('Audit Logs'),
-            url: '/usage-logs/audit',
-            icon: ClipboardList,
-          },
-          {
-            title: t('Risk events'),
-            url: '/risk-events',
-            icon: ShieldCheck,
           },
           {
             title: t('Task Logs'),
@@ -103,8 +100,8 @@ export function useSidebarData(): SidebarData {
         ],
       },
       {
-        id: 'personal',
-        title: t('Personal'),
+        id: 'account',
+        title: t('Account'),
         items: [
           {
             title: t('Wallet'),
@@ -121,6 +118,7 @@ export function useSidebarData(): SidebarData {
             url: '/referral',
             icon: Share2,
           },
+          ...(isAdmin ? [] : [riskEventsItem]),
           {
             title: t('Profile'),
             url: '/profile',
@@ -138,10 +136,29 @@ export function useSidebarData(): SidebarData {
         title: t('Admin'),
         items: [
           {
-            title: t('Payment exceptions'),
-            url: '/payment-events',
-            icon: Wallet,
-            requiredRole: ROLE.ADMIN,
+            title: t('Channels'),
+            url: '/channels',
+            icon: Radio,
+          },
+          {
+            title: t('Models'),
+            url: '/models/metadata',
+            icon: Box,
+          },
+          {
+            title: t('Users'),
+            url: '/users',
+            icon: Users,
+          },
+          {
+            title: t('Subscriptions'),
+            url: '/subscriptions',
+            icon: CreditCard,
+          },
+          {
+            title: t('Redemption Codes'),
+            url: '/redemption-codes',
+            icon: Ticket,
           },
           ...(canReferralAdmin
             ? [
@@ -164,29 +181,17 @@ export function useSidebarData(): SidebarData {
               ]
             : []),
           {
-            title: t('Channels'),
-            url: '/channels',
-            icon: Radio,
+            title: t('Payment exceptions'),
+            url: '/payment-events',
+            icon: Wallet,
+            requiredRole: ROLE.ADMIN,
           },
+          { ...riskEventsItem, requiredRole: ROLE.ADMIN },
           {
-            title: t('Models'),
-            url: '/models/metadata',
-            icon: Box,
-          },
-          {
-            title: t('Users'),
-            url: '/users',
-            icon: Users,
-          },
-          {
-            title: t('Redemption Codes'),
-            url: '/redemption-codes',
-            icon: Ticket,
-          },
-          {
-            title: t('Subscriptions'),
-            url: '/subscriptions',
-            icon: CreditCard,
+            title: t('Audit Logs'),
+            url: '/usage-logs/audit',
+            icon: ClipboardList,
+            requiredRole: ROLE.ADMIN,
           },
           {
             title: t('System Info'),

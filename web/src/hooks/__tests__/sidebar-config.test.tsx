@@ -81,12 +81,13 @@ describe('security sidebar visibility', () => {
     )
     expect(
       result.current
-        .find((group) => group.id === 'personal')
+        .find((group) => group.id === 'account')
         ?.items.map((item) => item.title)
     ).toEqual([
       'Wallet',
       'Invoices',
       'Referral rewards',
+      'Risk events',
       'Profile',
       'Security & Access',
     ])
@@ -142,19 +143,19 @@ describe('audit log sidebar entry', () => {
     expect(titles).toContain('Usage Logs')
   })
 
-  it('legacy configurations show a separate Audit Logs link immediately after Usage Logs', () => {
+  it('legacy configurations keep the Audit Logs link inside the admin group', () => {
     const { result } = sidebarFor(
       { console: { enabled: true, log: true } },
       { console: { enabled: true, log: true } }
     )
-    const items =
-      result.current.find((group) => group.id === 'general')?.items ?? []
-    const usageIndex = items.findIndex((item) => item.title === 'Usage Logs')
-    expect(items[usageIndex + 1]).toMatchObject({
-      title: 'Audit Logs',
-      url: '/usage-logs/audit',
-    })
-    const selected = items.filter((item) =>
+    const adminItems =
+      result.current.find((group) => group.id === 'admin')?.items ?? []
+    expect(
+      adminItems.some(
+        (item) => item.title === 'Audit Logs' && item.url === '/usage-logs/audit'
+      )
+    ).toBe(true)
+    const selected = adminItems.filter((item) =>
       checkIsActive('/usage-logs/audit', item)
     )
     expect(selected.map((item) => item.title)).toEqual(['Audit Logs'])
@@ -184,6 +185,55 @@ describe('audit log sidebar entry', () => {
       .map((item) => item.title)
     expect(titles).not.toContain('Usage Logs')
     expect(titles).toContain('Audit Logs')
+  })
+})
+
+describe('risk events sidebar placement', () => {
+  it('puts Risk events in the account group for regular users', () => {
+    const { result } = sidebarFor()
+    const accountItems =
+      result.current.find((group) => group.id === 'account')?.items ?? []
+    expect(
+      accountItems.some(
+        (item) => item.title === 'Risk events' && item.url === '/risk-events'
+      )
+    ).toBe(true)
+  })
+
+  it('puts Risk events in the admin group for administrators', () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    client.setQueryData(['status'], { SidebarModulesAdmin: '' })
+    useAuthStore.getState().auth.setUser({
+      id: 1,
+      username: 'root',
+      role: 10,
+      sidebar_modules: '',
+    })
+    function Wrapper(props: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={client}>
+          {props.children}
+        </QueryClientProvider>
+      )
+    }
+    const { result } = renderHook(
+      () => useSidebarConfig(useSidebarData().navGroups),
+      { wrapper: Wrapper }
+    )
+    const accountItems =
+      result.current.find((group) => group.id === 'account')?.items ?? []
+    const adminItems =
+      result.current.find((group) => group.id === 'admin')?.items ?? []
+    expect(accountItems.some((item) => item.title === 'Risk events')).toBe(
+      false
+    )
+    expect(
+      adminItems.some(
+        (item) => item.title === 'Risk events' && item.url === '/risk-events'
+      )
+    ).toBe(true)
   })
 })
 

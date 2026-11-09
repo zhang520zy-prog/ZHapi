@@ -28,8 +28,8 @@ import {
 
 import { useTopNavLinks } from '../use-top-nav-links'
 
-describe('RelayDesk public navigation', () => {
-  it('links to the official releases listing when the site status loads', () => {
+describe('RelayDesk console navigation', () => {
+  it('offers exactly Home, Model Square, Console and Docs', () => {
     const client = new QueryClient()
     client.setQueryData(['status'], { HeaderNavModules: '' })
     function Wrapper(props: { children: ReactNode }) {
@@ -41,11 +41,38 @@ describe('RelayDesk public navigation', () => {
     }
 
     const { result } = renderHook(() => useTopNavLinks(), { wrapper: Wrapper })
-    expect(result.current.find((link) => link.title === 'RelayDesk')).toEqual({
-      title: 'RelayDesk',
-      href: 'https://github.com/zhang520zy-prog/RelayDesk/releases',
-      external: true,
+    expect(result.current.map((link) => [link.title, link.href])).toEqual([
+      ['Home', '/'],
+      ['Model Square', '/pricing'],
+      ['Console', '/dashboard'],
+      ['Docs', '/docs'],
+    ])
+  })
+
+  it('honours per-module toggles and an external docs link', () => {
+    const client = new QueryClient()
+    client.setQueryData(['status'], {
+      HeaderNavModules: JSON.stringify({
+        home: false,
+        docs: true,
+      }),
+      docs_link: 'https://docs.example.com',
     })
+    function Wrapper(props: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={client}>
+          {props.children}
+        </QueryClientProvider>
+      )
+    }
+
+    const { result } = renderHook(() => useTopNavLinks(), { wrapper: Wrapper })
+    expect(result.current.map((link) => [link.title, link.href])).toEqual([
+      ['Model Square', '/pricing'],
+      ['Console', '/dashboard'],
+      ['Docs', 'https://docs.example.com'],
+    ])
+    expect(result.current.at(-1)?.external).toBe(true)
   })
 
   it('offers only simplified Chinese, traditional Chinese, and English', () => {

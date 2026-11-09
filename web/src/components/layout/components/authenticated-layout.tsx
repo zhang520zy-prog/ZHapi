@@ -32,7 +32,14 @@ type AuthenticatedLayoutProps = {
 }
 
 export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
-  const defaultOpen = getCookie('sidebar_state') !== 'false'
+  // Collapsed default on 768–1279px, expanded on >=1280px; the cookie wins
+  // once the user has made a choice.
+  const stored = getCookie('sidebar_state')
+  const defaultOpen =
+    stored === undefined
+      ? typeof window !== 'undefined' &&
+        window.matchMedia('(min-width: 1280px)').matches
+      : stored !== 'false'
 
   return (
     <LayoutProvider>

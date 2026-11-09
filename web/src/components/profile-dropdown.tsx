@@ -35,6 +35,7 @@ import useDialogState from '@/hooks/use-dialog'
 import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { formatQuotaWithCurrency } from '@/lib/currency'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -99,6 +100,15 @@ export function ProfileDropdown() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div className='flex items-center justify-between px-1.5 pt-0.5 pb-1'>
+            <span className='text-muted-foreground text-xs'>
+              {t('Balance')}
+            </span>
+            <span className='text-foreground font-mono text-xs font-medium tabular-nums'>
+              {formatQuotaWithCurrency(user?.quota)}
+            </span>
           </div>
 
           <DropdownMenuSeparator />
