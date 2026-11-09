@@ -73,5 +73,6 @@ describe('SettingsCategoryItem', () => {
     const item = screen.getByRole('button', { name: 'Security' })
     expect(item).toHaveAttribute('aria-current', 'page')
     expect(item).toHaveClass('bg-accent', 'text-accent-foreground')
+    expect(item).toHaveClass('shadow-[inset_3px_0_0_var(--primary)]')
   })
 })

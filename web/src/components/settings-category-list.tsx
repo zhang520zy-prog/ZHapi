@@ -75,7 +75,8 @@ export function SettingsCategoryItem({
       className: cn(
         'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors outline-none',
         'hover:bg-muted focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-        props.selected && 'bg-accent text-accent-foreground',
+        props.selected &&
+          'bg-accent text-accent-foreground shadow-[inset_3px_0_0_var(--primary)]',
         props.className
       ),
       children: (

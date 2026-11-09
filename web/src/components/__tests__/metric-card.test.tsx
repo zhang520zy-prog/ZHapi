@@ -35,8 +35,32 @@ describe('MetricCard', () => {
     expect(screen.getByText('Requests')).toBeInTheDocument()
     const value = screen.getByText('12,340')
     expect(value).toHaveClass('font-mono', 'tabular-nums')
+    expect(value).toHaveClass('text-[22px]/7', 'sm:text-[28px]/[34px]')
     expect(screen.getByText('in selected range')).toBeInTheDocument()
     expect(container.querySelector('svg')).not.toBeNull()
+  })
+
+  it('tints the round icon badge and the trend with the card chart tone', () => {
+    const { container } = render(
+      <MetricCard
+        icon={Activity}
+        tone='chart-2'
+        title='Requests'
+        value='12,340'
+        trend={[1, 3, 2, 5, 4]}
+      />
+    )
+    const iconBadge = container.querySelector('span.rounded-full')
+    expect(iconBadge).toHaveClass('bg-chart-2/14', 'text-chart-2', 'size-10')
+    const trendSvg = container.querySelector('svg.h-12')
+    expect(trendSvg).toHaveClass('text-chart-2')
+    expect(trendSvg?.querySelector('path[stroke-width]')).toHaveAttribute(
+      'stroke-width',
+      '1.5'
+    )
+    expect(
+      trendSvg?.querySelector('stop[offset="0%"]')
+    ).toHaveAttribute('stop-opacity', '0.24')
   })
 
   it('renders an optional status chip with a dot and 12% tint', () => {

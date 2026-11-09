@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { LucideIcon } from 'lucide-react'
+import { Check, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
@@ -66,13 +66,19 @@ export function OptionCard(props: OptionCardProps) {
         onSelect?.()
       }}
       className={cn(
-        'border-border bg-card flex w-full items-center gap-3 rounded-[var(--rd-radius-option)] border p-3 text-left transition-colors outline-none',
+        'border-border bg-card relative flex w-full items-center gap-3 rounded-[var(--rd-radius-option)] border p-3 text-left transition-colors outline-none',
         'hover:border-primary/40 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
         'disabled:pointer-events-none disabled:opacity-50',
-        'aria-pressed:border-primary aria-pressed:bg-primary/6',
+        'aria-pressed:bg-primary/6 aria-pressed:shadow-[inset_0_0_0_2px_var(--primary)]',
         className
       )}
     >
+      {selected && (
+        <Check
+          className='text-primary absolute top-2.5 right-2.5 size-4'
+          aria-hidden='true'
+        />
+      )}
       {Icon != null && (
         <IconBadge size='md' tone={resolvedIconTone}>
           <Icon />

@@ -71,7 +71,7 @@ export function TimeRangeSelector(props: TimeRangeSelectorProps) {
           }
           className={cn(
             'min-w-0 px-3',
-            'aria-pressed:bg-accent aria-pressed:text-accent-foreground'
+            'aria-pressed:bg-primary aria-pressed:text-primary-foreground'
           )}
         >
           {t(option.labelKey)}

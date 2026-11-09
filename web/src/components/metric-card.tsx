@@ -21,9 +21,25 @@ import { type ReactNode, useId } from 'react'
 
 import { StatusBadge, type StatusVariant } from '@/components/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+
+/** Per-card chart color; drives the round icon tint and the trend color. */
+export type MetricCardTone = 'chart-1' | 'chart-2' | 'chart-3' | 'chart-4'
+
+const TONE_ICON_CLASSES: Record<MetricCardTone, string> = {
+  'chart-1': 'bg-chart-1/14 text-chart-1',
+  'chart-2': 'bg-chart-2/14 text-chart-2',
+  'chart-3': 'bg-chart-3/14 text-chart-3',
+  'chart-4': 'bg-chart-4/14 text-chart-4',
+}
+
+const TONE_TREND_CLASSES: Record<MetricCardTone, string> = {
+  'chart-1': 'text-chart-1',
+  'chart-2': 'text-chart-2',
+  'chart-3': 'text-chart-3',
+  'chart-4': 'text-chart-4',
+}
 
 export interface MetricCardStatus {
   label: ReactNode
@@ -32,7 +48,8 @@ export interface MetricCardStatus {
 
 export interface MetricCardProps {
   icon?: LucideIcon
-  iconTone?: IconBadgeTone
+  /** Chart color identity of this metric (icon tint + trend). */
+  tone?: MetricCardTone
   title: ReactNode
   /** Pre-formatted value; callers should apply @/lib/currency / @/lib/format. */
   value: ReactNode
@@ -47,10 +64,10 @@ export interface MetricCardProps {
 }
 
 const TREND_WIDTH = 120
-const TREND_HEIGHT = 32
+const TREND_HEIGHT = 48
 const TREND_PADDING = 3
 
-function MetricTrend(props: { values: number[] }) {
+function MetricTrend(props: { values: number[]; tone: MetricCardTone }) {
   const gradientId = `metric-trend-${useId().replaceAll(':', '')}`
   const sanitized = props.values.map((value) => Math.max(0, Number(value) || 0))
   const max = Math.max(...sanitized)
@@ -87,12 +104,12 @@ function MetricTrend(props: { values: number[] }) {
     <svg
       viewBox={`0 0 ${TREND_WIDTH} ${TREND_HEIGHT}`}
       preserveAspectRatio='none'
-      className='text-primary h-8 w-full'
+      className={cn('h-12 w-full', TONE_TREND_CLASSES[props.tone])}
       aria-hidden='true'
     >
       <defs>
         <linearGradient id={gradientId} x1='0' x2='0' y1='0' y2='1'>
-          <stop offset='0%' stopColor='currentColor' stopOpacity='0.2' />
+          <stop offset='0%' stopColor='currentColor' stopOpacity='0.24' />
           <stop offset='100%' stopColor='currentColor' stopOpacity='0' />
         </linearGradient>
       </defs>
@@ -103,7 +120,7 @@ function MetricTrend(props: { values: number[] }) {
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
-        strokeWidth='2'
+        strokeWidth='1.5'
         vectorEffect='non-scaling-stroke'
       />
     </svg>
@@ -111,12 +128,13 @@ function MetricTrend(props: { values: number[] }) {
 }
 
 /**
- * Common metric card: icon + title row, large tabular value, subtitle,
- * optional area trend and optional status chip. Values are pre-formatted by
- * the caller via @/lib/currency or @/lib/format helpers.
+ * Common metric card: round chart-tinted icon + title row, large tabular
+ * value, subtitle, optional 48px area trend and optional status chip. Values
+ * are pre-formatted by the caller via @/lib/currency or @/lib/format.
  */
 export function MetricCard(props: MetricCardProps) {
   const Icon = props.icon
+  const tone = props.tone ?? 'chart-1'
   return (
     <Card
       data-slot='metric-card'
@@ -125,9 +143,15 @@ export function MetricCard(props: MetricCardProps) {
       <CardContent className='flex flex-col gap-2 p-4 sm:p-5'>
         <div className='flex items-center gap-2'>
           {Icon != null && (
-            <IconBadge size='sm' tone={props.iconTone ?? 'primary'}>
-              <Icon />
-            </IconBadge>
+            <span
+              className={cn(
+                'flex size-10 shrink-0 items-center justify-center rounded-full',
+                TONE_ICON_CLASSES[tone]
+              )}
+              aria-hidden='true'
+            >
+              <Icon className='size-5' />
+            </span>
           )}
           <div className='text-muted-foreground min-w-0 flex-1 truncate text-xs font-medium sm:text-sm'>
             {props.title}
@@ -138,7 +162,12 @@ export function MetricCard(props: MetricCardProps) {
               showDot
               copyable={false}
               variant={props.status.variant ?? 'neutral'}
-              label={typeof props.status.label === 'string' ? props.status.label : undefined}
+              label={
+                typeof props.status.label === 'string'
+                  ? props.status.label
+                  : undefined
+              }
+              className='shrink-0'
             >
               {props.status.label}
             </StatusBadge>
@@ -152,7 +181,7 @@ export function MetricCard(props: MetricCardProps) {
           </div>
         ) : (
           <div className='flex flex-col gap-1'>
-            <div className='text-foreground font-mono text-xl font-semibold tracking-tight break-all tabular-nums sm:text-2xl'>
+            <div className='text-foreground font-mono text-[22px]/7 font-semibold tracking-tight break-all tabular-nums sm:text-[28px]/[34px]'>
               {props.value}
             </div>
             {props.description != null && (
@@ -163,7 +192,7 @@ export function MetricCard(props: MetricCardProps) {
           </div>
         )}
         {props.trend != null && props.trend.length > 0 && (
-          <MetricTrend values={props.trend} />
+          <MetricTrend values={props.trend} tone={tone} />
         )}
       </CardContent>
     </Card>

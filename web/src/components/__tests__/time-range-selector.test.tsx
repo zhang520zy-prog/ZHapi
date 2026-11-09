@@ -36,8 +36,8 @@ describe('TimeRangeSelector', () => {
     render(<TimeRangeSelector value='7d' onChange={() => undefined} />)
     const selected = screen.getByRole('button', { name: '7 Days' })
     expect(selected).toHaveAttribute('aria-pressed', 'true')
-    expect(selected).toHaveClass('aria-pressed:bg-accent')
-    expect(selected).toHaveClass('aria-pressed:text-accent-foreground')
+    expect(selected).toHaveClass('aria-pressed:bg-primary')
+    expect(selected).toHaveClass('aria-pressed:text-primary-foreground')
     expect(screen.getByRole('button', { name: '24 Hours' })).toHaveAttribute(
       'aria-pressed',
       'false'

@@ -44,8 +44,18 @@ describe('OptionCard', () => {
     render(<OptionCard title='Package A' selected />)
     const card = screen.getByRole('button', { name: 'Package A' })
     expect(card).toHaveAttribute('aria-pressed', 'true')
-    expect(card).toHaveClass('aria-pressed:border-primary')
+    expect(card).toHaveClass(
+      'aria-pressed:shadow-[inset_0_0_0_2px_var(--primary)]'
+    )
     expect(card).toHaveClass('aria-pressed:bg-primary/6')
+    const check = card.querySelector('svg.text-primary')
+    expect(check).not.toBeNull()
+    expect(check).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('hides the selection check when not selected', () => {
+    const { container } = render(<OptionCard title='Package A' />)
+    expect(container.querySelector('svg.text-primary')).toBeNull()
   })
 
   it('uses the option-card radius token instead of a hardcoded radius', () => {
