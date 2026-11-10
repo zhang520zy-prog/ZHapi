@@ -24,12 +24,19 @@ func TestAgreementVersionDatabaseMatrix(t *testing.T) {
 	prevRegister, prevPasswordRegister := common.RegisterEnabled, common.PasswordRegisterEnabled
 	prevEmailVerification, prevQuotaForNewUser := common.EmailVerificationEnabled, common.QuotaForNewUser
 	prevDefaultToken := constant.GenerateDefaultToken
+	prevOptionMap := common.OptionMap
 	t.Cleanup(func() {
 		*system_setting.GetLegalSettings() = prevLegal
 		common.RegisterEnabled, common.PasswordRegisterEnabled = prevRegister, prevPasswordRegister
 		common.EmailVerificationEnabled, common.QuotaForNewUser = prevEmailVerification, prevQuotaForNewUser
 		constant.GenerateDefaultToken = prevDefaultToken
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap = prevOptionMap
+		common.OptionMapRWMutex.Unlock()
 	})
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap = map[string]string{}
+	common.OptionMapRWMutex.Unlock()
 	common.RegisterEnabled, common.PasswordRegisterEnabled = true, true
 	common.EmailVerificationEnabled, common.QuotaForNewUser = false, 0
 	constant.GenerateDefaultToken = false
@@ -110,7 +117,9 @@ func TestAgreementVersionDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, 1, stored.GetSetting().AgreementVersion)
 			var auditCount int64
 			require.NoError(t, db.Model(&model.AuditLog{}).Where("user_id = ? AND action = ?", alice.Id, "user.agreement_accept").Count(&auditCount).Error)
-			assert.Equal(t, int64(2), auditCount, "reject + accept should each write one audit row")
+			assert.Equal(t, int64(1), auditCount)
+			require.NoError(t, db.Model(&model.AuditLog{}).Where("user_id = ? AND action = ?", alice.Id, "user.agreement_reject").Count(&auditCount).Error)
+			assert.Equal(t, int64(1), auditCount, "rejected acceptance uses its own audit action")
 
 			// 重复接受幂等；self 显示已同意版本。
 			out = request("POST", "/user/agreement/accept", `{"version":1}`, alice.Id)
@@ -136,6 +145,12 @@ func TestAgreementVersionDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, 2, newbie.GetSetting().AgreementVersion)
 			// 侧栏初始化不能覆盖注册时写入的协议版本。
 			assert.NotEmpty(t, newbie.GetSetting().SidebarModules)
+
+			// 建议项：负数/非整数版本被拒绝，正整数正常写入配置。
+			require.Error(t, model.UpdateOption("legal.user_agreement_version", "-1"))
+			require.Error(t, model.UpdateOption("legal.user_agreement_version", "abc"))
+			require.NoError(t, model.UpdateOption("legal.user_agreement_version", "3"))
+			assert.Equal(t, 3, legal.UserAgreementVersion)
 		})
 	}
 }

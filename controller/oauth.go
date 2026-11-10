@@ -523,6 +523,8 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	}
 	user.Role = common.RoleCommonUser
 	user.Status = common.UserStatusEnabled
+	// B2.7-3：注册即视为同意当前版本协议，免重复弹窗。
+	stampAgreementVersion(user)
 
 	// 归属解析：dist_code 优先（无效或停用按无邀请人，不降级）；否则 aff_code 走推广
 	program, inviterId, inviteCode := model.ResolveInviteAttribution(affiliateCode, distCode)

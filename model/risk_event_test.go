@@ -276,6 +276,21 @@ func TestRiskCategoryNameDatabaseMatrix(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, older.EventID, state.EventID)
 			assert.Equal(t, "gone-cat", state.CategoryName)
+
+			// R-1：人工确认限制（review_status=confirmed + 事件行
+			// restriction_until）在状态行无截止时间时同样报受限，且
+			// event_id 指向产生当前限制的那条事件。
+			manual, err := RecordRiskEvent(RiskEventInput{UserID: owner.Id, TokenID: 1, Model: "m", Category: "gambling", Action: "record", Stage: "input"})
+			require.NoError(t, err)
+			manualDeadline := common.GetTimestamp() + 5400
+			require.NoError(t, db.Model(&RiskEvent{}).Where("event_id = ?", manual.EventID).
+				Updates(map[string]any{"review_status": "confirmed", "restriction_until": manualDeadline}).Error)
+			require.NoError(t, db.Model(&RiskUserState{}).Where("user_id = ?", owner.Id).Update("restricted_until", 0).Error)
+			state, err = GetRiskUserState(owner.Id)
+			require.NoError(t, err)
+			assert.Equal(t, manualDeadline, state.RestrictedUntil, "manual review restriction must surface like the API gate")
+			assert.Equal(t, manual.EventID, state.EventID)
+			assert.Equal(t, "Gambling Words", state.CategoryName)
 		})
 	}
 }

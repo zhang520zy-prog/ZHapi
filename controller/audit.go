@@ -44,6 +44,7 @@ var auditContentTemplates = map[string]string{
 	"user.passkey_delete":       "Deleted a passkey",
 	"user.reset_passkey":        "Reset the user passkey",
 	"user.agreement_accept":     "Accepted user agreement version ${version}",
+	"user.agreement_reject":     "Rejected agreement acceptance (submitted ${version}, current ${current_version})",
 	"option.update":             "Updated system setting ${key}",
 
 	"option.passkey_domains":           "Updated Passkey domains: removed ${domains}; affected ${known}; unknown ${unknown}",

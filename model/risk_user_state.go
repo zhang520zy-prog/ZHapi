@@ -294,23 +294,40 @@ func GetRiskUserState(userId int) (*RiskUserStateDTO, error) {
 		RestrictedUntil: state.RestrictedUntil,
 		Disabled:        disabled,
 	}
-	restricted := state.RestrictedUntil > common.GetTimestamp() || disabled
-	if restricted {
-		if err := fillLatestRestrictionEvent(dto, userId); err != nil {
+	// R-1：与 API 拦截（service/sensitive_rejection）用同一判断——自动阶梯
+	// 限制与人工确认事件的 restriction_until 取最大值。
+	now := common.GetTimestamp()
+	until, err := RiskRestrictionUntil(userId, now)
+	if err != nil {
+		return nil, err
+	}
+	if until > dto.RestrictedUntil {
+		dto.RestrictedUntil = until
+	}
+	if until > now || disabled {
+		if err := fillLatestRestrictionEvent(dto, userId, now); err != nil {
 			return nil, err
 		}
 	}
 	return dto, nil
 }
 
-// fillLatestRestrictionEvent 取该用户最近一条限制/停用事件，填 event_id 与
-// category_name（B2.7-1：类别被删时回退为类别 key 本身）。
-func fillLatestRestrictionEvent(dto *RiskUserStateDTO, userId int) error {
+// fillLatestRestrictionEvent 填最近一条限制事件的 event_id 与 category_name
+// （B2.7-1：类别被删时回退为类别 key 本身）。优先取产生当前限制截止时间
+// 的事件——自动阶梯与人工确认都会把 restriction_until 写在事件行；无匹配
+// （停用或状态行直改）时回退最近一条 restrict/disable 事件。
+func fillLatestRestrictionEvent(dto *RiskUserStateDTO, userId int, now int64) error {
 	var event RiskEvent
 	err := DB.Select("event_id", "category").
-		Where("user_id = ? AND action IN ?", userId, []string{"restrict", "disable"}).
-		Order("created_at DESC, id DESC").
+		Where("user_id = ? AND restriction_until > ?", userId, now).
+		Order("restriction_until DESC, id DESC").
 		Take(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = DB.Select("event_id", "category").
+			Where("user_id = ? AND action IN ?", userId, []string{"restrict", "disable"}).
+			Order("created_at DESC, id DESC").
+			Take(&event).Error
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}

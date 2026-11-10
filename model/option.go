@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"maps"
 	"strconv"
 	"strings"
@@ -297,6 +298,11 @@ func validateOptionValue(key string, value string) error {
 	}
 	if key == "payment_setting.fee_rate_bps" {
 		return operation_setting.ValidateFeeRateBpsJSON(value)
+	}
+	if key == "legal.user_agreement_version" {
+		if v, err := strconv.Atoi(strings.TrimSpace(value)); err != nil || v < 0 {
+			return errors.New("user_agreement_version 必须是不小于 0 的整数")
+		}
 	}
 	if field, ok := strings.CutPrefix(key, "risk_setting."); ok {
 		return operation_setting.ValidateRiskSettingValue(field, value)

@@ -144,7 +144,7 @@ func billingPaginationScenario(f *commissionFixture, t *testing.T) {
 	assert.Empty(t, page3)
 }
 
-// billingMoneyScenario 金额映射：快照金额、老订单（currency=''）fee=null、JPY 零小数位。
+// billingMoneyScenario 金额映射：快照金额、老订单（currency=”）fee=null、JPY 零小数位。
 func billingMoneyScenario(f *commissionFixture, t *testing.T) {
 	withBillingTables(t)
 	u := f.makeUser("bill_money", 0)

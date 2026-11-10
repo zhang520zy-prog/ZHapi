@@ -286,9 +286,7 @@ func Register(c *gin.Context) {
 		cleanUser.Email = user.Email
 	}
 	// B2.7-3：注册即视为同意当前版本协议，免重复弹窗。
-	newSetting := cleanUser.GetSetting()
-	newSetting.AgreementVersion = system_setting.GetLegalSettings().UserAgreementVersion
-	cleanUser.SetSetting(newSetting)
+	stampAgreementVersion(&cleanUser)
 	// 建用户与写归属同一事务：归属失败则注册失败（R3）。
 	if err := cleanUser.InsertWithInvite(inviterId, program, inviteCode); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
@@ -1286,6 +1284,14 @@ type UpdateUserSettingRequest struct {
 	RecordIpLog                      bool    `json:"record_ip_log"`
 }
 
+// stampAgreementVersion 在新注册用户的 setting 里记录当前协议版本（B2.7-3），
+// 用户名密码 / OAuth / 微信三条注册路径共用。
+func stampAgreementVersion(user *model.User) {
+	setting := user.GetSetting()
+	setting.AgreementVersion = system_setting.GetLegalSettings().UserAgreementVersion
+	user.SetSetting(setting)
+}
+
 // AcceptUserAgreement B2.7-3：记录用户对当前版本用户协议的同意。
 // 提交的版本必须与后台当前版本一致，防止用户确认已过期文本。
 func AcceptUserAgreement(c *gin.Context) {
@@ -1299,7 +1305,7 @@ func AcceptUserAgreement(c *gin.Context) {
 	userId := c.GetInt("id")
 	currentVersion := system_setting.GetLegalSettings().UserAgreementVersion
 	if req.Version != currentVersion {
-		recordUserSecurityAudit(c, userId, "user.agreement_accept", map[string]any{
+		recordUserSecurityAudit(c, userId, "user.agreement_reject", map[string]any{
 			"success": false, "version": req.Version, "current_version": currentVersion,
 		})
 		common.ApiErrorMsg(c, "agreement version mismatch, please refresh and retry")

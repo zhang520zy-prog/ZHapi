@@ -97,6 +97,8 @@ func WeChatAuth(c *gin.Context) {
 			user.DisplayName = "WeChat User"
 			user.Role = common.RoleCommonUser
 			user.Status = common.UserStatusEnabled
+			// B2.7-3：注册即视为同意当前版本协议，免重复弹窗。
+			stampAgreementVersion(&user)
 
 			if err := user.Insert(0); err != nil {
 				c.JSON(http.StatusOK, gin.H{
