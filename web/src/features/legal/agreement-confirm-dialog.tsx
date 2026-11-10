@@ -82,22 +82,20 @@ export function AgreementConfirmDialog() {
     setIsSigningOut(true)
     try {
       await logout()
-      clearAuthenticatedClientState(queryClient)
-      void navigate({ to: '/sign-in', replace: true })
     } catch (error: unknown) {
       handleServerError(error, t('Failed to sign out session'))
-      setIsSigningOut(false)
     }
+    clearAuthenticatedClientState(queryClient)
+    void navigate({ to: '/sign-in', replace: true })
   }
 
   if (!mustConfirm) return null
   return (
     <AgreementConfirmContent
       agreement={agreement}
-      accepting={accept.isPending}
       acceptFailed={accept.isError}
       acceptDisabled={accept.isPending || isSigningOut}
-      signingOut={isSigningOut}
+      signOutDisabled={isSigningOut}
       onAccept={() => accept.mutate()}
       onSignOut={() => void handleSignOut()}
     />
@@ -106,10 +104,9 @@ export function AgreementConfirmDialog() {
 
 function AgreementConfirmContent(props: {
   agreement: UseQueryResult<LegalDocumentResponse>
-  accepting: boolean
   acceptFailed: boolean
   acceptDisabled: boolean
-  signingOut: boolean
+  signOutDisabled: boolean
   onAccept: () => void
   onSignOut: () => void
 }) {
@@ -160,7 +157,7 @@ function AgreementConfirmContent(props: {
           <Button
             variant='outline'
             onClick={props.onSignOut}
-            disabled={props.acceptDisabled}
+            disabled={props.signOutDisabled}
           >
             {t('Log out')}
           </Button>

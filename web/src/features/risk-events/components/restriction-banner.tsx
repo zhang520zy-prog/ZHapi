@@ -167,8 +167,10 @@ function RestrictedBanner(props: {
             .format('YYYY-MM-DD HH:mm:ss'),
         })}
       </span>
-      <span aria-hidden='true'>{countdown}</span>
-      <span className='sr-only' role='status'>
+      <span aria-hidden='true' className='font-mono tabular-nums'>
+        {t('Remaining')} {countdown}
+      </span>
+      <span className='sr-only'>
         {t('Restriction lifts in about {{count}} minutes', {
           count: remainingMinutes,
         })}

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { AlertCircle, AlertTriangle, Settings, ShieldAlert } from 'lucide-react'
 /*
@@ -41,6 +42,8 @@ import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { getRiskSelfState, riskStateQueryKey } from '@/features/risk-events/api'
+import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -102,34 +105,7 @@ export function MessageError({
   }
 
   if (errorState.kind === 'risk-restricted') {
-    return (
-      <Alert variant='destructive' className={className}>
-        <ShieldAlert />
-        <AlertTitle>{t('Account API access is restricted')}</AlertTitle>
-        <AlertDescription className='space-y-2'>
-          <p>
-            {t(
-              'API access is temporarily restricted for this account. You can view the risk events or submit an appeal.'
-            )}
-          </p>
-          {errorState.content !== FALLBACK_ERROR_CONTENT && (
-            <p className='text-muted-foreground text-xs break-all'>
-              {errorState.content}
-            </p>
-          )}
-          <Link
-            to='/risk-events'
-            className={cn(
-              buttonVariants({ variant: 'outline', size: 'sm' }),
-              'w-fit'
-            )}
-          >
-            {t('View risk events')}
-          </Link>
-          {actions}
-        </AlertDescription>
-      </Alert>
-    )
+    return <RiskRestrictedError className={className} actions={actions} />
   }
 
   if (errorState.kind === 'model-price') {
@@ -171,6 +147,51 @@ export function MessageError({
             : errorState.content}
         </p>
         {actions}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function RiskRestrictedError(props: {
+  className?: string
+  actions?: ReactNode
+}) {
+  const { t } = useTranslation()
+  const userId = useAuthStore((s) => s.auth.user?.id)
+  const { data: state } = useQuery({
+    queryKey: riskStateQueryKey(userId),
+    queryFn: getRiskSelfState,
+    enabled: !!userId,
+    staleTime: 30_000,
+  })
+  const releaseAt =
+    state && state.restricted_until * 1000 > Date.now()
+      ? dayjs.unix(state.restricted_until).format('YYYY-MM-DD HH:mm:ss')
+      : null
+
+  return (
+    <Alert variant='destructive' className={props.className}>
+      <ShieldAlert />
+      <AlertTitle>{t('Account API access is restricted')}</AlertTitle>
+      <AlertDescription className='space-y-2'>
+        <p>
+          {t(
+            'API access is temporarily restricted for this account. You can view the risk events or submit an appeal.'
+          )}
+        </p>
+        {releaseAt && (
+          <p>{t('Expected release at {{time}}', { time: releaseAt })}</p>
+        )}
+        <Link
+          to='/risk-events'
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'sm' }),
+            'w-fit'
+          )}
+        >
+          {t('View risk events')}
+        </Link>
+        {props.actions}
       </AlertDescription>
     </Alert>
   )

@@ -25,7 +25,15 @@ import type { RiskAppeal } from './api'
 export type AppealSummaryStatus = 'none' | 'pending' | 'accepted' | 'rejected'
 
 export function latestAppealStatus(appeals: RiskAppeal[]): AppealSummaryStatus {
-  const latest = appeals.at(-1)
+  const latest = appeals.reduce<RiskAppeal | null>(
+    (current, appeal) =>
+      !current ||
+      appeal.created_at > current.created_at ||
+      (appeal.created_at === current.created_at && appeal.id > current.id)
+        ? appeal
+        : current,
+    null
+  )
   if (!latest) return 'none'
   if (latest.status === 'pending') return 'pending'
   if (latest.status === 'resolved' && latest.outcome === 'false_positive') {

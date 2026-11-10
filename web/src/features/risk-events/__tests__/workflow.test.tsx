@@ -135,11 +135,19 @@ it('a pending appeal disables further appeals in the detail dialog', async () =>
     outcome: '',
     version: 1,
   }
+  const rejectedAppeal = {
+    id: 3,
+    reason: 'Earlier attempt',
+    created_at: 1788600500,
+    status: 'resolved',
+    outcome: 'confirmed',
+    version: 1,
+  }
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
       data: String(url).endsWith('risk-42')
-        ? { event, appeals: [pendingAppeal], changes: [] }
+        ? { event, appeals: [pendingAppeal, rejectedAppeal], changes: [] }
         : { items: [event], total: 1 },
     },
   }))
@@ -155,6 +163,39 @@ it('a pending appeal disables further appeals in the detail dialog', async () =>
   expect(
     within(dialog).queryByLabelText('Appeal reason')
   ).not.toBeInTheDocument()
+})
+it('uses the newest appeal when a rejected one follows a pending entry', async () => {
+  const rejectedAppeal = {
+    id: 9,
+    reason: 'Latest attempt',
+    created_at: 1788600700,
+    status: 'resolved',
+    outcome: 'confirmed',
+    version: 1,
+  }
+  const stalePendingAppeal = {
+    id: 4,
+    reason: 'Older attempt',
+    created_at: 1788600500,
+    status: 'pending',
+    outcome: '',
+    version: 1,
+  }
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data: String(url).endsWith('risk-42')
+        ? { event, appeals: [rejectedAppeal, stalePendingAppeal], changes: [] }
+        : { items: [event], total: 1 },
+    },
+  }))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Details' }))
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Risk event details',
+  })
+  expect(await within(dialog).findByText('Appeal rejected')).toBeVisible()
+  expect(within(dialog).getByLabelText('Appeal reason')).toBeInTheDocument()
 })
 it('review permission allows a versioned decision with a required reason', async () => {
   useAuthStore.getState().auth.setUser({
