@@ -1,139 +1,16 @@
 package controller
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
-	"github.com/thanhpk/randstr"
 )
 
-type SubscriptionCreemPayRequest struct {
-	PlanId int `json:"plan_id"`
-}
-
+// Creem 商品币种仅支持 EUR/USD（官方 create-product API 的 ProductCurrency
+// 枚举，见 B3.8 交付说明 W-3 查证），无法按人民币定价，订阅暂不开放。
+// 完整实现见 git 历史，Creem 支持 CNY 商品后可恢复。
 func SubscriptionRequestCreemPay(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
 	}
-
-	var req SubscriptionCreemPayRequest
-
-	// Keep body for debugging consistency (like RequestCreemPay)
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Creem 订阅支付请求读取失败 error=%q", err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "read query error"})
-		return
-	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-	if err := c.ShouldBindJSON(&req); err != nil || req.PlanId <= 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
-		return
-	}
-
-	plan, err := model.GetSubscriptionPlanById(req.PlanId)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if !plan.Enabled {
-		common.ApiErrorMsg(c, "套餐未启用")
-		return
-	}
-	if plan.CreemProductId == "" {
-		common.ApiErrorMsg(c, "该套餐未配置 CreemProductId")
-		return
-	}
-	if setting.CreemWebhookSecret == "" && !setting.CreemTestMode {
-		common.ApiErrorMsg(c, "Creem Webhook 未配置")
-		return
-	}
-
-	userId := c.GetInt("id")
-	user, err := model.GetUserById(userId, false)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if user == nil {
-		common.ApiErrorMsg(c, "用户不存在")
-		return
-	}
-
-	if plan.MaxPurchasePerUser > 0 {
-		count, err := model.CountUserSubscriptionsByPlan(userId, plan.Id)
-		if err != nil {
-			common.ApiError(c, err)
-			return
-		}
-		if count >= int64(plan.MaxPurchasePerUser) {
-			common.ApiErrorMsg(c, "已达到该套餐购买上限")
-			return
-		}
-	}
-
-	reference := "sub-creem-ref-" + randstr.String(6)
-	referenceId := "sub_ref_" + common.Sha1([]byte(reference+time.Now().String()+user.Username))
-
-	// 套餐价按人民币理解（B3.8-2）：Creem 商品由管理员按套餐同价人民币
-	// 定价，快照写 CNY，回调按快照核对实付金额与币种。产品参考里的
-	// currency 不下发（genCreemLink 只发 ProductId），与快照保持一致即可。
-	snapshotCurrency := strings.ToUpper(strings.TrimSpace(plan.Currency))
-	if snapshotCurrency == "" {
-		snapshotCurrency = "CNY"
-	}
-
-	// Creem 价格已含手续费：fee 恒为 0，credited_money = 套餐价。
-	order := &model.SubscriptionOrder{
-		UserId:          userId,
-		PlanId:          plan.Id,
-		Money:           plan.PriceAmount,
-		TradeNo:         referenceId,
-		PaymentMethod:   model.PaymentMethodCreem,
-		PaymentProvider: model.PaymentProviderCreem,
-		CreateTime:      time.Now().Unix(),
-		Status:          common.TopUpStatusPending,
-		FeeRateBps:      0,
-		FeeMoney:        decimal.Zero,
-		CreditedMoney:   decimal.NewFromFloat(plan.PriceAmount),
-		Currency:        snapshotCurrency,
-	}
-	if err := order.Insert(); err != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
-		return
-	}
-
-	product := &CreemProduct{
-		ProductId: plan.CreemProductId,
-		Name:      plan.Title,
-		Price:     plan.PriceAmount,
-		Currency:  snapshotCurrency,
-		Quota:     0,
-	}
-
-	checkoutUrl, err := genCreemLink(c.Request.Context(), referenceId, product, user.Email, user.Username)
-	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Creem 订阅支付链接创建失败 trade_no=%s product_id=%s error=%q", referenceId, product.ProductId, err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "success",
-		"data": gin.H{
-			"checkout_url": checkoutUrl,
-			"order_id":     referenceId,
-		},
-	})
+	common.ApiErrorMsg(c, "Creem 暂不支持订阅支付")
 }

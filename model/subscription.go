@@ -857,7 +857,10 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			FeeRateBps:      0,
 			FeeMoney:        decimal.Zero,
 			CreditedMoney:   decimal.NewFromFloat(plan.PriceAmount),
-			Currency:        strings.ToUpper(strings.TrimSpace(plan.Currency)),
+			// 套餐价按人民币理解（B3.8-2）：快照币种固定 CNY，不读
+			// plan.Currency——现站迁移的套餐可能是 USD，但价格本身
+			// 已按人民币入账。
+			Currency: "CNY",
 		}
 		if err := tx.Create(order).Error; err != nil {
 			return err

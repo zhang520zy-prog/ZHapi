@@ -133,6 +133,36 @@ func subscriptionCnyInvoiceScenario(f *commissionFixture, t *testing.T) {
 	assert.Equal(t, "29.00", available.StringFixed(2))
 }
 
+// subscriptionCnyLegacyUsdScenario 现站迁移套餐 currency=USD：余额购买
+// 的快照仍固定 CNY（W-1），不读 plan.Currency。
+func subscriptionCnyLegacyUsdScenario(f *commissionFixture, t *testing.T) {
+	withBillingTables(t)
+	require.NoError(t, DB.AutoMigrate(&UserSubscription{}))
+	oldPrice := operation_setting.Price
+	operation_setting.Price = 7.3
+	t.Cleanup(func() { operation_setting.Price = oldPrice })
+
+	u := f.makeUser("legacy_usd", 0)
+	plan := &SubscriptionPlan{Title: "legacy USD plan", PriceAmount: 9.99, Currency: "USD",
+		DurationUnit: SubscriptionDurationMonth, DurationValue: 1,
+		Enabled: true, TotalAmount: 100, AllowBalancePay: common.GetPointer(true)}
+	require.NoError(t, f.db.Create(plan).Error)
+	InvalidateSubscriptionPlanCache(plan.Id)
+	t.Cleanup(func() { InvalidateSubscriptionPlanCache(plan.Id) })
+
+	expectedQuota, err := SubscriptionCnyToBalanceQuota(9.99)
+	require.NoError(t, err)
+	require.NoError(t, f.db.Model(&User{}).Where("id = ?", u.Id).
+		Update("quota", int64(expectedQuota)).Error)
+
+	require.NoError(t, PurchaseSubscriptionWithBalance(u.Id, plan.Id))
+
+	var order SubscriptionOrder
+	require.NoError(t, f.db.First(&order, "user_id = ?", u.Id).Error)
+	assert.Equal(t, "CNY", order.Currency)
+	assert.Equal(t, "9.99", order.CreditedMoney.String())
+}
+
 func TestSubscriptionCnyDatabaseMatrix(t *testing.T) {
 	// PurchaseSubscriptionWithBalance 内的 getDBTimestampTx 按主库方言分支，
 	// commissionFixture 不设置该值，这里补齐并复原。
@@ -143,6 +173,11 @@ func TestSubscriptionCnyDatabaseMatrix(t *testing.T) {
 			common.SetDatabaseTypes(common.DatabaseType(dialect), common.DatabaseType(dialect))
 			f := newCommissionFixture(t, dialect)
 			subscriptionCnyScenario(f, t)
+		})
+		t.Run(dialect+"/legacy_usd_snapshot", func(t *testing.T) {
+			common.SetDatabaseTypes(common.DatabaseType(dialect), common.DatabaseType(dialect))
+			f := newCommissionFixture(t, dialect)
+			subscriptionCnyLegacyUsdScenario(f, t)
 		})
 		t.Run(dialect+"/invoiceable", func(t *testing.T) {
 			common.SetDatabaseTypes(common.DatabaseType(dialect), common.DatabaseType(dialect))

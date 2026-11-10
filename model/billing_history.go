@@ -62,14 +62,31 @@ func billingMoneyStrings(money float64, credited, fee decimal.Decimal, currency 
 }
 
 func billingTopUpEntry(t *TopUp) BillingEntry {
+	// 直付的发票手续费（invoice_fee 行）没有 credited/fee 快照：整笔
+	// money 都是手续费，输出与余额结算（invoice_requests）一致的
+	// 三列格式——到账 0、手续费=实付=money、币种 CNY。
+	if t.PaymentMethod == "invoice_fee" {
+		money := decimal.NewFromFloat(t.Money).StringFixed(2)
+		return BillingEntry{
+			Kind:            BillingKindInvoiceFee,
+			TradeNo:         t.TradeNo,
+			Status:          t.Status,
+			CreateTime:      t.CreateTime,
+			CompleteTime:    t.CompleteTime,
+			PaymentProvider: t.PaymentProvider,
+			PaymentMethod:   t.PaymentMethod,
+			CreditedMoney:   "0.00",
+			FeeMoney:        &money,
+			TotalMoney:      money,
+			FeeRateBps:      t.FeeRateBps,
+			Currency:        "CNY",
+		}
+	}
 	credited, total, fee := billingMoneyStrings(t.Money, t.CreditedMoney, t.FeeMoney, t.Currency)
 	var quota *int64
-	// invoice_fee 行是发票手续费支出，不产生到账额度
-	if t.PaymentMethod != "invoice_fee" {
-		if q, err := creditedTopUpQuota(t); err == nil && q > 0 {
-			v := int64(q)
-			quota = &v
-		}
+	if q, err := creditedTopUpQuota(t); err == nil && q > 0 {
+		v := int64(q)
+		quota = &v
 	}
 	return BillingEntry{
 		Kind:            BillingKindTopup,

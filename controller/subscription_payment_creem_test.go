@@ -25,19 +25,16 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// B-1 回归 + B3.8-2：套餐价按人民币理解后，Creem 订阅订单快照币种取套餐
-// 币种（新套餐固定 CNY）。回调核对以快照为准：CNY 入账、币种不一致被拒。
-func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
-	originalDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
+// W-3：Creem 商品币种仅支持 EUR/USD，无法按人民币定价——订阅下单与试算
+// 两处入口均拒绝 creem，且不落订单。
+func TestCreemSubscriptionRejectedDatabaseMatrix(t *testing.T) {
 	originalConfirmed := operation_setting.GetPaymentSetting().ComplianceConfirmed
 	originalTermsVersion := operation_setting.GetPaymentSetting().ComplianceTermsVersion
 	originalTestMode := setting.CreemTestMode
-	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeCNY
 	operation_setting.GetPaymentSetting().ComplianceConfirmed = true
 	operation_setting.GetPaymentSetting().ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
 	setting.CreemTestMode = true
 	t.Cleanup(func() {
-		operation_setting.GetGeneralSetting().QuotaDisplayType = originalDisplayType
 		operation_setting.GetPaymentSetting().ComplianceConfirmed = originalConfirmed
 		operation_setting.GetPaymentSetting().ComplianceTermsVersion = originalTermsVersion
 		setting.CreemTestMode = originalTestMode
@@ -91,8 +88,9 @@ func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 				c.Set("id", id)
 			})
 			router.POST("/subscription/creem", SubscriptionRequestCreemPay)
-			request := func() *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodPost, "/subscription/creem", strings.NewReader(fmt.Sprintf(`{"plan_id":%d}`, plan.Id)))
+			router.POST("/subscription/quote", SubscriptionRequestQuote)
+			request := func(path, body string) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("X-Test-User", strconv.Itoa(user.Id))
 				out := httptest.NewRecorder()
@@ -100,25 +98,14 @@ func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 				return out
 			}
 
-			// 未配置 CreemApiKey 时下单在拉起支付处失败，但订单已落库；
-			// 这里只关心快照字段与回调核对。
-			_ = request()
-			var order model.SubscriptionOrder
-			require.NoError(t, db.First(&order, "user_id = ?", user.Id).Error)
-			assert.Equal(t, "CNY", order.Currency)
+			out := request("/subscription/creem", fmt.Sprintf(`{"plan_id":%d}`, plan.Id))
+			assert.Contains(t, out.Body.String(), "Creem 暂不支持订阅支付")
+			count := int64(0)
+			require.NoError(t, db.Model(&model.SubscriptionOrder{}).Where("user_id = ?", user.Id).Count(&count).Error)
+			assert.Equal(t, int64(0), count)
 
-			err = model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "CNY")
-			require.NoError(t, err)
-			require.NoError(t, db.First(&order, order.Id).Error)
-			assert.Equal(t, common.TopUpStatusSuccess, order.Status)
-
-			_ = request()
-			var order2 model.SubscriptionOrder
-			require.NoError(t, db.First(&order2, "user_id = ? AND id <> ?", user.Id, order.Id).Error)
-			err = model.CompleteSubscriptionOrder(order2.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "USD")
-			assert.ErrorIs(t, err, model.ErrPaymentAmountMismatch)
-			require.NoError(t, db.First(&order2, order2.Id).Error)
-			assert.Equal(t, common.TopUpStatusPending, order2.Status)
+			out = request("/subscription/quote", fmt.Sprintf(`{"plan_id":%d,"payment_method":"creem"}`, plan.Id))
+			assert.Contains(t, out.Body.String(), "Creem 暂不支持订阅支付")
 		})
 	}
 }

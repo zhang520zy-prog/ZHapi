@@ -106,8 +106,8 @@ type SubscriptionQuoteRequest struct {
 }
 
 // SubscriptionRequestQuote 返回订阅购买的报价：credited_money 为套餐价，
-// 在线支付通道按费率加收手续费。balance 与 creem 不产生手续费（creem 为
-// fee_included，手续费已含在价格中）。
+// 在线支付通道按费率加收手续费。balance 不产生手续费；creem 商品不支持
+// 人民币定价，订阅暂不开放。
 func SubscriptionRequestQuote(c *gin.Context) {
 	var req SubscriptionQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.PlanId <= 0 {
@@ -145,8 +145,10 @@ func SubscriptionRequestQuote(c *gin.Context) {
 		quote, err = service.BuildPaymentQuote(credited,
 			operation_setting.GetFeeRateBps(model.PaymentProviderEpay, method), "CNY")
 	case req.PaymentMethod == model.PaymentMethodCreem:
-		quote, err = service.BuildPaymentQuote(credited, 0, "CNY")
-		quote.FeeIncluded = true
+		// Creem 商品币种仅支持 EUR/USD（官方 create-product API 的
+		// ProductCurrency 枚举），无法按人民币定价，订阅暂不开放。
+		common.ApiErrorMsg(c, "Creem 暂不支持订阅支付")
+		return
 	case req.PaymentMethod == model.PaymentMethodWaffoPancake:
 		var usd decimal.Decimal
 		usd, err = model.SubscriptionCnyToWaffoUsd(plan.PriceAmount)

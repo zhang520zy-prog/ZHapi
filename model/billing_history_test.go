@@ -245,9 +245,11 @@ func billingInvoiceFeeScenario(f *commissionFixture, t *testing.T) {
 	mkInv(InvoiceSettlementBalance, "inv_paid", now-10, now-10)
 	mkInv(InvoiceSettlementBalance, "inv_unpaid", 0, now-11) // 未扣费
 	mkInv(InvoiceSettlementDirect, "inv_direct", now-12, now-12)
+	// 直付发票手续费不写快照（currency 为空、无 credited/fee）——W-2：
+	// 输出仍须与余额结算一致的格式。
 	require.NoError(t, f.db.Create(&TopUp{UserId: u.Id, Amount: 3, Money: 3.0,
 		TradeNo: "fee_row", PaymentProvider: PaymentProviderBalance, PaymentMethod: "invoice_fee",
-		Status: common.TopUpStatusSuccess, Currency: "CNY", CreateTime: now - 9, CompleteTime: now - 9}).Error)
+		Status: common.TopUpStatusSuccess, CreateTime: now - 9, CompleteTime: now - 9}).Error)
 
 	entries, total, err := GetUserBillingEntries(u.Id, BillingKindInvoiceFee, "", billingPage(1, 10))
 	require.NoError(t, err)
@@ -255,6 +257,15 @@ func billingInvoiceFeeScenario(f *commissionFixture, t *testing.T) {
 	require.Len(t, entries, 2)
 	assert.Equal(t, "fee_row", entries[0].TradeNo)
 	assert.Equal(t, "inv_paid", entries[1].TradeNo)
+
+	// top_ups 直付行：币种 CNY、到账 0、fee=total=money、quota=null
+	d := entries[0]
+	assert.Equal(t, "CNY", d.Currency)
+	assert.Equal(t, "0.00", d.CreditedMoney)
+	require.NotNil(t, d.FeeMoney)
+	assert.Equal(t, "3.00", *d.FeeMoney)
+	assert.Equal(t, "3.00", d.TotalMoney)
+	assert.Nil(t, d.Quota)
 
 	// invoice_requests 行：币种 CNY、provider/method=balance、fee=FeeCny、quota=null
 	e := entries[1]
