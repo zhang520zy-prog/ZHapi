@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -284,6 +285,10 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
+	// B2.7-3：注册即视为同意当前版本协议，免重复弹窗。
+	newSetting := cleanUser.GetSetting()
+	newSetting.AgreementVersion = system_setting.GetLegalSettings().UserAgreementVersion
+	cleanUser.SetSetting(newSetting)
 	// 建用户与写归属同一事务：归属失败则注册失败（R3）。
 	if err := cleanUser.InsertWithInvite(inviterId, program, inviteCode); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
@@ -515,6 +520,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"setting":           user.Setting,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"agreement_version": userSetting.AgreementVersion,
 		"distributor":       map[string]any{"status": model.GetDistributorStatus(user.Id)},
 		"permissions":       permissions,
 	}
@@ -1278,6 +1284,42 @@ type UpdateUserSettingRequest struct {
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
 	RecordIpLog                      bool    `json:"record_ip_log"`
+}
+
+// AcceptUserAgreement B2.7-3：记录用户对当前版本用户协议的同意。
+// 提交的版本必须与后台当前版本一致，防止用户确认已过期文本。
+func AcceptUserAgreement(c *gin.Context) {
+	var req struct {
+		Version int `json:"version"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	userId := c.GetInt("id")
+	currentVersion := system_setting.GetLegalSettings().UserAgreementVersion
+	if req.Version != currentVersion {
+		recordUserSecurityAudit(c, userId, "user.agreement_accept", map[string]any{
+			"success": false, "version": req.Version, "current_version": currentVersion,
+		})
+		common.ApiErrorMsg(c, "agreement version mismatch, please refresh and retry")
+		return
+	}
+	user, err := model.GetUserById(userId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	setting := user.GetSetting()
+	setting.AgreementVersion = currentVersion
+	if err := model.UpdateUserSetting(user.Id, setting); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	recordUserSecurityAudit(c, userId, "user.agreement_accept", map[string]any{
+		"success": true, "version": currentVersion,
+	})
+	common.ApiSuccess(c, gin.H{"agreement_version": currentVersion})
 }
 
 func UpdateUserSetting(c *gin.Context) {

@@ -126,6 +126,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/waffo-pancake/amount", controller.RequestWaffoPancakeAmount)
 				selfRoute.POST("/waffo-pancake/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPancakePay)
 				selfRoute.POST("/aff_transfer", middleware.UserCriticalRateLimit("aff-transfer"), controller.TransferAffQuota)
+				selfRoute.POST("/agreement/accept", middleware.CriticalRateLimit(), controller.AcceptUserAgreement)
 
 				// 推广与分销（用户侧）
 				selfRoute.GET("/commission/summary", controller.GetReferralSummary)
