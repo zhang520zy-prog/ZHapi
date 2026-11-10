@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { hasPermission } from '@/lib/admin-permissions'
+import { isHttpUrl } from '@/lib/content-format'
 import dayjs from '@/lib/dayjs'
 import { handleServerError } from '@/lib/handle-server-error'
 import { ROLE } from '@/lib/roles'
@@ -116,7 +117,15 @@ function InvoicesTab(props: { canReview: boolean }) {
         cell: ({ row }) => {
           const inv = row.original
           if (inv.status !== 'pending' && inv.status !== 'processing') {
-            return inv.file_url ? (
+            if (!inv.file_url) return null
+            if (!isHttpUrl(inv.file_url)) {
+              return (
+                <span className='text-muted-foreground text-xs'>
+                  {t('Invoice file link is invalid')}
+                </span>
+              )
+            }
+            return (
               <a
                 href={inv.file_url}
                 target='_blank'
@@ -125,7 +134,7 @@ function InvoicesTab(props: { canReview: boolean }) {
               >
                 {t('File')}
               </a>
-            ) : null
+            )
           }
           if (!props.canReview) return null
           return (

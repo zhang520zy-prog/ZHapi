@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -49,9 +49,10 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { submitPaymentForm } from '@/features/wallet/lib/payment'
-import { useSystemConfig } from '@/hooks/use-system-config'
 import { formatQuotaWithCurrency } from '@/lib/currency'
+import { formatFeeRateBps } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
+import { getServerErrorSources } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -59,8 +60,7 @@ import {
   type InvoiceOptions,
   type InvoiceSettlement,
 } from '../api'
-
-const QUOTA_PER_USD = 500000
+import { cnyInRange, cnyToCents, minCnyString } from '../lib/cny'
 
 const INVOICE_TYPE_LABELS: Record<string, string> = {
   normal_fast: 'Standard invoice (same-day issuance)',
@@ -107,17 +107,16 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.auth.user)
-  const { currency } = useSystemConfig()
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [settlement, setSettlement] = useState<InvoiceSettlement>('balance')
 
   const profile = props.options.profile
-  const categories =
-    props.options.categories?.length
-      ? props.options.categories
-      : INVOICE_CATEGORIES
-  const items =
-    props.options.items?.length ? props.options.items : INVOICE_ITEMS
+  const categories = props.options.categories?.length
+    ? props.options.categories
+    : INVOICE_CATEGORIES
+  const items = props.options.items?.length
+    ? props.options.items
+    : INVOICE_ITEMS
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -125,7 +124,8 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
       buyer_name: profile?.buyer_name ?? '',
       tax_no: profile?.tax_no ?? '',
       amount_cny: '',
-      invoice_type: props.options.types[1]?.key ?? props.options.types[0]?.key ?? 'normal',
+      invoice_type:
+        props.options.types[1]?.key ?? props.options.types[0]?.key ?? 'normal',
       category:
         (profile?.category && categories.includes(profile.category)
           ? profile.category
@@ -139,22 +139,19 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
     },
   })
 
-  const amountCny = Number(form.watch('amount_cny')) || 0
+  const amountInput = form.watch('amount_cny')
+  const amountCents = cnyToCents(amountInput)
   const invoiceType = form.watch('invoice_type')
   const rateBps =
     props.options.types.find((x) => x.key === invoiceType)?.rate_bps ?? 0
-  const feeCny = useMemo(
-    () => Math.round(amountCny * rateBps) / 10000,
-    [amountCny, rateBps]
+  const maxAllowed = minCnyString(
+    props.options.max_cny,
+    props.options.invoiceable_cny
   )
-  const minCny = Number(props.options.min_cny) || 0
-  const maxCny = Number(props.options.max_cny) || 0
-  const usdExchangeRate = currency?.usdExchangeRate || 1
-  const balanceUsd = (user?.quota ?? 0) / QUOTA_PER_USD
 
-  const amountInRange = amountCny >= minCny && amountCny <= maxCny
-  const insufficientBalance =
-    feeCny > 0 && feeCny / usdExchangeRate > balanceUsd
+  const amountInRange =
+    amountCents != null &&
+    cnyInRange(amountInput, props.options.min_cny, maxAllowed)
 
   const submit = useMutation({
     mutationFn: (values: InvoiceFormValues) =>
@@ -170,9 +167,24 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
         submitPaymentForm(result.payment_url, result.payment_params)
         return
       }
-      toast.success(t('Invoice request submitted'))
+      const fee = result.invoice.fee_cny
+      toast.success(
+        fee
+          ? `${t('Invoice request submitted')} — ${t('service fee')}: ¥${fee}`
+          : t('Invoice request submitted')
+      )
     },
-    onError: (e) => handleServerError(e, t('Invoice request failed')),
+    onError: (e) => {
+      const quotaExceeded = getServerErrorSources(e).some(
+        (source) => source.code === 'INVOICE_QUOTA'
+      )
+      if (quotaExceeded) {
+        toast.error(t('The requested amount exceeds the invoiceable balance'))
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+        return
+      }
+      handleServerError(e, t('Invoice request failed'))
+    },
   })
 
   const errors = form.formState.errors
@@ -184,15 +196,16 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
   }
   const canSubmit = Boolean(
     form.watch('buyer_name')?.trim() &&
-      amountCny > 0 &&
-      amountInRange &&
-      form.watch('item')?.trim() &&
-      form.watch('email')?.trim()
+    amountCents != null &&
+    amountCents > 0 &&
+    amountInRange &&
+    form.watch('item')?.trim() &&
+    form.watch('email')?.trim()
   )
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className='max-h-[90vh] sm:max-w-2xl overflow-y-auto'>
+      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle>{t('Apply for invoice')}</DialogTitle>
         </DialogHeader>
@@ -240,10 +253,9 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
               {...form.register('amount_cny')}
             />
             <p className='text-muted-foreground text-xs'>
-              {t('Amount range')} ¥{props.options.min_cny} – ¥
-              {props.options.max_cny}
+              {t('Amount range')} ¥{props.options.min_cny} – ¥{maxAllowed}
             </p>
-            {amountCny > 0 && !amountInRange ? (
+            {amountCents != null && amountCents > 0 && !amountInRange ? (
               <p className='text-destructive text-xs'>
                 {t('Amount is out of range')}
               </p>
@@ -269,7 +281,7 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
                         (x) => x.key === invoiceType
                       )
                       if (!opt) return invoiceType
-                      return `${t(opt.label || INVOICE_TYPE_LABELS[opt.key] || opt.key)} · ${t('fee')} ${(opt.rate_bps / 100).toFixed(0)}%`
+                      return `${t(opt.label || INVOICE_TYPE_LABELS[opt.key] || opt.key)} · ${t('fee')} ${formatFeeRateBps(opt.rate_bps)}`
                     })()}
                   </SelectValue>
                 </SelectTrigger>
@@ -277,7 +289,7 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
                   {props.options.types.map((opt) => (
                     <SelectItem key={opt.key} value={opt.key}>
                       {t(opt.label || INVOICE_TYPE_LABELS[opt.key] || opt.key)}{' '}
-                      · {t('fee')} {(opt.rate_bps / 100).toFixed(0)}%
+                      · {t('fee')} {formatFeeRateBps(opt.rate_bps)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -366,15 +378,15 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
           <div className='bg-muted/40 space-y-1 rounded-md px-3 py-2.5 text-sm'>
             <div className='flex items-center justify-between'>
               <span className='text-muted-foreground'>
-                {t('Service fee')}{' '}
-                <span className='text-xs'>
-                  {t('rate')} {(rateBps / 100).toFixed(0)}%
-                </span>
+                {t('Estimated service fee')}
               </span>
               <span className='font-semibold tabular-nums'>
-                ¥{feeCny.toFixed(2)}
+                {t('rate')} {formatFeeRateBps(rateBps)}
               </span>
             </div>
+            <p className='text-muted-foreground text-xs'>
+              {t('Confirmed on submission')}
+            </p>
             <div className='flex items-center justify-between'>
               <span className='text-muted-foreground'>
                 {t('Available balance')}
@@ -419,22 +431,6 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
               </div>
             </div>
           ) : null}
-          {settlement === 'balance' && insufficientBalance ? (
-            <div className='flex flex-wrap items-center gap-2'>
-              <p className='text-destructive text-xs'>
-                {t('Balance is below the invoice fee')}
-                {props.options.direct_pay ? ` — ${t('choose Pay now instead')}` : ''}
-              </p>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={() => window.open('/wallet', '_blank')}
-              >
-                {t('Top up & pay')}
-              </Button>
-            </div>
-          ) : null}
           <DialogFooter>
             <Button
               type='button'
@@ -445,12 +441,7 @@ export function ApplyInvoiceDialog(props: ApplyInvoiceDialogProps) {
             </Button>
             <Button
               type='submit'
-              disabled={
-                !canSubmit ||
-                !amountInRange ||
-                (settlement === 'balance' && insufficientBalance) ||
-                submit.isPending
-              }
+              disabled={!canSubmit || !amountInRange || submit.isPending}
             >
               {submitLabel}
             </Button>

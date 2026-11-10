@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { FileText, Plus } from 'lucide-react'
+import { Banknote, FileCheck, FileText, Plus, Receipt } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -26,14 +26,19 @@ import { toast } from 'sonner'
 import { DataTablePage, useDataTable } from '@/components/data-table'
 import { EmptyState } from '@/components/empty-state'
 import { SectionPageLayout } from '@/components/layout'
+import { MetricCard } from '@/components/metric-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { isHttpUrl } from '@/lib/content-format'
+import { formatServerMoney } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
+import { formatFeeRateBps } from '@/lib/format'
 
 import { getInvoiceOptions, listMyInvoices, type InvoiceRequest } from './api'
 import { ApplyInvoiceDialog } from './components/apply-dialog'
+import { isZeroCny } from './lib/cny'
 
 const PAGE_SIZE = 10
 
@@ -113,7 +118,7 @@ export function InvoicePage() {
         cell: ({ row }) => (
           <span className='tabular-nums'>
             ¥{row.original.fee_cny} (
-            {(row.original.fee_rate_bps / 100).toFixed(0)}%)
+            {formatFeeRateBps(row.original.fee_rate_bps)})
           </span>
         ),
       },
@@ -132,6 +137,13 @@ export function InvoicePage() {
         cell: ({ row }) => {
           const inv = row.original
           if (inv.file_url) {
+            if (!isHttpUrl(inv.file_url)) {
+              return (
+                <span className='text-muted-foreground text-xs'>
+                  {t('Invoice file link is invalid')}
+                </span>
+              )
+            }
             return (
               <a
                 href={inv.file_url}
@@ -175,6 +187,9 @@ export function InvoicePage() {
   })
 
   const enabled = options.data?.enabled !== false
+  const noInvoiceable = options.data
+    ? isZeroCny(options.data.invoiceable_cny)
+    : false
 
   return (
     <>
@@ -195,10 +210,15 @@ export function InvoicePage() {
           >
             {t('Refresh')}
           </Button>
+          {enabled && noInvoiceable ? (
+            <span className='text-muted-foreground text-sm'>
+              {t('No invoiceable amount available')}
+            </span>
+          ) : null}
           {enabled ? (
             <Button
               size='sm'
-              disabled={options.isLoading}
+              disabled={options.isLoading || noInvoiceable}
               onClick={() => {
                 if (!options.data) {
                   toast.error(t('Failed to load invoice options'))
@@ -213,9 +233,43 @@ export function InvoicePage() {
           ) : null}
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <p className='text-muted-foreground mb-4 text-sm'>
+          <div className='mb-4 grid gap-3 sm:grid-cols-3'>
+            <MetricCard
+              icon={Banknote}
+              tone='chart-2'
+              title={t('Received (CNY)')}
+              value={formatServerMoney(
+                options.data?.received_cny ?? '0.00',
+                'CNY'
+              )}
+            />
+            <MetricCard
+              icon={FileCheck}
+              tone='chart-3'
+              title={t('Invoiced (incl. processing)')}
+              value={formatServerMoney(
+                options.data?.invoiced_cny ?? '0.00',
+                'CNY'
+              )}
+            />
+            <MetricCard
+              icon={Receipt}
+              tone='chart-4'
+              title={t('Invoiceable')}
+              value={formatServerMoney(
+                options.data?.invoiceable_cny ?? '0.00',
+                'CNY'
+              )}
+            />
+          </div>
+          <p className='text-muted-foreground mb-1 text-sm'>
             {t(
               'A service fee (invoice amount × rate) is deducted from your balance on submission; once issued, the invoice can be downloaded here and is sent to your email.'
+            )}
+          </p>
+          <p className='text-muted-foreground mb-4 text-sm'>
+            {t(
+              'Only amounts received via online payment in CNY are invoiceable, excluding service fees; rejected requests release the quota.'
             )}
           </p>
           <Tabs

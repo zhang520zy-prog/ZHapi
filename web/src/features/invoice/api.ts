@@ -47,6 +47,12 @@ export interface InvoiceOptions {
   enabled: boolean
   min_cny: string
   max_cny: string
+  /** CNY received via online payment — server-formatted "0.00" string. */
+  received_cny: string
+  /** Already invoiced, including in-flight requests. */
+  invoiced_cny: string
+  /** Remaining invoiceable amount; rejected requests release it. */
+  invoiceable_cny: string
   types: InvoiceTypeOption[]
   categories?: string[]
   items?: string[]
