@@ -106,3 +106,21 @@ func GetUsage(c *gin.Context) {
 	c.JSON(200, usage)
 	return
 }
+
+// GetUserBillingSelf 返回当前用户的合并账单（B3.8）：
+// kind=all|topup|subscription|invoice_fee，按 create_time DESC, id DESC 分页。
+func GetUserBillingSelf(c *gin.Context) {
+	userId := c.GetInt("id")
+	pageInfo := common.GetPageQuery(c)
+	kind := c.DefaultQuery("kind", model.BillingKindAll)
+	keyword := c.Query("keyword")
+
+	entries, total, err := model.GetUserBillingEntries(userId, kind, keyword, pageInfo)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(entries)
+	common.ApiSuccess(c, pageInfo)
+}
