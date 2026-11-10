@@ -76,6 +76,14 @@ func bumpCommissionTermsVersion(changedKey string) bool {
 	return false
 }
 
+// currentAnnouncementNextID B6.1：公告 id 计数器当前值（待分配 id，最小为 1）。
+func currentAnnouncementNextID() int {
+	common.OptionMapRWMutex.RLock()
+	value, _ := strconv.Atoi(common.OptionMap[console_setting.AnnouncementNextIDOption])
+	common.OptionMapRWMutex.RUnlock()
+	return max(value, 1)
+}
+
 func isPositiveOptionValue(value string) bool {
 	intValue, err := strconv.Atoi(strings.TrimSpace(value))
 	if err == nil {
@@ -123,7 +131,8 @@ func GetOptions(c *gin.Context) {
 	optionValues := make(map[string]string)
 	common.OptionMapRWMutex.Lock()
 	for k, v := range common.OptionMap {
-		if k == "theme.frontend" || k == "billing_setting.billing_mode" || k == "billing_setting.billing_expr" {
+		if k == "theme.frontend" || k == "billing_setting.billing_mode" || k == "billing_setting.billing_expr" ||
+			k == console_setting.AnnouncementNextIDOption {
 			continue
 		}
 		value := common.Interface2String(v)
@@ -262,6 +271,7 @@ func UpdateOption(c *gin.Context) {
 			return
 		}
 	}
+	announcementNextID := 0
 	switch option.Key {
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {
@@ -501,11 +511,16 @@ func UpdateOption(c *gin.Context) {
 			return
 		}
 	case "console_setting.announcements":
-		err = console_setting.ValidateConsoleSettings(option.Value.(string), "Announcements")
-		if err != nil {
+		var normalizeErr error
+		option.Value, announcementNextID, normalizeErr = console_setting.NormalizeAnnouncements(
+			option.Value.(string),
+			console_setting.GetConsoleSetting().Announcements,
+			currentAnnouncementNextID(),
+		)
+		if normalizeErr != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": err.Error(),
+				"message": normalizeErr.Error(),
 			})
 			return
 		}
@@ -548,6 +563,11 @@ func UpdateOption(c *gin.Context) {
 			common.ApiError(c, err)
 		}
 		return
+	}
+	if announcementNextID > 0 {
+		if err := model.UpdateOption(console_setting.AnnouncementNextIDOption, strconv.Itoa(announcementNextID)); err != nil {
+			common.SysError("failed to persist announcement id counter: " + err.Error())
+		}
 	}
 	if bumpCommissionTermsVersion(option.Key) {
 		service.NotifyActiveDistributorsAgreementUpdate(operation_setting.DistributorAgreementVersion)

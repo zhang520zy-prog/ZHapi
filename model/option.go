@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -217,6 +218,7 @@ func InitOptionMap() {
 	common.OptionMap["InvoiceTypes"] = operation_setting.InvoiceTypesText
 	common.OptionMap["InvoiceCategories"] = operation_setting.InvoiceCategoriesText
 	common.OptionMap["InvoiceItems"] = operation_setting.InvoiceItemsText
+	common.OptionMap[console_setting.AnnouncementNextIDOption] = "1"
 
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
@@ -225,6 +227,41 @@ func InitOptionMap() {
 	common.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
 	migrateTermsExtraOptions()
+	migrateAnnouncementIDs()
+}
+
+// announcementNextID B6.1：公告 id 计数器当前值（待分配 id，最小为 1）。
+func announcementNextID() int {
+	common.OptionMapRWMutex.RLock()
+	value, _ := strconv.Atoi(common.OptionMap[console_setting.AnnouncementNextIDOption])
+	common.OptionMapRWMutex.RUnlock()
+	return max(value, 1)
+}
+
+// migrateAnnouncementIDs B6.1：升级后首次启动给没有 id 的存量公告补上服务端
+// id 并写回，同时把计数器抬到最大 id 之上。幂等：全部有 id 时不产生写操作。
+func migrateAnnouncementIDs() {
+	raw := console_setting.GetConsoleSetting().Announcements
+	if strings.TrimSpace(raw) == "" {
+		return
+	}
+	normalized, nextID, err := console_setting.NormalizeAnnouncements(raw, raw, announcementNextID())
+	if err != nil {
+		common.SysError("failed to backfill announcement ids: " + err.Error())
+		return
+	}
+	if normalized != raw {
+		if err := UpdateOption("console_setting.announcements", normalized); err != nil {
+			common.SysError("failed to persist announcement ids: " + err.Error())
+			return
+		}
+		common.SysLog("backfilled announcement ids")
+	}
+	if nextID > announcementNextID() {
+		if err := UpdateOption(console_setting.AnnouncementNextIDOption, strconv.Itoa(nextID)); err != nil {
+			common.SysError("failed to persist announcement id counter: " + err.Error())
+		}
+	}
 }
 
 // migrateTermsExtraOptions R5：补充条款拆成推广/分销两份。旧共用值一次性复制
@@ -302,6 +339,11 @@ func validateOptionValue(key string, value string) error {
 	if key == "legal.user_agreement_version" {
 		if v, err := strconv.Atoi(strings.TrimSpace(value)); err != nil || v < 0 {
 			return errors.New("user_agreement_version 必须是不小于 0 的整数")
+		}
+	}
+	if key == console_setting.AnnouncementNextIDOption {
+		if v, err := strconv.Atoi(strings.TrimSpace(value)); err != nil || v < 1 {
+			return errors.New("announcement_next_id 必须是不小于 1 的整数")
 		}
 	}
 	if field, ok := strings.CutPrefix(key, "risk_setting."); ok {

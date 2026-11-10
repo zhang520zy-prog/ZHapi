@@ -2,6 +2,7 @@ package console_setting
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"sort"
@@ -144,6 +145,22 @@ func GetApiInfo() []map[string]interface{} {
 	return getJSONList(GetConsoleSetting().ApiInfo)
 }
 
+// AnnouncementNextIDOption B6.1：公告 id 计数器（只增不减，走 option 机制，
+// 不注册进 console_setting 结构，仅存放在 OptionMap 与 options 表）。
+const AnnouncementNextIDOption = "AnnouncementNextId"
+
+func announcementID(ann map[string]interface{}) (int, bool) {
+	v, exists := ann["id"]
+	if !exists {
+		return 0, false
+	}
+	f, ok := v.(float64)
+	if !ok || f < 1 || f != math.Trunc(f) {
+		return 0, false
+	}
+	return int(f), true
+}
+
 func validateAnnouncements(announcementsStr string) error {
 	list, err := parseJSONArray(announcementsStr, "系统公告")
 	if err != nil {
@@ -168,7 +185,8 @@ func validateAnnouncements(announcementsStr string) error {
 		if !ok || publishDateStr == "" {
 			return fmt.Errorf("第%d个公告的发布日期不能为空", i+1)
 		}
-		if _, err := time.Parse(time.RFC3339, publishDateStr); err != nil {
+		publishTime, err := time.Parse(time.RFC3339, publishDateStr)
+		if err != nil {
 			return fmt.Errorf("第%d个公告的发布日期格式错误", i+1)
 		}
 		if t, exists := ann["type"]; exists {
@@ -178,8 +196,32 @@ func validateAnnouncements(announcementsStr string) error {
 				}
 			}
 		}
-		if exceedsMaxCharacters(content, 500) {
-			return fmt.Errorf("第%d个公告的内容长度不能超过500字符", i+1)
+		if title, exists := ann["title"]; exists {
+			titleStr, ok := title.(string)
+			if !ok || exceedsMaxCharacters(titleStr, 60) {
+				return fmt.Errorf("第%d个公告的标题长度不能超过60字符", i+1)
+			}
+		}
+		if popup, exists := ann["popup"]; exists {
+			if _, ok := popup.(bool); !ok {
+				return fmt.Errorf("第%d个公告的popup字段必须是布尔值", i+1)
+			}
+		}
+		if expire, exists := ann["expireDate"]; exists {
+			expireStr, ok := expire.(string)
+			if !ok {
+				return fmt.Errorf("第%d个公告的过期时间格式错误", i+1)
+			}
+			expireTime, err := time.Parse(time.RFC3339, expireStr)
+			if err != nil {
+				return fmt.Errorf("第%d个公告的过期时间格式错误", i+1)
+			}
+			if !expireTime.After(publishTime) {
+				return fmt.Errorf("第%d个公告的过期时间必须晚于发布时间", i+1)
+			}
+		}
+		if exceedsMaxCharacters(content, 2000) {
+			return fmt.Errorf("第%d个公告的内容长度不能超过2000字符", i+1)
 		}
 		if extra, exists := ann["extra"]; exists {
 			if extraStr, ok := extra.(string); ok && exceedsMaxCharacters(extraStr, 100) {
@@ -188,6 +230,79 @@ func validateAnnouncements(announcementsStr string) error {
 		}
 	}
 	return nil
+}
+
+// NormalizeAnnouncements B6.1：校验公告 JSON 并完成服务端 id 分配。
+// existing 为当前存储的 JSON（可为空串）；nextID 为计数器里待分配的下一个 id。
+// 已有 id 且存在于现有列表的条目保持 id；无 id 条目按计数器分配，删掉的不复用；
+// 传入不在现有列表且大于计数器的 id 会被拒绝（id 由服务端分配）。
+// 返回规范化 JSON（所有条目带整数 id）与新的计数器值。
+func NormalizeAnnouncements(raw string, existing string, nextID int) (string, int, error) {
+	if strings.TrimSpace(raw) == "" {
+		return raw, nextID, nil
+	}
+	if err := validateAnnouncements(raw); err != nil {
+		return "", nextID, err
+	}
+	if nextID < 1 {
+		nextID = 1
+	}
+	list, err := parseJSONArray(raw, "系统公告")
+	if err != nil {
+		return "", nextID, err
+	}
+	existingIDs := make(map[int]bool)
+	for _, ann := range getJSONList(existing) {
+		if id, ok := announcementID(ann); ok {
+			existingIDs[id] = true
+			if id >= nextID {
+				nextID = id + 1
+			}
+		}
+	}
+	seen := make(map[int]bool)
+	for i, ann := range list {
+		if _, present := ann["id"]; present {
+			id, ok := announcementID(ann)
+			if !ok {
+				return "", nextID, fmt.Errorf("第%d个公告的id必须是正整数", i+1)
+			}
+			if seen[id] {
+				return "", nextID, fmt.Errorf("第%d个公告的id与其他公告重复", i+1)
+			}
+			if !existingIDs[id] && id > nextID {
+				return "", nextID, fmt.Errorf("第%d个公告的id无效：公告id由服务端分配", i+1)
+			}
+			seen[id] = true
+			ann["id"] = id
+			if id >= nextID {
+				nextID = id + 1
+			}
+			continue
+		}
+		ann["id"] = nextID
+		seen[nextID] = true
+		nextID++
+	}
+	normalized, err := common.Marshal(list)
+	if err != nil {
+		return "", nextID, err
+	}
+	return string(normalized), nextID, nil
+}
+
+// GetPopupAnnouncementIDs 返回当前配置中 popup=true 的公告 id 集合（B6.1）。
+func GetPopupAnnouncementIDs() map[int]struct{} {
+	ids := map[int]struct{}{}
+	for _, ann := range getJSONList(GetConsoleSetting().Announcements) {
+		if popup, _ := ann["popup"].(bool); !popup {
+			continue
+		}
+		if id, ok := announcementID(ann); ok {
+			ids[id] = struct{}{}
+		}
+	}
+	return ids
 }
 
 func validateFAQ(faqStr string) error {

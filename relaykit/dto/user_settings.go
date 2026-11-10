@@ -17,6 +17,7 @@ type UserSetting struct {
 	BillingPreference                string  `json:"billing_preference,omitempty"`                   // BillingPreference 扣费策略（订阅/钱包）
 	Language                         string  `json:"language,omitempty"`                             // Language 用户语言偏好 (zh, en)
 	AgreementVersion                 int     `json:"agreement_version,omitempty"`                    // AgreementVersion 已同意的用户协议版本（B2.7-3）
+	AnnouncementAckedIDs             []int   `json:"announcement_acked_ids,omitempty"`               // AnnouncementAckedIDs 已看过的弹窗公告 id（B6.1）
 }
 
 var (

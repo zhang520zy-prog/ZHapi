@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -489,38 +490,43 @@ func GetSelf(c *gin.Context) {
 // administrator-only remarks.
 func buildSelfUserData(user *model.User) map[string]any {
 	userSetting := user.GetSetting()
+	ackedAnnouncementIDs := userSetting.AnnouncementAckedIDs
+	if ackedAnnouncementIDs == nil {
+		ackedAnnouncementIDs = []int{}
+	}
 	permissions := calculateUserPermissions(user.Role)
 	permissions["admin_permissions"] = authz.Capabilities(user.Id, user.Role)
 	return map[string]any{
-		"id":                user.Id,
-		"username":          user.Username,
-		"display_name":      user.DisplayName,
-		"has_password":      user.HasPassword,
-		"role":              user.Role,
-		"status":            user.Status,
-		"email":             user.Email,
-		"github_id":         user.GitHubId,
-		"discord_id":        user.DiscordId,
-		"google_id":         user.GoogleId,
-		"oidc_id":           user.OidcId,
-		"wechat_id":         user.WeChatId,
-		"telegram_id":       user.TelegramId,
-		"group":             user.Group,
-		"quota":             user.Quota,
-		"used_quota":        user.UsedQuota,
-		"request_count":     user.RequestCount,
-		"aff_code":          user.AffCode,
-		"aff_count":         user.AffCount,
-		"aff_quota":         user.AffQuota,
-		"aff_history_quota": user.AffHistoryQuota,
-		"inviter_id":        user.InviterId,
-		"linux_do_id":       user.LinuxDOId,
-		"setting":           user.Setting,
-		"stripe_customer":   user.StripeCustomer,
-		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
-		"agreement_version": userSetting.AgreementVersion,
-		"distributor":       map[string]any{"status": model.GetDistributorStatus(user.Id)},
-		"permissions":       permissions,
+		"id":                     user.Id,
+		"username":               user.Username,
+		"display_name":           user.DisplayName,
+		"has_password":           user.HasPassword,
+		"role":                   user.Role,
+		"status":                 user.Status,
+		"email":                  user.Email,
+		"github_id":              user.GitHubId,
+		"discord_id":             user.DiscordId,
+		"google_id":              user.GoogleId,
+		"oidc_id":                user.OidcId,
+		"wechat_id":              user.WeChatId,
+		"telegram_id":            user.TelegramId,
+		"group":                  user.Group,
+		"quota":                  user.Quota,
+		"used_quota":             user.UsedQuota,
+		"request_count":          user.RequestCount,
+		"aff_code":               user.AffCode,
+		"aff_count":              user.AffCount,
+		"aff_quota":              user.AffQuota,
+		"aff_history_quota":      user.AffHistoryQuota,
+		"inviter_id":             user.InviterId,
+		"linux_do_id":            user.LinuxDOId,
+		"setting":                user.Setting,
+		"stripe_customer":        user.StripeCustomer,
+		"sidebar_modules":        userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"agreement_version":      userSetting.AgreementVersion,
+		"announcement_acked_ids": ackedAnnouncementIDs,
+		"distributor":            map[string]any{"status": model.GetDistributorStatus(user.Id)},
+		"permissions":            permissions,
 	}
 }
 
@@ -1326,6 +1332,51 @@ func AcceptUserAgreement(c *gin.Context) {
 		"success": true, "version": currentVersion,
 	})
 	common.ApiSuccess(c, gin.H{"agreement_version": currentVersion})
+}
+
+// AckUserAnnouncements B6.1：记录当前用户已看过的弹窗公告 id。
+// 只接受当前存在且 popup=true 的公告 id；并入已有列表去重后最多保留最新
+// 100 个（新确认的在尾部）；重复调用结果不变。看公告不是安全事件，不写审计。
+func AckUserAnnouncements(c *gin.Context) {
+	var req struct {
+		IDs []int `json:"ids"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	valid := console_setting.GetPopupAnnouncementIDs()
+	user, err := model.GetUserById(c.GetInt("id"), false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	setting := user.GetSetting()
+	seen := make(map[int]bool, len(setting.AnnouncementAckedIDs)+len(req.IDs))
+	merged := make([]int, 0, len(setting.AnnouncementAckedIDs)+len(req.IDs))
+	for _, id := range setting.AnnouncementAckedIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		merged = append(merged, id)
+	}
+	for _, id := range req.IDs {
+		if _, ok := valid[id]; !ok || seen[id] {
+			continue
+		}
+		seen[id] = true
+		merged = append(merged, id)
+	}
+	if len(merged) > 100 {
+		merged = merged[len(merged)-100:]
+	}
+	setting.AnnouncementAckedIDs = merged
+	if err := model.UpdateUserSetting(user.Id, setting); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"announcement_acked_ids": merged})
 }
 
 func UpdateUserSetting(c *gin.Context) {
