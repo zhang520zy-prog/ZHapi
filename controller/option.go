@@ -265,6 +265,10 @@ func UpdateOption(c *gin.Context) {
 			return
 		}
 	}
+	if option.Key == console_setting.AnnouncementNextIDOption {
+		common.ApiErrorMsg(c, "公告 id 计数器不允许通过通用设置接口修改")
+		return
+	}
 	if option.Key == "TaskPublicAddress" && option.Value.(string) != "" {
 		if err := service.ValidateTaskArtifactBaseURL(option.Value.(string)); err != nil {
 			common.ApiErrorMsg(c, err.Error())

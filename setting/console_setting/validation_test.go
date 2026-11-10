@@ -98,60 +98,49 @@ func TestNormalizeAnnouncementsAssignsIDs(t *testing.T) {
 	assert.Equal(t, float64(3), list[1]["id"], "无 id 条目拿计数器值，删掉的不复用")
 }
 
-func TestNormalizeAnnouncementsKeepsBoundaryID(t *testing.T) {
-	// 旧前端给新条目自算 max+1 提交，等于计数器值时不算伪造，保留并抬升计数器。
+func TestNormalizeAnnouncementsReassignsUnknownID(t *testing.T) {
+	// AN-1：客户端带来但不在现有列表的 id（伪造、已删除复用、旧前端自算
+	// 的 max+1）一律按新公告由计数器重新分配，不报错；已删除的 id 不复用。
 	existing := annJSON(t, []map[string]interface{}{
 		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-		{"id": 3, "content": "b", "publishDate": "2026-11-02T00:00:00Z"},
+		{"id": 2, "content": "b", "publishDate": "2026-11-02T00:00:00Z"},
 	})
 	raw := annJSON(t, []map[string]interface{}{
 		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-		{"id": 4, "content": "new", "publishDate": "2026-11-11T00:00:00Z"},
+		{"id": 3, "content": "reuse-of-deleted", "publishDate": "2026-11-11T00:00:00Z"},
+		{"id": 99, "content": "forged", "publishDate": "2026-11-11T00:00:00Z"},
+		{"id": "x", "content": "bad", "publishDate": "2026-11-11T00:00:00Z"},
 	})
+	// 计数器为 4 表示 id 3 曾分配后被删除。
 	normalized, nextID, err := NormalizeAnnouncements(raw, existing, 4)
 	require.NoError(t, err)
-	assert.Equal(t, 5, nextID)
-	assert.Contains(t, normalized, `"id":4`)
+	assert.Equal(t, 7, nextID)
+	var list []map[string]interface{}
+	require.NoError(t, common.UnmarshalJsonStr(normalized, &list))
+	require.Len(t, list, 4)
+	assert.Equal(t, float64(1), list[0]["id"], "现有 id 保持")
+	assert.Equal(t, float64(4), list[1]["id"], "已删 id 3 不复用，拿计数器值")
+	assert.Equal(t, float64(5), list[2]["id"])
+	assert.Equal(t, float64(6), list[3]["id"])
 }
 
-func TestNormalizeAnnouncementsRejectsForgedID(t *testing.T) {
+func TestNormalizeAnnouncementsReassignsDuplicateID(t *testing.T) {
+	// 同一次提交里重复引用同一个现有 id：第一个保持，第二个按新公告分配。
 	existing := annJSON(t, []map[string]interface{}{
 		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
 	})
 	raw := annJSON(t, []map[string]interface{}{
-		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-		{"id": 99, "content": "forged", "publishDate": "2026-11-11T00:00:00Z"},
-	})
-	_, _, err := NormalizeAnnouncements(raw, existing, 2)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "由服务端分配")
-}
-
-func TestNormalizeAnnouncementsRejectsDuplicateAndBadID(t *testing.T) {
-	existing := annJSON(t, []map[string]interface{}{
-		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-	})
-	dup := annJSON(t, []map[string]interface{}{
 		{"id": 1, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
 		{"id": 1, "content": "b", "publishDate": "2026-11-02T00:00:00Z"},
 	})
-	_, _, err := NormalizeAnnouncements(dup, existing, 2)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "重复")
-
-	bad := annJSON(t, []map[string]interface{}{
-		{"id": "x", "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-	})
-	_, _, err = NormalizeAnnouncements(bad, existing, 2)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "正整数")
-
-	fraction := annJSON(t, []map[string]interface{}{
-		{"id": 1.5, "content": "a", "publishDate": "2026-11-01T00:00:00Z"},
-	})
-	_, _, err = NormalizeAnnouncements(fraction, existing, 2)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "正整数")
+	normalized, nextID, err := NormalizeAnnouncements(raw, existing, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 3, nextID)
+	var list []map[string]interface{}
+	require.NoError(t, common.UnmarshalJsonStr(normalized, &list))
+	require.Len(t, list, 2)
+	assert.Equal(t, float64(1), list[0]["id"])
+	assert.Equal(t, float64(2), list[1]["id"])
 }
 
 func TestNormalizeAnnouncementsEmptyAllowed(t *testing.T) {

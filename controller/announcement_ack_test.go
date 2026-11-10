@@ -135,13 +135,34 @@ func TestAnnouncementAckDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, float64(1), list[0]["id"])
 			assert.Equal(t, float64(4), list[3]["id"], "删后新增拿新 id 不复用")
 
-			// 伪造超计数器 id 被拒。
+			// AN-1：客户端带来但不在现有列表的 id 一律按新公告重新分配，不报错。
+			// 复现路径：删掉最新一条（id 4）保存后，旧前端新增条目自算
+			// max+1=4 提交——4 是已删除 id，必须拿计数器值而不是复用。
 			out = saveAnnouncements(toJSON([]any{
 				annItem("a-edited", "2026-11-01T00:00:00Z", map[string]any{"popup": true, "id": 1}),
+				annItem("b", "2026-11-02T00:00:00Z", map[string]any{"popup": true, "id": 2}),
+				annItem("c", "2026-11-03T00:00:00Z", map[string]any{"id": 3}),
+			}))
+			require.Contains(t, out.Body.String(), `"success":true`)
+			out = saveAnnouncements(toJSON([]any{
+				annItem("a-edited", "2026-11-01T00:00:00Z", map[string]any{"popup": true, "id": 1}),
+				annItem("b", "2026-11-02T00:00:00Z", map[string]any{"popup": true, "id": 2}),
+				annItem("c", "2026-11-03T00:00:00Z", map[string]any{"id": 3}),
+				annItem("reuse-deleted", "2026-11-05T00:00:00Z", map[string]any{"id": 4, "popup": true}),
 				annItem("forged", "2026-11-05T00:00:00Z", map[string]any{"id": 99}),
 			}))
+			require.Contains(t, out.Body.String(), `"success":true`)
+			list = storedList()
+			require.Len(t, list, 5)
+			assert.Equal(t, float64(5), list[3]["id"], "已删 id 4 不复用，拿计数器值")
+			assert.Equal(t, float64(6), list[4]["id"], "伪造 id 99 拿计数器值")
+
+			// AN-2：id 计数器不允许通过通用设置接口修改。
+			out = request("POST", "/option", `{"key":"AnnouncementNextId","value":"1"}`, 0, common.RoleRootUser)
 			assert.Contains(t, out.Body.String(), `"success":false`)
-			assert.Contains(t, out.Body.String(), "由服务端分配")
+			common.OptionMapRWMutex.RLock()
+			assert.Equal(t, "7", common.OptionMap[console_setting.AnnouncementNextIDOption])
+			common.OptionMapRWMutex.RUnlock()
 
 			// 校验：标题/内容超限与过期时间倒挂被拒。
 			out = saveAnnouncements(toJSON([]any{
@@ -157,7 +178,8 @@ func TestAnnouncementAckDatabaseMatrix(t *testing.T) {
 			}))
 			assert.Contains(t, out.Body.String(), `"success":false`)
 
-			// 确认接口：只记录存在且 popup=true 的 id（1/2/4 有效，3 未开、99 不存在）。
+			// 确认接口：只记录存在且 popup=true 的 id（1/2/5 有效，3 未开、
+			// 4 已删除、99 不存在、6 未开）。
 			out = request("POST", "/user/announcements/ack", `{"ids":[1,3,99]}`, alice.Id, common.RoleCommonUser)
 			require.Equal(t, 200, out.Code)
 			assert.Contains(t, out.Body.String(), `"announcement_acked_ids":[1,5]`)
@@ -169,10 +191,10 @@ func TestAnnouncementAckDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, 2, storedSetting.AgreementVersion, "确认不能冲掉已有设置字段")
 
 			out = request("POST", "/user/announcements/ack", `{"ids":[2,4]}`, alice.Id, common.RoleCommonUser)
-			require.Contains(t, out.Body.String(), `"announcement_acked_ids":[1,5,2,4]`)
+			require.Contains(t, out.Body.String(), `"announcement_acked_ids":[1,5,2]`)
 			// 幂等：重复调用结果不变。
 			out = request("POST", "/user/announcements/ack", `{"ids":[2,4]}`, alice.Id, common.RoleCommonUser)
-			require.Contains(t, out.Body.String(), `"announcement_acked_ids":[1,5,2,4]`)
+			require.Contains(t, out.Body.String(), `"announcement_acked_ids":[1,5,2]`)
 
 			// 超限裁剪：已有 105 条时确认新 id，只保留最新 100 个。
 			long := make([]int, 0, 105)
@@ -181,14 +203,14 @@ func TestAnnouncementAckDatabaseMatrix(t *testing.T) {
 			}
 			require.NoError(t, db.Model(&model.User{}).Where("id = ?", alice.Id).
 				Update("setting", `{"language":"zh","announcement_acked_ids":`+toJSON(long)+`}`).Error)
-			out = request("POST", "/user/announcements/ack", `{"ids":[4]}`, alice.Id, common.RoleCommonUser)
+			out = request("POST", "/user/announcements/ack", `{"ids":[5]}`, alice.Id, common.RoleCommonUser)
 			require.Equal(t, 200, out.Code)
 			require.NoError(t, db.Take(&stored, alice.Id).Error)
 			merged := stored.GetSetting().AnnouncementAckedIDs
 			require.Len(t, merged, 100)
 			assert.Equal(t, 16, merged[0], "最旧的被丢掉")
 			assert.Equal(t, 114, merged[98])
-			assert.Equal(t, 4, merged[99], "新确认的在尾部")
+			assert.Equal(t, 5, merged[99], "新确认的在尾部")
 
 			// /self 返回与库一致。
 			out = request("GET", "/user/self", "", alice.Id, common.RoleCommonUser)
@@ -202,14 +224,14 @@ func TestAnnouncementAckDatabaseMatrix(t *testing.T) {
 			var migrated []map[string]any
 			require.NoError(t, common.UnmarshalJsonStr(cs.Announcements, &migrated))
 			require.Len(t, migrated, 1)
-			assert.Equal(t, float64(5), migrated[0]["id"], "补 id 取计数器当前值")
+			assert.Equal(t, float64(7), migrated[0]["id"], "补 id 取计数器当前值")
 			firstPass := cs.Announcements
 			model.InitOptionMap()
 			assert.Equal(t, firstPass, cs.Announcements, "补 id 只补一次")
 			common.OptionMapRWMutex.RLock()
 			counter := common.OptionMap[console_setting.AnnouncementNextIDOption]
 			common.OptionMapRWMutex.RUnlock()
-			assert.Equal(t, "6", counter)
+			assert.Equal(t, "8", counter)
 		})
 	}
 }

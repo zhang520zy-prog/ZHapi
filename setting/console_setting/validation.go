@@ -234,8 +234,9 @@ func validateAnnouncements(announcementsStr string) error {
 
 // NormalizeAnnouncements B6.1：校验公告 JSON 并完成服务端 id 分配。
 // existing 为当前存储的 JSON（可为空串）；nextID 为计数器里待分配的下一个 id。
-// 已有 id 且存在于现有列表的条目保持 id；无 id 条目按计数器分配，删掉的不复用；
-// 传入不在现有列表且大于计数器的 id 会被拒绝（id 由服务端分配）。
+// 已有 id 且存在于现有列表的条目保持 id；其余条目（无 id、id 不在现有
+// 列表、id 畸形或与本列表内其他条目重复）一律按新公告由计数器重新分配，
+// 不报错——已删除的 id 因此永远不会被复用。
 // 返回规范化 JSON（所有条目带整数 id）与新的计数器值。
 func NormalizeAnnouncements(raw string, existing string, nextID int) (string, int, error) {
 	if strings.TrimSpace(raw) == "" {
@@ -261,24 +262,16 @@ func NormalizeAnnouncements(raw string, existing string, nextID int) (string, in
 		}
 	}
 	seen := make(map[int]bool)
-	for i, ann := range list {
+	for _, ann := range list {
 		if _, present := ann["id"]; present {
 			id, ok := announcementID(ann)
-			if !ok {
-				return "", nextID, fmt.Errorf("第%d个公告的id必须是正整数", i+1)
+			if ok && existingIDs[id] && !seen[id] {
+				seen[id] = true
+				ann["id"] = id
+				continue
 			}
-			if seen[id] {
-				return "", nextID, fmt.Errorf("第%d个公告的id与其他公告重复", i+1)
-			}
-			if !existingIDs[id] && id > nextID {
-				return "", nextID, fmt.Errorf("第%d个公告的id无效：公告id由服务端分配", i+1)
-			}
-			seen[id] = true
-			ann["id"] = id
-			if id >= nextID {
-				nextID = id + 1
-			}
-			continue
+			// id 不在现有列表（含伪造、已删除复用、畸形值与同列表重复）：
+			// 一律按新公告重新分配，不报错——已删除的 id 不会被复用。
 		}
 		ann["id"] = nextID
 		seen[nextID] = true
