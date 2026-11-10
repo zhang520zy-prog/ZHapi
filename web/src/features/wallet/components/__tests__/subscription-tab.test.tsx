@@ -22,7 +22,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
-import { formatQuota } from '@/lib/format'
+import { formatQuotaWithCurrency } from '@/lib/currency'
 
 import { SubscriptionTab } from '../subscription-tab'
 
@@ -207,7 +207,9 @@ it('shows the server quota and no-fee text for balance payment', async () => {
     expect(dl).toHaveTextContent('¥29.90')
     expect(dl).toHaveTextContent('No service fee')
     expect(dl).toHaveTextContent('Quota to deduct')
-    expect(dl).toHaveTextContent(formatQuota(2047946))
+    expect(dl).toHaveTextContent(
+      formatQuotaWithCurrency(2047946, { abbreviate: false })
+    )
     expect(dl).toHaveTextContent('Current Balance')
   })
 })
@@ -302,90 +304,6 @@ it('disables the subscribe button at the purchase limit', async () => {
   const button = screen.getByRole('button', { name: 'Limit Reached' })
   expect(button).toBeDisabled()
   expect(screen.getByText('Purchased 1 / Limit 1')).toBeInTheDocument()
-})
-
-it('offers Stripe hosted checkout without a quote', async () => {
-  const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-  const { postSpy } = mockApi({
-    post: (url) => {
-      if (url === '/api/subscription/stripe/pay') {
-        return {
-          data: {
-            message: 'success',
-            data: { pay_link: 'https://checkout.stripe.com/cpay_1' },
-          },
-        }
-      }
-      return null
-    },
-  })
-  const user = userEvent.setup()
-  await renderTab({
-    topupInfo: { ...topupInfo, enable_stripe_topup: true },
-  })
-
-  await user.click(screen.getByRole('button', { name: 'Subscribe Now' }))
-  const stripeCard = await screen.findByRole('button', { name: /Stripe/ })
-  await user.click(stripeCard)
-
-  // No quote request is issued for Stripe.
-  await waitFor(() =>
-    expect(stripeCard).toHaveAttribute('aria-pressed', 'true')
-  )
-  expect(postSpy).not.toHaveBeenCalledWith(
-    '/api/subscription/quote',
-    expect.objectContaining({ payment_method: 'stripe' })
-  )
-  expect(
-    await screen.findByText('Final amount shown at checkout')
-  ).toBeInTheDocument()
-
-  const confirm = screen.getByRole('button', { name: 'Confirm Payment' })
-  await waitFor(() => expect(confirm).toBeEnabled())
-  await user.click(confirm)
-
-  await waitFor(() =>
-    expect(postSpy).toHaveBeenCalledWith(
-      '/api/subscription/stripe/pay',
-      expect.objectContaining({ plan_id: 1 })
-    )
-  )
-  await waitFor(() =>
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://checkout.stripe.com/cpay_1',
-      '_blank'
-    )
-  )
-})
-
-it('rejects an unsafe Stripe pay_link', async () => {
-  const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-  mockApi({
-    post: (url) => {
-      if (url === '/api/subscription/stripe/pay') {
-        return {
-          data: {
-            message: 'success',
-            data: { pay_link: 'javascript:alert(1)' },
-          },
-        }
-      }
-      return null
-    },
-  })
-  const user = userEvent.setup()
-  await renderTab({
-    topupInfo: { ...topupInfo, enable_stripe_topup: true },
-  })
-
-  await user.click(screen.getByRole('button', { name: 'Subscribe Now' }))
-  await user.click(await screen.findByRole('button', { name: /Stripe/ }))
-  const confirm = screen.getByRole('button', { name: 'Confirm Payment' })
-  await waitFor(() => expect(confirm).toBeEnabled())
-  await user.click(confirm)
-
-  await new Promise((r) => setTimeout(r, 50))
-  expect(openSpy).not.toHaveBeenCalled()
 })
 
 it('completes a balance purchase and refreshes self data', async () => {

@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { isHttpUrl } from '@/lib/content-format'
-import { formatServerMoney } from '@/lib/currency'
+import { formatQuotaWithCurrency, formatServerMoney } from '@/lib/currency'
 import { formatFeeRateBps, formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { requireServerSuccess } from '@/lib/server-error-message'
@@ -38,7 +38,6 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 import {
   paySubscriptionBalance,
   paySubscriptionEpay,
-  paySubscriptionStripe,
   paySubscriptionWaffoPancake,
   requestSubscriptionQuote,
 } from '../../api'
@@ -59,7 +58,6 @@ interface Props {
   enableOnlineTopUp?: boolean
   enableWaffoPancake?: boolean
   epayMethods?: PaymentMethodOption[]
-  enableStripe?: boolean
   waffoPancakeFeeRateBps?: number
   purchaseLimit?: number
   purchaseCount?: number
@@ -67,7 +65,7 @@ interface Props {
   onPurchaseSuccess?: () => void | Promise<void>
 }
 
-type MethodKind = 'balance' | 'epay' | 'pancake' | 'stripe'
+type MethodKind = 'balance' | 'epay' | 'pancake'
 
 interface MethodOption {
   key: string
@@ -152,16 +150,6 @@ export function SubscriptionPurchaseDialog(props: Props) {
             : t('No service fee'),
       })
     }
-    // Stripe Checkout prices from the plan's Stripe price id, so the backend
-    // quote endpoint has no branch for it — the hosted page shows the amount.
-    if (props.enableStripe && plan.stripe_price_id) {
-      list.push({
-        key: 'stripe',
-        kind: 'stripe',
-        name: 'Stripe',
-        description: t('Hosted checkout'),
-      })
-    }
     return list
   }, [
     plan,
@@ -169,7 +157,6 @@ export function SubscriptionPurchaseDialog(props: Props) {
     props.epayMethods,
     props.enableWaffoPancake,
     props.waffoPancakeFeeRateBps,
-    props.enableStripe,
     t,
   ])
 
@@ -198,12 +185,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
       )
       return res
     },
-    enabled:
-      props.open &&
-      plan != null &&
-      methodKey != null &&
-      methodKey !== 'stripe' &&
-      !limitReached,
+    enabled: props.open && plan != null && methodKey != null && !limitReached,
     retry: false,
     meta: { errorToast: false },
   })
@@ -238,21 +220,6 @@ export function SubscriptionPurchaseDialog(props: Props) {
               (res.data ?? {}) as Record<string, unknown>
             )
             toast.success(t('Payment initiated'))
-            props.onOpenChange(false)
-          } else {
-            handleServerError(res, t('Payment request failed'))
-          }
-          break
-        }
-        case 'stripe': {
-          const res = await paySubscriptionStripe({ plan_id: plan.id })
-          if (
-            res.message === 'success' &&
-            res.data?.pay_link &&
-            isHttpUrl(res.data.pay_link)
-          ) {
-            window.open(res.data.pay_link, '_blank')
-            toast.success(t('Payment page opened'))
             props.onOpenChange(false)
           } else {
             handleServerError(res, t('Payment request failed'))
@@ -299,12 +266,6 @@ export function SubscriptionPurchaseDialog(props: Props) {
         {t('Please select a payment method')}
       </p>
     )
-  } else if (selectedMethod.kind === 'stripe') {
-    detailsContent = (
-      <p className='text-muted-foreground text-xs'>
-        {t('Final amount shown at checkout')}
-      </p>
-    )
   } else if (quoteQuery.isFetching) {
     detailsContent = (
       <div className='space-y-1.5'>
@@ -346,14 +307,19 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <dt className='text-muted-foreground'>{t('Quota to deduct')}</dt>
               <dd className='font-mono tabular-nums'>
                 {quoteQuery.data?.quota != null
-                  ? formatQuota(quoteQuery.data.quota)
+                  ? formatQuotaWithCurrency(quoteQuery.data.quota, {
+                      abbreviate: false,
+                    })
                   : '—'}
               </dd>
             </div>
             <div className='flex items-center justify-between'>
               <dt className='text-muted-foreground'>{t('Current Balance')}</dt>
               <dd className='font-mono tabular-nums'>
-                {formatQuota(Math.max(0, Number(props.userQuota || 0)))}
+                {formatQuotaWithCurrency(
+                  Math.max(0, Number(props.userQuota || 0)),
+                  { abbreviate: false }
+                )}
               </dd>
             </div>
           </>
@@ -369,15 +335,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
     props.userQuota != null &&
     Number(props.userQuota) < requiredQuota
 
-  const quoteReady =
-    selectedMethod?.kind === 'stripe'
-      ? true
-      : !quoteQuery.isFetching && !quoteQuery.isError && quote != null
-
   const canPay =
     !limitReached &&
     selectedMethod != null &&
-    quoteReady &&
+    !quoteQuery.isFetching &&
+    !quoteQuery.isError &&
+    quote != null &&
     !insufficientBalance &&
     !paying
 
@@ -397,7 +360,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
       bodyClassName='space-y-4'
     >
       <div className='space-y-3 sm:space-y-4'>
-        <div className='bg-muted/50 space-y-2.5 rounded-lg border p-3 sm:space-y-3 sm:p-4'>
+        <div className='bg-card space-y-2.5 rounded-[var(--rd-radius-card)] border p-3 sm:space-y-3 sm:p-4'>
           <div className='flex justify-between'>
             <span className='text-muted-foreground text-sm'>
               {t('Plan Name')}
@@ -495,7 +458,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
         )}
 
         {!limitReached && methods.length > 0 && (
-          <div className='bg-muted/50 space-y-1.5 rounded-lg border p-3'>
+          <div className='bg-card space-y-1.5 rounded-[var(--rd-radius-card)] border p-3'>
             {detailsContent}
             <p className='text-muted-foreground text-xs'>
               {t('Final amounts are subject to the server quote')}

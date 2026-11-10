@@ -7590,8 +7590,6 @@
     "Billing preference": "Tùy chọn thanh toán",
     "Quota to deduct": "Quota sẽ trừ",
     "No payment method is available for this plan": "Gói này chưa có phương thức thanh toán khả dụng",
-    "Insufficient balance": "Số dư không đủ",
-    "Hosted checkout": "Thanh toán lưu trữ",
-    "Final amount shown at checkout": "Số tiền cuối cùng hiển thị khi thanh toán"
+    "Insufficient balance": "Số dư không đủ"
   }
 }

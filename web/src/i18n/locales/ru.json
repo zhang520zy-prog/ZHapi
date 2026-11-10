@@ -7590,8 +7590,6 @@
     "Billing preference": "Предпочтение оплаты",
     "Quota to deduct": "Квота к списанию",
     "No payment method is available for this plan": "Для этого плана нет доступных способов оплаты",
-    "Insufficient balance": "Недостаточно средств",
-    "Hosted checkout": "Оплата на стороне сервиса",
-    "Final amount shown at checkout": "Итоговая сумма показана при оформлении"
+    "Insufficient balance": "Недостаточно средств"
   }
 }

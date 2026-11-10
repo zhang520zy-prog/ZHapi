@@ -431,7 +431,6 @@ export function SubscriptionTab(props: SubscriptionTabProps) {
         }}
         plan={selectedPlan}
         enableOnlineTopUp={!!props.topupInfo?.enable_online_topup}
-        enableStripe={!!props.topupInfo?.enable_stripe_topup}
         enableWaffoPancake={!!props.topupInfo?.enable_waffo_pancake_topup}
         epayMethods={props.topupInfo?.pay_methods}
         waffoPancakeFeeRateBps={props.topupInfo?.waffo_pancake_fee_rate_bps}

@@ -7590,8 +7590,6 @@
     "Billing preference": "Préférence de facturation",
     "Quota to deduct": "Quota à déduire",
     "No payment method is available for this plan": "Aucun moyen de paiement n'est disponible pour cette offre",
-    "Insufficient balance": "Solde insuffisant",
-    "Hosted checkout": "Paiement hébergé",
-    "Final amount shown at checkout": "Montant final affiché au paiement"
+    "Insufficient balance": "Solde insuffisant"
   }
 }

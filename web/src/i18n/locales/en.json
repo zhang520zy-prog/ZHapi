@@ -7590,8 +7590,6 @@
     "Billing preference": "Billing preference",
     "Quota to deduct": "Quota to deduct",
     "No payment method is available for this plan": "No payment method is available for this plan",
-    "Insufficient balance": "Insufficient balance",
-    "Hosted checkout": "Hosted checkout",
-    "Final amount shown at checkout": "Final amount shown at checkout"
+    "Insufficient balance": "Insufficient balance"
   }
 }

@@ -7590,8 +7590,6 @@
     "Billing preference": "计费偏好",
     "Quota to deduct": "将扣除额度",
     "No payment method is available for this plan": "该套餐暂无可用支付方式",
-    "Insufficient balance": "余额不足",
-    "Hosted checkout": "托管收银台",
-    "Final amount shown at checkout": "实付金额以收银台显示为准"
+    "Insufficient balance": "余额不足"
   }
 }

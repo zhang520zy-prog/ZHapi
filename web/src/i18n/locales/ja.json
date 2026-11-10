@@ -7590,8 +7590,6 @@
     "Billing preference": "請求設定",
     "Quota to deduct": "引き落としクォータ",
     "No payment method is available for this plan": "このプランで利用できる支払い方法がありません",
-    "Insufficient balance": "残高不足",
-    "Hosted checkout": "ホスト型チェックアウト",
-    "Final amount shown at checkout": "最終金額はチェックアウト画面で表示されます"
+    "Insufficient balance": "残高不足"
   }
 }
