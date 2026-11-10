@@ -124,7 +124,7 @@ export function ClientCards(props: { baseUrl: string }) {
                 <p className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                   {t('Where to configure')}
                 </p>
-                <p className='text-sm'>{client.menuPath}</p>
+                <p className='text-sm'>{t(client.menuPath)}</p>
               </div>
               <div className='space-y-1'>
                 <p className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
