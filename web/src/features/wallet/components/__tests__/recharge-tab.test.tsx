@@ -247,6 +247,23 @@ it('defaults to the topup tab and keeps confirm disabled until a method is chose
   ).toBe(true)
 })
 
+it('shows the backend fee rate on each method card', async () => {
+  mockApi()
+  await renderPage()
+
+  const alipay = await screen.findByRole('button', { name: /Alipay/ })
+  expect(alipay).toHaveTextContent('Fee rate 1.5%')
+  expect(screen.getByRole('button', { name: /WeChat/ })).toHaveTextContent(
+    'No service fee'
+  )
+  expect(screen.getByRole('button', { name: /Waffo Card/ })).toHaveTextContent(
+    'Fee rate 2%'
+  )
+  expect(
+    screen.getByRole('button', { name: /Waffo Pancake/ })
+  ).toHaveTextContent('Fee rate 1.5%')
+})
+
 it('renders the server quote strings verbatim after selecting a method', async () => {
   const { postSpy } = mockApi()
   await renderPage()
@@ -420,12 +437,12 @@ it('disables confirm below the minimum and shows the reason', async () => {
 })
 
 it('disables confirm while a quote is being fetched', async () => {
-  let resolveQuote: (() => void) | null = null
+  const deferred: { resolve?: () => void } = {}
   mockApi({
     post: (url) =>
       url === '/api/user/amount'
         ? new Promise((resolve) => {
-            resolveQuote = () =>
+            deferred.resolve = () =>
               resolve({ data: { success: true, data: '0', quote } })
           })
         : null,
@@ -436,7 +453,7 @@ it('disables confirm while a quote is being fetched', async () => {
   await waitFor(() => expect(confirmButton()).toBeDisabled())
   expect(screen.getByText('Loading...')).toBeInTheDocument()
 
-  resolveQuote?.()
+  deferred.resolve?.()
   await waitFor(() => expect(confirmButton()).toBeEnabled())
 })
 

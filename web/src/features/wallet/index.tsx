@@ -129,7 +129,6 @@ export function Wallet() {
             topupInfo={topupInfo}
             presetAmounts={presetAmounts}
             topupLoading={topupLoading}
-            priceRatio={(status?.price as number) || 1}
             hasUserAgreement={status?.user_agreement_enabled === true}
             onBillingHistory={() => switchTab('billing')}
             onPaid={refreshUser}

@@ -67,6 +67,7 @@ function parsePaymentMethods(
     .map((item) => {
       const rawMinTopup = Number(item.min_topup)
       const normalizedMinTopup = Number.isFinite(rawMinTopup) ? rawMinTopup : 0
+      const rawFeeRate = Number(item.fee_rate_bps)
       const type = typeof item.type === 'string' ? item.type : ''
 
       return {
@@ -78,6 +79,7 @@ function parsePaymentMethods(
           type === 'stripe' && normalizedMinTopup <= 0
             ? stripeMinTopup
             : normalizedMinTopup,
+        fee_rate_bps: Number.isFinite(rawFeeRate) ? rawFeeRate : 0,
       }
     })
     .filter((item) => item.name && item.type && item.type !== 'waffo')
@@ -89,14 +91,22 @@ function parseWaffoPayMethods(data: unknown): WaffoPayMethod[] {
       (item): item is Record<string, unknown> =>
         !!item && typeof item === 'object'
     )
-    .map((item) => ({
-      name: typeof item.name === 'string' ? item.name : '',
-      icon: typeof item.icon === 'string' ? item.icon : undefined,
-      payMethodType:
-        typeof item.payMethodType === 'string' ? item.payMethodType : undefined,
-      payMethodName:
-        typeof item.payMethodName === 'string' ? item.payMethodName : undefined,
-    }))
+    .map((item) => {
+      const rawFeeRate = Number(item.fee_rate_bps)
+      return {
+        name: typeof item.name === 'string' ? item.name : '',
+        icon: typeof item.icon === 'string' ? item.icon : undefined,
+        payMethodType:
+          typeof item.payMethodType === 'string'
+            ? item.payMethodType
+            : undefined,
+        payMethodName:
+          typeof item.payMethodName === 'string'
+            ? item.payMethodName
+            : undefined,
+        fee_rate_bps: Number.isFinite(rawFeeRate) ? rawFeeRate : 0,
+      }
+    })
     .filter((item) => item.name)
 }
 

@@ -63,7 +63,6 @@ interface RechargeTabProps {
   topupInfo: TopupInfo | null
   presetAmounts: PresetAmount[]
   topupLoading: boolean
-  priceRatio: number
   hasUserAgreement: boolean
   onBillingHistory: () => void
   onPaid: () => void
@@ -210,7 +209,6 @@ export function RechargeTab(props: RechargeTabProps) {
                   onSelectCreemProduct={setCreemProduct}
                   presetAmounts={props.presetAmounts}
                   discount={props.topupInfo.discount}
-                  priceRatio={props.priceRatio}
                   selectedPreset={selectedPreset}
                   onSelectPreset={(preset) => {
                     setSelectedPreset(preset.value)
@@ -248,6 +246,11 @@ export function RechargeTab(props: RechargeTabProps) {
               )}
 
               <div className='space-y-2'>
+                {disabledReason != null && (
+                  <p className='text-muted-foreground text-xs'>
+                    {disabledReason}
+                  </p>
+                )}
                 <Button
                   className='w-full sm:w-auto'
                   disabled={!canConfirm}
@@ -258,11 +261,6 @@ export function RechargeTab(props: RechargeTabProps) {
                   )}
                   {t('Confirm topup')}
                 </Button>
-                {disabledReason != null && (
-                  <p className='text-muted-foreground text-xs'>
-                    {disabledReason}
-                  </p>
-                )}
                 {props.hasUserAgreement && (
                   <p className='text-muted-foreground text-xs'>
                     {t('I have read and agree to the')}{' '}

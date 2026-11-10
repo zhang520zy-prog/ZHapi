@@ -48,7 +48,7 @@ export function BalanceCard(props: BalanceCardProps) {
             {props.loading ? (
               <Skeleton className='mt-1.5 h-8 w-40' />
             ) : (
-              <p className='mt-0.5 truncate text-2xl font-semibold tracking-tight tabular-nums'>
+              <p className='mt-0.5 truncate font-mono text-2xl font-semibold tracking-tight tabular-nums'>
                 {formatQuotaWithCurrency(props.user?.quota ?? 0, {
                   abbreviate: false,
                   digitsLarge: 2,

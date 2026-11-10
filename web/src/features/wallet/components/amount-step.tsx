@@ -23,14 +23,9 @@ import { OptionCard } from '@/components/option-card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatCurrencyFromUSD, formatQuotaWithCurrency } from '@/lib/currency'
-import { formatNumber } from '@/lib/format'
 
 import { DEFAULT_DISCOUNT_RATE } from '../constants'
-import {
-  calculatePresetPricing,
-  formatCreemPrice,
-  getDiscountLabel,
-} from '../lib'
+import { formatCreemPrice, getDiscountLabel } from '../lib'
 import type { CreemProduct, PresetAmount } from '../types'
 
 interface AmountStepProps {
@@ -41,7 +36,6 @@ interface AmountStepProps {
   onSelectCreemProduct: (product: CreemProduct) => void
   presetAmounts: PresetAmount[]
   discount?: Record<number, number>
-  priceRatio: number
   selectedPreset: number | null
   onSelectPreset: (preset: PresetAmount) => void
   customSelected: boolean
@@ -88,8 +82,7 @@ export function AmountStep(props: AmountStepProps) {
                 preset.discount ??
                 props.discount?.[preset.value] ??
                 DEFAULT_DISCOUNT_RATE
-              const { actualPrice, savedAmount, hasDiscount } =
-                calculatePresetPricing(preset.value, props.priceRatio, discount)
+              const discountLabel = getDiscountLabel(discount)
               return (
                 <OptionCard
                   key={preset.value}
@@ -106,19 +99,11 @@ export function AmountStep(props: AmountStepProps) {
                     </span>
                   }
                   meta={
-                    hasDiscount ? (
+                    discountLabel ? (
                       <span className='text-success text-xs font-medium'>
-                        {getDiscountLabel(discount)}
+                        {discountLabel}
                       </span>
                     ) : undefined
-                  }
-                  description={
-                    <span className='tabular-nums'>
-                      {t('Pay')} {formatNumber(actualPrice)}
-                      {hasDiscount && savedAmount > 0
-                        ? ` · ${t('Save')} ${formatNumber(savedAmount)}`
-                        : ''}
-                    </span>
                   }
                 />
               )
