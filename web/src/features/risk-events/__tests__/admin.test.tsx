@@ -532,6 +532,53 @@ it('shows only counts in the import preview and double-confirms replace', async 
   )
 })
 
+it('counts all valid file words in the replace confirmation', async () => {
+  setUser({ read: true, manage: true })
+  mockApi()
+  vi.spyOn(api, 'post').mockImplementation(async (url: string) => {
+    if (url.endsWith('import/preview')) {
+      return {
+        data: {
+          success: true,
+          data: {
+            total: 1,
+            added: 0,
+            duplicate: 1,
+            invalid: 0,
+            preview_id: 'p1',
+          },
+        },
+      }
+    }
+    return {
+      data: { success: true, data: { added: 0, duplicate: 1, invalid: 0 } },
+    }
+  })
+  await renderPage('/risk-events?tab=words')
+  const row = (await screen.findByText('Test category')).closest(
+    'tr'
+  ) as HTMLElement
+  const user = userEvent.setup()
+  await user.click(within(row).getByRole('button', { name: 'Import' }))
+  const dialog = await screen.findByRole('dialog')
+  const input = dialog.querySelector('input[type="file"]') as HTMLElement
+  const file = new File(['rd-test-word-1'], 'words.txt', {
+    type: 'text/plain',
+  })
+  await user.upload(input, file)
+  await within(dialog).findByText('New words')
+  await user.click(within(dialog).getByRole('radio', { name: /Replace:/ }))
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Replace words' })
+  )
+  const confirm = await screen.findByRole('alertdialog')
+  expect(
+    within(confirm).getByText(
+      'The existing 3 words will be replaced by 1 words.'
+    )
+  ).toBeInTheDocument()
+})
+
 it('rejects non-increasing durations and only submits changed keys', async () => {
   setUser(undefined, 100)
   mockApi()

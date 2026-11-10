@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "Đánh dấu là dương tính giả?",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "Điều này đánh dấu sự kiện của người dùng {{userId}} là dương tính giả. Không áp dụng hạn chế.",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "Quyết định đã xác nhận này tạm thời chặn các lệnh gọi API mới của người dùng {{userId}}. Người dùng vẫn có thể đăng nhập và khiếu nại.",
-    "Sensitive words are now managed per category.": "Từ nhạy cảm hiện được quản lý theo danh mục.",
-    "Go to Risk events → Word library": "Đi tới Sự kiện rủi ro → Thư viện từ",
-    "Prompt text filtering needs both switches enabled.": "Tính năng lọc văn bản prompt yêu cầu bật cả hai công tắc.",
-    "Save request checks": "Lưu kiểm tra yêu cầu"
+    "Content checks and sensitive words are now managed under Risk events.": "Kiểm tra nội dung và từ nhạy cảm hiện được quản lý trong Risk events."
   }
 }

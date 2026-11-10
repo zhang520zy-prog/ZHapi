@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "誤検知としてマークしますか？",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "ユーザー {{userId}} のイベントを誤検知としてマークします。制限は適用されません。",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "この確認済みの決定は、ユーザー {{userId}} の新しい API 呼び出しを一時的にブロックします。ユーザーは引き続きサインインして申し立てできます。",
-    "Sensitive words are now managed per category.": "センシティブワードはカテゴリごとに管理されるようになりました。",
-    "Go to Risk events → Word library": "リスクイベント → 単語ライブラリへ移動",
-    "Prompt text filtering needs both switches enabled.": "プロンプトのテキストフィルターには両方のスイッチの有効化が必要です。",
-    "Save request checks": "リクエストチェックを保存"
+    "Content checks and sensitive words are now managed under Risk events.": "コンテンツチェックとセンシティブワードは Risk events で管理するようになりました。"
   }
 }

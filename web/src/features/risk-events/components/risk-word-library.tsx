@@ -631,7 +631,7 @@ function ImportWordsDialog(props: {
           'The existing {{existing}} words will be replaced by {{incoming}} words.',
           {
             existing: props.category.word_count,
-            incoming: preview?.added ?? 0,
+            incoming: preview ? preview.added + preview.duplicate : 0,
           }
         )}
         confirmText={t('Replace words')}

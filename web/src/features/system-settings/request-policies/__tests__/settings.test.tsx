@@ -187,50 +187,30 @@ afterEach(() => {
 })
 
 describe('request policy settings', () => {
-  it('the filtering section keeps the switches and links to the word library', async () => {
+  it('the filtering section has no controls and links to the risk pages', async () => {
     await renderPolicies('/system-settings/request-policies/filtering')
     expect(
-      await screen.findByText('Sensitive words are now managed per category.')
+      await screen.findByText(/Content checks and sensitive words/)
     ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Risk settings' })).toHaveAttribute(
+      'href',
+      '/risk-events?tab=settings'
+    )
+    expect(screen.getByRole('link', { name: 'Word library' })).toHaveAttribute(
+      'href',
+      '/risk-events?tab=words'
+    )
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'Go to Risk events → Word library' })
-    ).toHaveAttribute('href', '/risk-events?tab=words')
-    expect(
-      screen.getByRole('switch', { name: 'Enable filtering' })
-    ).toBeChecked()
-    expect(
-      screen.getByRole('switch', { name: 'Inspect user prompts' })
-    ).toBeChecked()
-    expect(
-      screen.queryByRole('textbox', { name: 'Blocked keywords' })
+      screen.queryByRole('button', { name: /Save/ })
     ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('textbox', { name: 'Rule test input' })
-    ).not.toBeInTheDocument()
-  })
-
-  it('saving a changed filtering switch writes only that option key', async () => {
-    await renderPolicies('/system-settings/request-policies/filtering')
-    await screen.findByText('Sensitive words are now managed per category.')
-    await userEvent.click(
-      screen.getByRole('switch', { name: 'Inspect user prompts' })
-    )
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save request checks' })
-    )
-    await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledExactlyOnceWith(
-        '/api/option/request_policy',
-        { options: { CheckSensitiveOnPromptEnabled: 'false' } }
-      )
-    )
   })
 
   it.each([
     ['retry', 'Save Changes'],
     ['health', 'Save Changes'],
     ['affinity', 'Save Changes'],
-    ['filtering', 'Save request checks'],
   ])(
     'opening %s and saving unchanged values does not write options',
     async (section, saveLabel) => {
@@ -274,13 +254,13 @@ describe('request policy settings', () => {
 
   it('refreshing another policy keeps the section mounted', async () => {
     await renderPolicies('/system-settings/request-policies/filtering')
-    await screen.findByText('Sensitive words are now managed per category.')
+    await screen.findByText(/Content checks and sensitive words/)
     settings.RetryTimes = 5
     await act(async () => {
       await queryClient.invalidateQueries({ queryKey: ['system-options'] })
     })
     expect(
-      screen.getByText('Sensitive words are now managed per category.')
+      screen.getByText(/Content checks and sensitive words/)
     ).toBeInTheDocument()
   })
 

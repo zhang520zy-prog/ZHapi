@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "Marquer comme faux positif ?",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "Cela marque l’événement de l’utilisateur {{userId}} comme un faux positif. Aucune restriction n’est appliquée.",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "Cette décision confirmée bloque temporairement les nouveaux appels API de l’utilisateur {{userId}}. L’utilisateur peut toujours se connecter et faire appel.",
-    "Sensitive words are now managed per category.": "Les mots sensibles sont désormais gérés par catégorie.",
-    "Go to Risk events → Word library": "Aller à Événements de risque → Bibliothèque de mots",
-    "Prompt text filtering needs both switches enabled.": "Le filtrage du texte des prompts nécessite l’activation des deux commutateurs.",
-    "Save request checks": "Enregistrer les contrôles de requêtes"
+    "Content checks and sensitive words are now managed under Risk events.": "Les contrôles de contenu et les mots sensibles sont désormais gérés dans Risk events."
   }
 }

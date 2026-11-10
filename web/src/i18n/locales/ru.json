@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "Пометить как ложное срабатывание?",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "Это помечает событие пользователя {{userId}} как ложное срабатывание. Ограничение не применяется.",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "Это подтверждённое решение временно блокирует новые вызовы API для пользователя {{userId}}. Пользователь всё ещё может войти и подать апелляцию.",
-    "Sensitive words are now managed per category.": "Чувствительные слова теперь управляются по категориям.",
-    "Go to Risk events → Word library": "Перейти к События рисков → Библиотека слов",
-    "Prompt text filtering needs both switches enabled.": "Для фильтрации текста промптов необходимо включить оба переключателя.",
-    "Save request checks": "Сохранить проверки запросов"
+    "Content checks and sensitive words are now managed under Risk events.": "Проверки контента и чувствительные слова теперь управляются в разделе «Risk events»."
   }
 }

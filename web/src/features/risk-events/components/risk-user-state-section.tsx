@@ -203,6 +203,9 @@ function RiskUserActionForm(props: {
       className='space-y-3'
       onSubmit={form.handleSubmit((input) => setConfirming(input))}
     >
+      <h4 className='font-medium'>
+        {isRevoke ? t('Revoke restriction') : t('Re-enable account')}
+      </h4>
       <Label htmlFor={id}>{t('Reason')}</Label>
       <Textarea
         id={id}

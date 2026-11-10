@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "Mark as false positive?",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "This marks the event for user {{userId}} as a false positive. No restriction is applied.",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.",
-    "Sensitive words are now managed per category.": "Sensitive words are now managed per category.",
-    "Go to Risk events → Word library": "Go to Risk events → Word library",
-    "Prompt text filtering needs both switches enabled.": "Prompt text filtering needs both switches enabled.",
-    "Save request checks": "Save request checks"
+    "Content checks and sensitive words are now managed under Risk events.": "Content checks and sensitive words are now managed under Risk events."
   }
 }

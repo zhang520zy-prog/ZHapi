@@ -7583,9 +7583,6 @@
     "Mark as false positive?": "標記為誤判？",
     "This marks the event for user {{userId}} as a false positive. No restriction is applied.": "將使用者 {{userId}} 的該事件標記為誤判，不施加限制。",
     "This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.": "此確認決定會暫時阻止使用者 {{userId}} 的新 API 呼叫，使用者仍可登入和申訴。",
-    "Sensitive words are now managed per category.": "敏感詞已改為按類別管理。",
-    "Go to Risk events → Word library": "前往 風險事件 → 敏感詞庫",
-    "Prompt text filtering needs both switches enabled.": "提示詞文字過濾需要同時啟用兩個開關。",
-    "Save request checks": "儲存請求檢查"
+    "Content checks and sensitive words are now managed under Risk events.": "內容檢查與敏感詞已移至「風險事件」下管理。"
   }
 }
