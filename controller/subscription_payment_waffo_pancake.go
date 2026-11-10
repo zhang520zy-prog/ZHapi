@@ -13,7 +13,6 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -80,9 +79,15 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 	// dispatch in WaffoPancakeWebhook.
 	tradeNo := fmt.Sprintf("WAFFO_PANCAKE_SUB-%d-%d-%s", userId, time.Now().UnixMilli(), randstr.String(6))
 
-	// Waffo Pancake 订阅按套餐价收手续费：下单金额 = 套餐价 + fee，币种 USD。
+	// 套餐价按人民币理解，Waffo Pancake 为外币通道：经统一换算得到美元
+	// 金额后下单（下单金额 = 美元价 + fee，快照币种 USD）。
+	usd, err := model.SubscriptionCnyToWaffoUsd(plan.PriceAmount)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	quote, err := service.BuildPaymentQuote(
-		decimal.NewFromFloat(plan.PriceAmount),
+		usd,
 		operation_setting.GetFeeRateBps(model.PaymentProviderWaffoPancake, "default"),
 		"USD",
 	)
@@ -94,7 +99,7 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 	order := &model.SubscriptionOrder{
 		UserId:          userId,
 		PlanId:          plan.Id,
-		Money:           plan.PriceAmount,
+		Money:           usd.InexactFloat64(),
 		TradeNo:         tradeNo,
 		PaymentMethod:   model.PaymentMethodWaffoPancake,
 		PaymentProvider: model.PaymentProviderWaffoPancake,

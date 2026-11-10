@@ -125,15 +125,17 @@ func SubscriptionRequestQuote(c *gin.Context) {
 		return
 	}
 
+	// 套餐价统一按人民币理解：credited 为 CNY 原价；Waffo Pancake 为外币
+	// 通道，经统一换算得到美元快照。balance 另外返回要扣的 quota。
 	credited := decimal.NewFromFloat(plan.PriceAmount)
-	currency := strings.ToUpper(strings.TrimSpace(plan.Currency))
-	if currency == "" {
-		currency = "USD"
-	}
+	var quota int
 	var quote service.PaymentQuote
 	switch {
 	case req.PaymentMethod == model.PaymentMethodBalance:
-		quote, err = service.BuildPaymentQuote(credited, 0, currency)
+		quote, err = service.BuildPaymentQuote(credited, 0, "CNY")
+		if err == nil {
+			quota, err = model.SubscriptionCnyToBalanceQuota(plan.PriceAmount)
+		}
 	case strings.HasPrefix(req.PaymentMethod, model.PaymentProviderEpay+":"):
 		method := strings.TrimPrefix(req.PaymentMethod, model.PaymentProviderEpay+":")
 		if !operation_setting.ContainsPayMethod(method) {
@@ -143,23 +145,28 @@ func SubscriptionRequestQuote(c *gin.Context) {
 		quote, err = service.BuildPaymentQuote(credited,
 			operation_setting.GetFeeRateBps(model.PaymentProviderEpay, method), "CNY")
 	case req.PaymentMethod == model.PaymentMethodCreem:
-		quote, err = service.BuildPaymentQuote(credited, 0, currency)
+		quote, err = service.BuildPaymentQuote(credited, 0, "CNY")
 		quote.FeeIncluded = true
 	case req.PaymentMethod == model.PaymentMethodWaffoPancake:
-		quote, err = service.BuildPaymentQuote(credited,
-			operation_setting.GetFeeRateBps(model.PaymentProviderWaffoPancake, "default"), "USD")
+		var usd decimal.Decimal
+		usd, err = model.SubscriptionCnyToWaffoUsd(plan.PriceAmount)
+		if err == nil {
+			quote, err = service.BuildPaymentQuote(usd,
+				operation_setting.GetFeeRateBps(model.PaymentProviderWaffoPancake, "default"), "USD")
+		}
 	default:
 		common.ApiErrorMsg(c, "支付方式不存在")
 		return
 	}
 	if err != nil {
-		common.ApiErrorMsg(c, "套餐金额无效")
+		common.ApiError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data":    quote.TotalMoney.StringFixed(service.MinorUnitsForCurrency(quote.Currency)),
 		"quote":   quote,
+		"quota":   quota,
 	})
 }
 
@@ -227,10 +234,8 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "价格不能超过9999")
 		return
 	}
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
-	}
-	req.Plan.Currency = "USD"
+	// 套餐价格统一按人民币理解（B3.8-2）：无论传入什么都写 CNY。
+	req.Plan.Currency = "CNY"
 	if req.Plan.AllowBalancePay == nil {
 		req.Plan.AllowBalancePay = common.GetPointer(true)
 	}
@@ -307,10 +312,8 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	req.Plan.Id = id
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
-	}
-	req.Plan.Currency = "USD"
+	// 套餐价格统一按人民币理解（B3.8-2）：无论传入什么都写 CNY。
+	req.Plan.Currency = "CNY"
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}

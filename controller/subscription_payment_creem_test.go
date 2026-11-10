@@ -25,8 +25,8 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// B-1 回归：站点显示类型为 CNY 时，Creem 订阅订单快照币种仍须取套餐币种。
-// 回调核对以快照币种为准，取错会导致真实回调全部被拒。
+// B-1 回归 + B3.8-2：套餐价按人民币理解后，Creem 订阅订单快照币种取套餐
+// 币种（新套餐固定 CNY）。回调核对以快照为准：CNY 入账、币种不一致被拒。
 func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 	originalDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
 	originalConfirmed := operation_setting.GetPaymentSetting().ComplianceConfirmed
@@ -82,7 +82,7 @@ func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 
 			user := model.User{Username: "creem-sub-user", Password: "preserved", Role: common.RoleCommonUser, Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&user).Error)
-			plan := model.SubscriptionPlan{Title: "USD plan", PriceAmount: 10, Currency: "USD", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, Enabled: true, TotalAmount: 100, CreemProductId: "prod_test"}
+			plan := model.SubscriptionPlan{Title: "CNY plan", PriceAmount: 10, Currency: "CNY", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, Enabled: true, TotalAmount: 100, CreemProductId: "prod_test"}
 			require.NoError(t, db.Create(&plan).Error)
 
 			router := gin.New()
@@ -105,9 +105,9 @@ func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 			_ = request()
 			var order model.SubscriptionOrder
 			require.NoError(t, db.First(&order, "user_id = ?", user.Id).Error)
-			assert.Equal(t, "USD", order.Currency)
+			assert.Equal(t, "CNY", order.Currency)
 
-			err = model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "USD")
+			err = model.CompleteSubscriptionOrder(order.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "CNY")
 			require.NoError(t, err)
 			require.NoError(t, db.First(&order, order.Id).Error)
 			assert.Equal(t, common.TopUpStatusSuccess, order.Status)
@@ -115,7 +115,7 @@ func TestCreemSubscriptionSnapshotCurrencyDatabaseMatrix(t *testing.T) {
 			_ = request()
 			var order2 model.SubscriptionOrder
 			require.NoError(t, db.First(&order2, "user_id = ? AND id <> ?", user.Id, order.Id).Error)
-			err = model.CompleteSubscriptionOrder(order2.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "EUR")
+			err = model.CompleteSubscriptionOrder(order2.TradeNo, "", model.PaymentProviderCreem, "", "10.00", "USD")
 			assert.ErrorIs(t, err, model.ErrPaymentAmountMismatch)
 			require.NoError(t, db.First(&order2, order2.Id).Error)
 			assert.Equal(t, common.TopUpStatusPending, order2.Status)

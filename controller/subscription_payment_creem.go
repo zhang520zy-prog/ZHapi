@@ -12,7 +12,6 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
@@ -87,21 +86,12 @@ func SubscriptionRequestCreemPay(c *gin.Context) {
 	reference := "sub-creem-ref-" + randstr.String(6)
 	referenceId := "sub_ref_" + common.Sha1([]byte(reference+time.Now().String()+user.Username))
 
-	// Reuse Creem checkout generator by building a lightweight product reference.
-	currency := "USD"
-	switch operation_setting.GetGeneralSetting().QuotaDisplayType {
-	case operation_setting.QuotaDisplayTypeCNY:
-		currency = "CNY"
-	case operation_setting.QuotaDisplayTypeUSD:
-		currency = "USD"
-	default:
-		currency = "USD"
-	}
-
-	// 快照币种按套餐定价，回调核对以此为依据；支付链接币种仍按站点显示类型。
+	// 套餐价按人民币理解（B3.8-2）：Creem 商品由管理员按套餐同价人民币
+	// 定价，快照写 CNY，回调按快照核对实付金额与币种。产品参考里的
+	// currency 不下发（genCreemLink 只发 ProductId），与快照保持一致即可。
 	snapshotCurrency := strings.ToUpper(strings.TrimSpace(plan.Currency))
 	if snapshotCurrency == "" {
-		snapshotCurrency = "USD"
+		snapshotCurrency = "CNY"
 	}
 
 	// Creem 价格已含手续费：fee 恒为 0，credited_money = 套餐价。
@@ -128,7 +118,7 @@ func SubscriptionRequestCreemPay(c *gin.Context) {
 		ProductId: plan.CreemProductId,
 		Name:      plan.Title,
 		Price:     plan.PriceAmount,
-		Currency:  currency,
+		Currency:  snapshotCurrency,
 		Quota:     0,
 	}
 
