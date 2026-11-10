@@ -343,10 +343,7 @@ function BillingSelfList(props: {
             {props.entries.map((entry) => {
               const statusConfig = getBillingStatusConfig(entry.status)
               return (
-                <tr
-                  key={`${entry.kind}-${entry.trade_no}`}
-                  className='border-b last:border-b-0'
-                >
+                <tr key={entry.id} className='border-b last:border-b-0'>
                   <td className='text-muted-foreground px-3 py-2.5 whitespace-nowrap'>
                     {formatTimestamp(entry.create_time)}
                   </td>
@@ -406,7 +403,7 @@ function BillingSelfList(props: {
           const statusConfig = getBillingStatusConfig(entry.status)
           return (
             <div
-              key={`${entry.kind}-${entry.trade_no}`}
+              key={entry.id}
               className='bg-card space-y-2 rounded-[var(--rd-radius-card)] border p-3'
             >
               <div className='flex items-center justify-between gap-2'>
@@ -431,7 +428,7 @@ function BillingSelfList(props: {
                 <span className='shrink-0'>
                   {formatTimestamp(entry.create_time)}
                 </span>
-                <span className='text-muted-foreground/40'>·</span>
+                <span aria-hidden='true'>·</span>
                 <code className='truncate font-mono'>{entry.trade_no}</code>
                 <Button
                   variant='ghost'

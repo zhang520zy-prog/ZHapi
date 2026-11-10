@@ -83,6 +83,8 @@ const BILLING_STATUS_VARIANTS: Record<string, StatusConfig['variant']> = {
   success: 'success',
   pending: 'warning',
   awaiting_payment: 'warning',
+  processing: 'warning',
+  issued: 'success',
   failed: 'danger',
   expired: 'danger',
 }
@@ -91,6 +93,9 @@ const BILLING_STATUS_LABELS: Record<string, string> = {
   success: 'Success',
   pending: 'Pending',
   awaiting_payment: 'Awaiting payment',
+  processing: 'Processing',
+  issued: 'Issued',
+  rejected: 'Rejected',
   failed: 'Failed',
   expired: 'Expired',
   cancelled: 'Cancelled',

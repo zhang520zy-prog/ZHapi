@@ -323,6 +323,8 @@ export type BillingKind = 'topup' | 'subscription' | 'invoice_fee'
  * `fee_money`/`quota` are null when not applicable.
  */
 export interface BillingEntry {
+  /** Source-table stable id (`topup:`/`subscription:`/`invoice:` + PK) — row key. */
+  id: string
   kind: BillingKind
   trade_no: string
   status: string

@@ -219,7 +219,9 @@ export function SubscriptionTab(props: SubscriptionTabProps) {
                 )}
                 {expiredCount > 0 && (
                   <>
-                    <span className='text-muted-foreground/30'>·</span>
+                    <span className='text-muted-foreground' aria-hidden='true'>
+                      ·
+                    </span>
                     <span className='text-muted-foreground'>
                       {expiredCount} {t('expired')}
                     </span>

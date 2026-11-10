@@ -36,6 +36,7 @@ import { Wallet } from '../..'
 
 const billingItems = [
   {
+    id: 'topup:1',
     kind: 'topup',
     trade_no: 'TU2026001',
     status: 'success',
@@ -52,6 +53,7 @@ const billingItems = [
     quota: 500000,
   },
   {
+    id: 'subscription:2',
     kind: 'subscription',
     trade_no: 'SUB2026001',
     status: 'success',
@@ -68,6 +70,7 @@ const billingItems = [
     quota: 4100000,
   },
   {
+    id: 'invoice:3',
     kind: 'invoice_fee',
     trade_no: 'INV2026001',
     status: 'expired',
@@ -314,6 +317,124 @@ it('does not render the admin switch for regular users', async () => {
   await renderPage('/wallet?tab=billing')
   await screen.findAllByText('TU2026001')
   expect(screen.queryByText('All users')).not.toBeInTheDocument()
+})
+
+// AA-1: balance-settled invoice fees have an empty trade_no — rows must be
+// keyed by server id so switching filters never leaves stale rows behind.
+it('replaces all rows when switching kind, even with duplicate empty trade_no', async () => {
+  const feeRow = (id: string) => ({
+    id,
+    kind: 'invoice_fee',
+    trade_no: '',
+    status: 'issued',
+    create_time: 1730000000,
+    complete_time: 1730000100,
+    title: '',
+    payment_provider: 'balance',
+    payment_method: 'balance',
+    credited_money: '0.00',
+    fee_money: '2.00',
+    total_money: '2.00',
+    fee_rate_bps: 0,
+    currency: 'CNY',
+    quota: null,
+  })
+  const subRow = {
+    id: 'subscription:7',
+    kind: 'subscription',
+    trade_no: 'SUB_ONLY',
+    status: 'success',
+    create_time: 1730000200,
+    complete_time: 1730000200,
+    title: 'Solo Plan',
+    payment_provider: 'balance',
+    payment_method: 'balance',
+    credited_money: '9.00',
+    fee_money: '0.00',
+    total_money: '9.00',
+    fee_rate_bps: 0,
+    currency: 'CNY',
+    quota: 4500000,
+  }
+  const getSpy = vi
+    .spyOn(api, 'get')
+    .mockImplementation(
+      async (url: string, config?: { params?: Record<string, unknown> }) => {
+        if (url === '/api/user/billing/self') {
+          const kind = config?.params?.kind ?? 'all'
+          const items =
+            kind === 'all'
+              ? [feeRow('invoice:91'), feeRow('invoice:92'), subRow]
+              : [subRow]
+          return {
+            data: { success: true, data: { items, total: items.length } },
+          }
+        }
+        const payloads: Record<string, unknown> = {
+          '/api/user/topup/info': {},
+          '/api/user/self': { id: 7, username: 'alice', quota: 0 },
+          '/api/subscription/plans': [],
+          '/api/subscription/self': null,
+          '/api/status': statusData(),
+        }
+        return { data: { success: true, data: payloads[url] ?? null } }
+      }
+    )
+  const user = userEvent.setup()
+  await renderPage('/wallet?tab=billing')
+
+  // All: 3 table rows (two identical-looking invoice fees + one subscription).
+  await waitFor(() => {
+    expect(document.querySelectorAll('tbody tr').length).toBe(3)
+  })
+
+  await user.click(screen.getByRole('button', { name: 'Subscription' }))
+
+  // After switching, only the new data renders — no stale invoice rows.
+  await waitFor(() => {
+    expect(document.querySelectorAll('tbody tr').length).toBe(1)
+  })
+  expect(screen.getAllByText('SUB_ONLY').length).toBeGreaterThanOrEqual(1)
+  expect(screen.queryAllByText('Invoice fee').length).toBe(1) // only the chip
+  expect(getSpy).toHaveBeenCalled()
+})
+
+// AA-2: balance-settled invoice rows carry invoice statuses — must be
+// translated, not shown as raw English values.
+it('renders invoice request statuses as translated badges', async () => {
+  const rows = ['issued', 'rejected', 'processing'].map((status, i) => ({
+    id: `invoice:${i + 1}`,
+    kind: 'invoice_fee',
+    trade_no: '',
+    status,
+    create_time: 1730000000 + i,
+    complete_time: 0,
+    title: '',
+    payment_provider: 'balance',
+    payment_method: 'balance',
+    credited_money: '0.00',
+    fee_money: '2.00',
+    total_money: '2.00',
+    fee_rate_bps: 0,
+    currency: 'CNY',
+    quota: null,
+  }))
+  mockApi({ billingItems: rows, billingTotal: 3 })
+  await renderPage('/wallet?tab=billing')
+
+  await waitFor(() => {
+    expect(document.querySelectorAll('tbody tr').length).toBe(3)
+  })
+  expect(screen.getAllByText('Issued').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('Rejected').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('Processing').length).toBeGreaterThanOrEqual(1)
+  // Status column shows translated labels, never the raw backend value.
+  const statusCells = [...document.querySelectorAll('tbody tr td:last-child')]
+  expect(statusCells.map((c) => c.textContent?.trim())).toEqual([
+    'Issued',
+    'Rejected',
+    'Processing',
+  ])
 })
 
 it('admin switch swaps to the all-users view with complete-order flow', async () => {
