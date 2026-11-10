@@ -145,7 +145,7 @@ export function Docs() {
       <div className='mx-auto flex w-full max-w-5xl gap-10 py-8 lg:pr-44'>
         <div className='min-w-0 flex-1 space-y-12'>
           <header className='space-y-2'>
-            <h1 className='text-2xl font-semibold tracking-tight'>
+            <h1 className='text-[18px]/[26px] font-semibold tracking-tight sm:text-[22px]/[30px]'>
               {t('Integration guide')}
             </h1>
             <p className='text-muted-foreground text-sm'>

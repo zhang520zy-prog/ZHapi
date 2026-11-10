@@ -51,7 +51,7 @@ const CLIENTS: ClientCard[] = [
   {
     name: 'Cherry Studio',
     icon: <AppWindow />,
-    menuPath: 'Settings → Model Services → Add Provider → OpenAI-compatible',
+    menuPath: 'Settings → Model Provider → Add → OpenAI-compatible',
     addressPath: '/v1',
   },
   {
@@ -91,7 +91,7 @@ env_key = "SELFHOSTED_API_KEY"`,
   {
     name: 'ChatBox',
     icon: <MessageSquare />,
-    menuPath: 'Settings → Model Provider → OpenAI API → API Host',
+    menuPath: 'Settings → Model Provider → Add → OpenAI API → API Host',
     addressPath: '/v1',
   },
   {
