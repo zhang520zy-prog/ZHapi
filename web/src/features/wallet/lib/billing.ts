@@ -55,6 +55,55 @@ export function getStatusConfig(status: TopupStatus): StatusConfig {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending
 }
 
+// ============================================================================
+// Merged billing entries (GET /api/user/billing/self)
+// ============================================================================
+
+/** Filter chip values — `all` maps to the unfiltered list. */
+export const BILLING_KINDS = [
+  'all',
+  'topup',
+  'subscription',
+  'invoice_fee',
+] as const
+export type BillingKindFilter = (typeof BILLING_KINDS)[number]
+
+export const BILLING_KIND_LABELS: Record<BillingKindFilter, string> = {
+  all: 'All',
+  topup: 'Top Up',
+  subscription: 'Subscription',
+  invoice_fee: 'Invoice fee',
+}
+
+/**
+ * Merged-entry status mapping per the N3 spec: success → success, pending →
+ * warning, failed/expired → danger, everything else → neutral.
+ */
+const BILLING_STATUS_VARIANTS: Record<string, StatusConfig['variant']> = {
+  success: 'success',
+  pending: 'warning',
+  awaiting_payment: 'warning',
+  failed: 'danger',
+  expired: 'danger',
+}
+
+const BILLING_STATUS_LABELS: Record<string, string> = {
+  success: 'Success',
+  pending: 'Pending',
+  awaiting_payment: 'Awaiting payment',
+  failed: 'Failed',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+}
+
+export function getBillingStatusConfig(status: string): StatusConfig {
+  return {
+    variant: BILLING_STATUS_VARIANTS[status] ?? 'neutral',
+    label: BILLING_STATUS_LABELS[status] ?? status,
+  }
+}
+
 /**
  * Payment method display names
  */
@@ -63,6 +112,10 @@ export const PAYMENT_METHOD_NAMES: Record<string, string> = {
   alipay: 'Alipay',
   wxpay: 'WeChat Pay',
   waffo: 'Waffo',
+  waffo_pancake: 'Waffo Pancake',
+  balance: 'Balance',
+  invoice_fee: 'Invoice fee',
+  creem: 'Creem',
 }
 
 /**

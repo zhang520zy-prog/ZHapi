@@ -29,6 +29,7 @@ import type {
   PaymentResponse,
   StripePaymentResponse,
   AffiliateCodeResponse,
+  BillingEntry,
   BillingHistoryResponse,
   CompleteOrderRequest,
   CreemPaymentRequest,
@@ -188,21 +189,23 @@ export async function getAffiliateCode(): Promise<AffiliateCodeResponse> {
 }
 
 /**
- * Get billing history for current user
+ * Get the merged billing list for the current user (B3.8): top-ups,
+ * subscriptions and invoice fees, deduplicated and paginated server-side.
  */
-export async function getUserBillingHistory(
-  page: number,
-  pageSize: number,
+export async function getBillingSelf(params: {
+  p: number
+  pageSize: number
+  kind?: string
   keyword?: string
-): Promise<ApiResponse<BillingHistoryResponse>> {
-  const params = new URLSearchParams({
-    p: page.toString(),
-    page_size: pageSize.toString(),
+}): Promise<ApiResponse<{ items?: BillingEntry[]; total?: number }>> {
+  const res = await api.get('/api/user/billing/self', {
+    params: {
+      p: params.p,
+      page_size: params.pageSize,
+      kind: params.kind ?? 'all',
+      keyword: params.keyword || undefined,
+    },
   })
-  if (keyword) {
-    params.append('keyword', keyword)
-  }
-  const res = await api.get(`/api/user/topup/self?${params.toString()}`)
   return res.data
 }
 

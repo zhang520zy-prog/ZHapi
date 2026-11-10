@@ -25,6 +25,13 @@ const walletSearchSchema = z.object({
   tab: z.enum(['topup', 'subscription', 'billing']).optional(),
   /** Legacy deep link — the wallet redirects it to ?tab=billing. */
   show_history: z.boolean().optional(),
+  /** Billing tab filters — only meaningful with ?tab=billing. */
+  kind: z
+    .enum(['all', 'topup', 'subscription', 'invoice_fee'])
+    .optional()
+    .catch('all'),
+  keyword: z.string().optional().catch(undefined),
+  p: z.number().int().min(1).optional().catch(1),
 })
 
 export const Route = createFileRoute('/_authenticated/wallet/')({

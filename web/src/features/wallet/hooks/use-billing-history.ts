@@ -24,12 +24,7 @@ import { useIsAdmin } from '@/hooks/use-admin'
 import { useDebounce } from '@/hooks/use-debounce'
 import { handleServerError } from '@/lib/handle-server-error'
 
-import {
-  getUserBillingHistory,
-  getAllBillingHistory,
-  completeOrder,
-  isApiSuccess,
-} from '../api'
+import { getAllBillingHistory, completeOrder, isApiSuccess } from '../api'
 import type { TopupRecord } from '../types'
 
 // ============================================================================
@@ -64,9 +59,11 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     const requestId = ++requestIdRef.current
     setLoading(true)
     try {
-      const response = isAdmin
-        ? await getAllBillingHistory(page, pageSize, debouncedKeyword)
-        : await getUserBillingHistory(page, pageSize, debouncedKeyword)
+      const response = await getAllBillingHistory(
+        page,
+        pageSize,
+        debouncedKeyword
+      )
 
       if (requestId !== requestIdRef.current) return
 
@@ -88,7 +85,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
         setLoading(false)
       }
     }
-  }, [debouncedKeyword, isAdmin, page, pageSize])
+  }, [debouncedKeyword, page, pageSize])
 
   /**
    * Complete a pending order (admin only)

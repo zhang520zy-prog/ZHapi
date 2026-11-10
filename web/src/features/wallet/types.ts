@@ -311,3 +311,32 @@ export interface BillingHistoryResponse {
 export interface CompleteOrderRequest {
   trade_no: string
 }
+
+/**
+ * Merged billing entry kind — mirrors model.BillingKind* on the backend.
+ */
+export type BillingKind = 'topup' | 'subscription' | 'invoice_fee'
+
+/**
+ * One row of GET /api/user/billing/self — merged top-up, subscription and
+ * invoice-fee records. Monetary fields are server-formatted strings;
+ * `fee_money`/`quota` are null when not applicable.
+ */
+export interface BillingEntry {
+  kind: BillingKind
+  trade_no: string
+  status: string
+  create_time: number
+  complete_time: number
+  /** Plan title for subscriptions; empty for other kinds. */
+  title: string
+  payment_provider: string
+  payment_method: string
+  credited_money: string
+  fee_money: string | null
+  total_money: string
+  fee_rate_bps: number
+  currency: string
+  /** Credited quota for top-ups; deducted quota for balance subscriptions. */
+  quota: number | null
+}
