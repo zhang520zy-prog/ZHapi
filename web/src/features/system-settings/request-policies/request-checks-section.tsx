@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -29,12 +29,9 @@ import {
   FormControl,
   FormDescription,
   FormField,
-  FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import {
@@ -51,82 +48,28 @@ import { useSavePolicy } from './use-save-policy'
 const sensitiveSchema = z.object({
   CheckSensitiveEnabled: z.boolean(),
   CheckSensitiveOnPromptEnabled: z.boolean(),
-  SensitiveWords: z.string().optional(),
 })
 
 type SensitiveFormValues = z.infer<typeof sensitiveSchema>
 
-type RequestChecksSectionProps = {
+export function RequestChecksSection(props: {
   defaultValues: SensitiveFormValues
-}
-
-export function RequestChecksSection({
-  defaultValues,
-}: RequestChecksSectionProps) {
+}) {
   const { t } = useTranslation()
   const updateOption = useSavePolicy()
-  const [testInput, setTestInput] = useState('')
   const form = useForm<SensitiveFormValues>({
     resolver: zodResolver(sensitiveSchema),
-    defaultValues,
+    defaultValues: props.defaultValues,
   })
 
   useEffect(() => {
-    form.reset(defaultValues)
-  }, [defaultValues, form])
-
-  const sensitiveWords = form.watch('SensitiveWords') ?? ''
-  const filteringEnabled =
-    form.watch('CheckSensitiveEnabled') &&
-    form.watch('CheckSensitiveOnPromptEnabled')
-  const testRules = useMemo(
-    () =>
-      sensitiveWords
-        .split(/\r?\n/)
-        .map((word) => word.trim())
-        .filter(Boolean),
-    [sensitiveWords]
-  )
-  const matchedRuleCount = useMemo(() => {
-    const normalizedInput = testInput.toLowerCase()
-    if (!normalizedInput) return 0
-    return testRules.filter((rule) =>
-      normalizedInput.includes(rule.toLowerCase())
-    ).length
-  }, [testInput, testRules])
-  const testResult = (() => {
-    if (!testInput.trim()) return null
-    if (!filteringEnabled) {
-      return (
-        <p className='text-muted-foreground text-xs'>
-          {t(
-            'Prompt text filtering is disabled in the current form values. This text would not be blocked by this filter.'
-          )}
-        </p>
-      )
-    }
-    if (matchedRuleCount > 0) {
-      return (
-        <Alert variant='destructive'>
-          <AlertDescription>
-            {t('{{count}} current rule(s) would block this request', {
-              count: matchedRuleCount,
-            })}
-          </AlertDescription>
-        </Alert>
-      )
-    }
-    return (
-      <p className='text-success text-xs'>
-        {t('No current rule matches this text.')}
-      </p>
-    )
-  })()
+    form.reset(props.defaultValues)
+  }, [props.defaultValues, form])
 
   const onSubmit = async (values: SensitiveFormValues) => {
     const updates = Object.entries(values).filter(
       ([key, value]) =>
-        value !== defaultValues[key as keyof SensitiveFormValues]
+        value !== props.defaultValues[key as keyof SensitiveFormValues]
     )
 
     try {
@@ -158,19 +101,16 @@ export function RequestChecksSection({
           <SettingsPageFormActions
             onSave={form.handleSubmit(onSubmit)}
             isSaving={form.formState.isSubmitting}
-            saveLabel='Save sensitive words'
+            saveLabel='Save request checks'
           />
           <Alert>
             <AlertDescription>
               {form.watch('CheckSensitiveEnabled') &&
-              form.watch('CheckSensitiveOnPromptEnabled') &&
-              form.watch('SensitiveWords')?.trim()
+              form.watch('CheckSensitiveOnPromptEnabled')
                 ? t(
                     'Prompt text filtering is active with the current form values.'
                   )
-                : t(
-                    'Prompt text filtering needs both switches enabled and a non-empty keyword list.'
-                  )}
+                : t('Prompt text filtering needs both switches enabled.')}
             </AlertDescription>
           </Alert>
           <SettingsControlGroup>
@@ -224,58 +164,16 @@ export function RequestChecksSection({
             </SettingsControlChildren>
           </SettingsControlGroup>
 
-          <FormField
-            control={form.control}
-            name='SensitiveWords'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('Blocked keywords')}</FormLabel>
-                <FormControl>
-                  <Textarea
-                    rows={12}
-                    placeholder={t('Enter one keyword per line')}
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription>
-                  {t(
-                    'Each line represents one keyword. Leave blank to disable the list but keep the switch states.'
-                  )}
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className='border-border/60 bg-muted/20 space-y-3 rounded-lg border p-3'>
-            <div>
-              <h3 className='text-sm font-medium'>{t('Rule test')}</h3>
-              <p className='text-muted-foreground mt-1 text-xs leading-relaxed'>
-                {t(
-                  'Paste harmless text to test the current form values locally. This test never calls upstream or consumes quota.'
-                )}
-              </p>
-            </div>
-            <Textarea
-              rows={4}
-              value={testInput}
-              onChange={(event) => setTestInput(event.target.value)}
-              placeholder={t('Enter harmless text to test the current rules')}
-              aria-label={t('Rule test input')}
-            />
-            {testResult}
-          </div>
-
-          <div className='text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs'>
-            <span>{t('Review recorded policy events in request logs.')}</span>
+          <p className='text-muted-foreground text-sm'>
+            {t('Sensitive words are now managed per category.')}{' '}
             <Link
               className='text-primary underline underline-offset-4'
-              to='/usage-logs/$section'
-              params={{ section: 'common' }}
+              to='/risk-events'
+              search={{ tab: 'words' }}
             >
-              {t('Open request logs')}
+              {t('Go to Risk events → Word library')}
             </Link>
-          </div>
+          </p>
         </SettingsForm>
       </Form>
     </SettingsSection>

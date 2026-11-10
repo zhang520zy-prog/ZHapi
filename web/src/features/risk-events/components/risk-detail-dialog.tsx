@@ -34,9 +34,12 @@ import {
   appealStatusLabel,
   latestAppealStatus,
   riskActionText,
+  riskLevelLabel,
+  riskStageLabel,
   riskStatusLabel,
 } from '../status'
 import { RiskActionForm } from './risk-action-form'
+import { RiskUserStateSection } from './risk-user-state-section'
 
 export function RiskDetailDialog(props: {
   event: Pick<RiskEvent, 'event_id'>
@@ -127,7 +130,13 @@ function RiskDetailContent(props: {
           )}
         </dd>
         <dt>{t('Level')}</dt>
-        <dd>{event.level ?? 0}</dd>
+        <dd>{riskLevelLabel(event.level, t)}</dd>
+        {props.scope === 'all' && (
+          <>
+            <dt>{t('Stage')}</dt>
+            <dd>{riskStageLabel(event.stage, t)}</dd>
+          </>
+        )}
         {!!event.restriction_until && (
           <>
             <dt>{t('Restriction expires')}</dt>
@@ -167,6 +176,12 @@ function RiskDetailContent(props: {
           'Conversation bodies, matched words and API keys are not retained in this ledger.'
         )}
       </p>
+      {props.scope === 'all' && event.user_id !== undefined && (
+        <RiskUserStateSection
+          userId={event.user_id}
+          canReview={props.canReview}
+        />
+      )}
       {props.scope === 'all' && props.canReview && (
         <RiskActionForm event={event} mode='review' />
       )}

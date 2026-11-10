@@ -142,3 +142,155 @@ export async function reviewRiskEvent(eventID: string, request: RiskReview) {
   }
   return response.data.data
 }
+
+export const RISK_CATEGORY_ENABLED = 1
+export const RISK_CATEGORY_DISABLED = 2
+
+export interface RiskWordCategory {
+  id: number
+  key: string
+  name: string
+  action: string
+  word_count: number
+  status: number
+  version: number
+  updated_at: number
+  updated_by: number
+}
+export interface RiskUserState {
+  level: number
+  hits: number
+  restricted_until: number
+  disabled: boolean
+  category_hits: Record<string, number>
+}
+export interface RiskImportPreview {
+  total: number
+  added: number
+  duplicate: number
+  invalid: number
+  preview_id: string
+}
+export interface RiskImportResult {
+  added: number
+  duplicate: number
+  invalid: number
+}
+export interface RiskCategoryUpdate {
+  name: string
+  action: string
+  status: number
+  expected_version: number
+}
+export type RiskImportMode = 'append' | 'replace'
+
+export async function listRiskWordCategories() {
+  const response = await api.get<ApiResponse<RiskWordCategory[]>>(
+    '/api/risk/categories'
+  )
+  if (!response.data.success || !response.data.data) {
+    throw createServerError(response.data, t('Failed to load categories'))
+  }
+  return response.data.data
+}
+export async function createRiskWordCategory(request: {
+  key: string
+  name: string
+  action: string
+}) {
+  const response = await api.post<ApiResponse<RiskWordCategory>>(
+    '/api/risk/categories',
+    request
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to create category'))
+  }
+  return response.data.data
+}
+export async function updateRiskWordCategory(
+  id: number,
+  request: RiskCategoryUpdate
+) {
+  const response = await api.put<ApiResponse<RiskWordCategory>>(
+    `/api/risk/categories/${id}`,
+    request
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to update category'))
+  }
+  return response.data.data
+}
+export async function deleteRiskWordCategory(
+  id: number,
+  expectedVersion: number
+) {
+  const response = await api.delete<ApiResponse<unknown>>(
+    `/api/risk/categories/${id}`,
+    { data: { expected_version: expectedVersion } }
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to delete category'))
+  }
+}
+export async function previewRiskWordImport(id: number, file: File) {
+  const body = new FormData()
+  body.append('file', file)
+  const response = await api.post<ApiResponse<RiskImportPreview>>(
+    `/api/risk/categories/${id}/import/preview`,
+    body
+  )
+  if (!response.data.success || !response.data.data) {
+    throw createServerError(response.data, t('Failed to preview import'))
+  }
+  return response.data.data
+}
+export async function commitRiskWordImport(
+  id: number,
+  request: {
+    preview_id: string
+    mode: RiskImportMode
+    expected_version: number
+  }
+) {
+  const response = await api.post<ApiResponse<RiskImportResult>>(
+    `/api/risk/categories/${id}/import/commit`,
+    request
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to import words'))
+  }
+  return response.data.data
+}
+export async function exportRiskWords(id: number) {
+  const response = await api.get<Blob>(`/api/risk/categories/${id}/export`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
+export async function getRiskUserState(userID: number) {
+  const response = await api.get<ApiResponse<RiskUserState>>(
+    `/api/risk/users/${userID}/state`
+  )
+  if (!response.data.success || !response.data.data) {
+    throw createServerError(response.data, t('Failed to load user state'))
+  }
+  return response.data.data
+}
+export async function revokeRiskRestriction(userID: number, reason: string) {
+  const response = await api.post<ApiResponse<unknown>>(
+    `/api/risk/users/${userID}/restriction/revoke`,
+    { reason }
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to revoke restriction'))
+  }
+}
+export async function reenableRiskUser(userID: number, reason: string) {
+  const response = await api.post<ApiResponse<unknown>>(
+    `/api/risk/users/${userID}/reenable`,
+    { reason }
+  )
+  if (!response.data.success) {
+    throw createServerError(response.data, t('Failed to re-enable user'))
+  }
+}

@@ -187,72 +187,61 @@ afterEach(() => {
 })
 
 describe('request policy settings', () => {
-  it.each(['Enable filtering', 'Inspect user prompts'])(
-    'rule preview stops claiming a block when %s is disabled',
-    async (label) => {
-      await renderPolicies('/system-settings/request-policies/filtering')
-      fireEvent.change(
-        await screen.findByRole('textbox', { name: 'Rule test input' }),
-        {
-          target: { value: 'BLOCKED text' },
-        }
-      )
-      expect(
-        screen.getByText(/current rule\(s\) would block this request/)
-      ).toBeVisible()
-      await userEvent.click(screen.getByRole('switch', { name: label }))
-      expect(
-        screen.queryByText(/current rule\(s\) would block this request/)
-      ).not.toBeInTheDocument()
-      expect(
-        screen.getByText(
-          'Prompt text filtering is disabled in the current form values. This text would not be blocked by this filter.'
-        )
-      ).toBeVisible()
-      expect(api.patch).not.toHaveBeenCalled()
-      expect(api.put).not.toHaveBeenCalled()
-    }
-  )
-
-  it('rule preview updates from unsaved keywords without a server request', async () => {
+  it('the filtering section keeps the switches and links to the word library', async () => {
     await renderPolicies('/system-settings/request-policies/filtering')
-    const input = await screen.findByRole('textbox', {
-      name: 'Rule test input',
-    })
-    const requestsBefore = vi.mocked(api.get).mock.calls.length
-    fireEvent.change(input, { target: { value: 'Harmless sample' } })
-    expect(screen.getByText('No current rule matches this text.')).toBeVisible()
-    fireEvent.change(
-      screen.getByRole('textbox', { name: 'Blocked keywords' }),
-      {
-        target: { value: 'SAMPLE' },
-      }
-    )
     expect(
-      screen.getByText(/current rule\(s\) would block this request/)
-    ).toBeVisible()
-    expect(api.get).toHaveBeenCalledTimes(requestsBefore)
-    expect(api.patch).not.toHaveBeenCalled()
-    fireEvent.change(input, { target: { value: '' } })
+      await screen.findByText('Sensitive words are now managed per category.')
+    ).toBeInTheDocument()
     expect(
-      screen.queryByText(/current rule\(s\) would block this request/)
+      screen.getByRole('link', { name: 'Go to Risk events → Word library' })
+    ).toHaveAttribute('href', '/risk-events?tab=words')
+    expect(
+      screen.getByRole('switch', { name: 'Enable filtering' })
+    ).toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Inspect user prompts' })
+    ).toBeChecked()
+    expect(
+      screen.queryByRole('textbox', { name: 'Blocked keywords' })
     ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('textbox', { name: 'Rule test input' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('saving a changed filtering switch writes only that option key', async () => {
+    await renderPolicies('/system-settings/request-policies/filtering')
+    await screen.findByText('Sensitive words are now managed per category.')
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Inspect user prompts' })
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save request checks' })
+    )
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledExactlyOnceWith(
+        '/api/option/request_policy',
+        { options: { CheckSensitiveOnPromptEnabled: 'false' } }
+      )
+    )
   })
 
   it.each([
     ['retry', 'Save Changes'],
     ['health', 'Save Changes'],
-    ['filtering', 'Save sensitive words'],
     ['affinity', 'Save Changes'],
+    ['filtering', 'Save request checks'],
   ])(
     'opening %s and saving unchanged values does not write options',
     async (section, saveLabel) => {
       await renderPolicies(`/system-settings/request-policies/${section}`)
       const save = await screen.findByRole('button', { name: saveLabel })
       expect(api.put).not.toHaveBeenCalled()
+      expect(api.patch).not.toHaveBeenCalled()
       await userEvent.click(save)
       await waitFor(() => expect(save).toBeEnabled())
       expect(api.put).not.toHaveBeenCalled()
+      expect(api.patch).not.toHaveBeenCalled()
     }
   )
 
@@ -283,39 +272,16 @@ describe('request policy settings', () => {
     }
   )
 
-  it('turning filtering off preserves the prompt switch and keyword list', async () => {
+  it('refreshing another policy keeps the section mounted', async () => {
     await renderPolicies('/system-settings/request-policies/filtering')
-    await userEvent.click(
-      await screen.findByRole('switch', { name: 'Enable filtering' })
-    )
-    const prompt = screen.getByRole('switch', { name: 'Inspect user prompts' })
-    expect(prompt).toHaveAttribute('aria-disabled', 'true')
-    expect(prompt).toBeChecked()
-    expect(
-      screen.getByRole('textbox', { name: 'Blocked keywords' })
-    ).toHaveValue('blocked')
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save sensitive words' })
-    )
-    await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledExactlyOnceWith(
-        '/api/option/request_policy',
-        { options: { CheckSensitiveEnabled: 'false' } }
-      )
-    )
-  })
-
-  it('refreshing another policy keeps unsaved filter text', async () => {
-    await renderPolicies('/system-settings/request-policies/filtering')
-    const keywords = await screen.findByRole('textbox', {
-      name: 'Blocked keywords',
-    })
-    fireEvent.change(keywords, { target: { value: 'unsaved' } })
+    await screen.findByText('Sensitive words are now managed per category.')
     settings.RetryTimes = 5
     await act(async () => {
       await queryClient.invalidateQueries({ queryKey: ['system-options'] })
     })
-    expect(keywords).toHaveValue('unsaved')
+    expect(
+      screen.getByText('Sensitive words are now managed per category.')
+    ).toBeInTheDocument()
   })
 
   it('invalid retry status ranges show validation and do not write options', async () => {

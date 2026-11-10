@@ -17,9 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 
 import { RiskEvents } from '@/features/risk-events'
 
+const riskEventsSearchSchema = z.object({
+  tab: z.enum(['events', 'words', 'settings']).optional().catch(undefined),
+})
+
 export const Route = createFileRoute('/_authenticated/risk-events/')({
+  validateSearch: riskEventsSearchSchema,
   component: RiskEvents,
 })

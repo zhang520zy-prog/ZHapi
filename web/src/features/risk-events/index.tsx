@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { isAxiosError } from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -48,13 +49,26 @@ import {
   type RiskScope,
 } from './api'
 import { RiskDetailDialog } from './components/risk-detail-dialog'
-import { riskActionText, riskActionVariant, riskStatusLabel } from './status'
+import { RiskSettingsPanel } from './components/risk-settings-panel'
+import { RiskWordLibrary } from './components/risk-word-library'
+import {
+  isAutoRestriction,
+  riskActionText,
+  riskActionVariant,
+  riskLevelLabel,
+  riskStageLabel,
+  riskStatusLabel,
+} from './status'
 
 const EMPTY_EVENTS: RiskEvent[] = []
+type RiskTab = 'events' | 'words' | 'settings'
+
 export function RiskEvents() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.auth.user)
   const client = useQueryClient()
+  const search = useSearch({ from: '/_authenticated/risk-events/' })
+  const navigate = useNavigate()
   const [scope, setScope] = useState<RiskScope>('all')
   const [revoked, setRevoked] = useState(false)
   const canRead =
@@ -64,6 +78,15 @@ export function RiskEvents() {
     !revoked
   const effectiveScope = canRead ? scope : 'self'
   const canReview = canRead && hasPermission(user, 'risk', 'review')
+  const canManage =
+    !!user && user.role >= ROLE.ADMIN && hasPermission(user, 'risk', 'manage')
+  const isRoot = user?.role === ROLE.SUPER_ADMIN
+  const tabParam: RiskTab =
+    search.tab === 'words' || search.tab === 'settings' ? search.tab : 'events'
+  const effectiveTab: RiskTab =
+    (tabParam === 'words' && !canRead) || (tabParam === 'settings' && !isRoot)
+      ? 'events'
+      : tabParam
   const userID = user?.id
   const onAccessDenied = useCallback(() => {
     setRevoked(true)
@@ -72,6 +95,23 @@ export function RiskEvents() {
       .cancelQueries({ queryKey: ['risk', userID, 'all'] })
       .then(() => client.removeQueries({ queryKey: ['risk', userID, 'all'] }))
   }, [client, userID])
+  useEffect(() => {
+    if (effectiveTab !== tabParam) {
+      void navigate({
+        to: '/risk-events',
+        search: { tab: 'events' },
+        replace: true,
+      })
+    }
+  }, [effectiveTab, tabParam, navigate])
+  const switchTab = (value: string) => {
+    const next = value === 'words' || value === 'settings' ? value : 'events'
+    void navigate({
+      to: '/risk-events',
+      search: next === 'events' ? {} : { tab: next },
+      replace: false,
+    })
+  }
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Risk events')}</SectionPageLayout.Title>
@@ -79,39 +119,58 @@ export function RiskEvents() {
         {t('Review flagged risk events and current restrictions.')}
       </SectionPageLayout.Description>
       <SectionPageLayout.Actions>
-        {canRead && (
-          <Tabs
-            value={scope}
-            onValueChange={(value) =>
-              setScope(value === 'all' ? 'all' : 'self')
-            }
-          >
-            <TabsList aria-label={t('View scope')}>
-              <TabsTrigger value='all'>{t('All')}</TabsTrigger>
-              <TabsTrigger value='self'>{t('Only Mine')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
+        <Tabs value={effectiveTab} onValueChange={switchTab}>
+          <TabsList aria-label={t('Risk sections')}>
+            <TabsTrigger value='events'>{t('Risk events')}</TabsTrigger>
+            {canRead && (
+              <TabsTrigger value='words'>{t('Word library')}</TabsTrigger>
+            )}
+            {isRoot && (
+              <TabsTrigger value='settings'>{t('Risk settings')}</TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <div className='flex h-full min-h-0 flex-col gap-3'>
-          <p className='text-muted-foreground text-sm'>
-            {t(
-              'A blocked request is a risk signal, not a confirmed violation. Normal requests do not wait for manual review.'
+        {effectiveTab === 'words' && canRead && (
+          <RiskWordLibrary canManage={canManage} />
+        )}
+        {effectiveTab === 'settings' && isRoot && <RiskSettingsPanel />}
+        {effectiveTab === 'events' && (
+          <div className='flex h-full min-h-0 flex-col gap-3'>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <p className='text-muted-foreground text-sm'>
+                {t(
+                  'A blocked request is a risk signal, not a confirmed violation. Normal requests do not wait for manual review.'
+                )}
+              </p>
+              {canRead && (
+                <Tabs
+                  value={scope}
+                  onValueChange={(value) =>
+                    setScope(value === 'all' ? 'all' : 'self')
+                  }
+                >
+                  <TabsList aria-label={t('View scope')}>
+                    <TabsTrigger value='all'>{t('All')}</TabsTrigger>
+                    <TabsTrigger value='self'>{t('Only Mine')}</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
+            {revoked && (
+              <p role='status'>
+                {t('Risk access changed. Showing only your records.')}
+              </p>
             )}
-          </p>
-          {revoked && (
-            <p role='status'>
-              {t('Risk access changed. Showing only your records.')}
-            </p>
-          )}
-          <RiskEventViewer
-            key={`${String(userID)}:${effectiveScope}`}
-            scope={effectiveScope}
-            canReview={canReview}
-            onAccessDenied={onAccessDenied}
-          />
-        </div>
+            <RiskEventViewer
+              key={`${String(userID)}:${effectiveScope}`}
+              scope={effectiveScope}
+              canReview={canReview}
+              onAccessDenied={onAccessDenied}
+            />
+          </div>
+        )}
       </SectionPageLayout.Content>
     </SectionPageLayout>
   )
@@ -152,20 +211,43 @@ function RiskEventViewer(props: {
         header: t('Category'),
         cell: ({ row }) => row.original.category_name || row.original.category,
       },
+      ...(props.scope === 'all'
+        ? ([
+            {
+              accessorKey: 'level',
+              header: t('Level'),
+              cell: ({ row }) => riskLevelLabel(row.original.level, t),
+            },
+            {
+              accessorKey: 'stage',
+              header: t('Stage'),
+              cell: ({ row }) => riskStageLabel(row.original.stage, t),
+            },
+          ] satisfies ColumnDef<RiskEvent>[])
+        : []),
       {
         accessorKey: 'action',
         header: t('Disposition'),
         cell: ({ row }) => (
-          <StatusBadge
-            variant={riskActionVariant(row.original.action)}
-            label={riskActionText(
-              row.original.action,
-              row.original.restriction_until,
-              row.original.created_at,
-              t
+          <span className='inline-flex items-center gap-1.5'>
+            <StatusBadge
+              variant={riskActionVariant(row.original.action)}
+              label={riskActionText(
+                row.original.action,
+                row.original.restriction_until,
+                row.original.created_at,
+                t
+              )}
+              copyable={false}
+            />
+            {isAutoRestriction(row.original) && (
+              <StatusBadge
+                variant='neutral'
+                label={t('Auto')}
+                copyable={false}
+              />
             )}
-            copyable={false}
-          />
+          </span>
         ),
       },
       {

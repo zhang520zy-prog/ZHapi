@@ -18,6 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
+import {
   cleanup,
   render,
   screen,
@@ -26,6 +33,7 @@ import {
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
@@ -58,13 +66,39 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
-function renderPage() {
+const riskEventsSearchSchema = z.object({
+  tab: z.enum(['events', 'words', 'settings']).optional().catch(undefined),
+})
+
+async function renderPage(path = '/risk-events') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
+  const root = createRootRoute()
+  const authenticated = createRoute({
+    getParentRoute: () => root,
+    id: '_authenticated',
+  })
+  const riskEventsLayout = createRoute({
+    getParentRoute: () => authenticated,
+    path: 'risk-events',
+  })
+  const index = createRoute({
+    getParentRoute: () => riskEventsLayout,
+    path: '/',
+    validateSearch: riskEventsSearchSchema,
+    component: RiskEvents,
+  })
+  const router = createRouter({
+    routeTree: root.addChildren([
+      authenticated.addChildren([riskEventsLayout.addChildren([index])]),
+    ]),
+    history: createMemoryHistory({ initialEntries: [path] }),
+  })
+  await router.load()
   render(
     <QueryClientProvider client={client}>
-      <RiskEvents />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
   return client
@@ -84,7 +118,7 @@ it('ordinary users see only their risk records and can appeal without submitting
   const post = vi
     .spyOn(api, 'post')
     .mockResolvedValue({ data: { success: true, data: { id: 1 } } })
-  renderPage()
+  await renderPage()
   await screen.findByText('chat-model')
   expect(get).toHaveBeenCalledWith('/api/risk/self', expect.anything())
   expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument()
@@ -113,7 +147,7 @@ it('ordinary users see only their risk records and can appeal without submitting
 })
 it('shows category name, action and appeal summary in list and detail', async () => {
   mockRecords()
-  renderPage()
+  await renderPage()
   const row = await screen.findByText('chat-model')
   const rowEl = row.closest('tr') as HTMLElement
   expect(within(rowEl).getByText('Sensitive keyword')).toBeVisible()
@@ -151,7 +185,7 @@ it('a pending appeal disables further appeals in the detail dialog', async () =>
         : { items: [event], total: 1 },
     },
   }))
-  renderPage()
+  await renderPage()
   await userEvent.click(await screen.findByRole('button', { name: 'Details' }))
   const dialog = await screen.findByRole('dialog', {
     name: 'Risk event details',
@@ -189,7 +223,7 @@ it('uses the newest appeal when a rejected one follows a pending entry', async (
         : { items: [event], total: 1 },
     },
   }))
-  renderPage()
+  await renderPage()
   await userEvent.click(await screen.findByRole('button', { name: 'Details' }))
   const dialog = await screen.findByRole('dialog', {
     name: 'Risk event details',
@@ -213,7 +247,7 @@ it('review permission allows a versioned decision with a required reason', async
       data: { ...event, review_status: 'false_positive', version: 4 },
     },
   })
-  renderPage()
+  await renderPage()
   const user = userEvent.setup()
   await user.click(await screen.findByRole('button', { name: 'Details' }))
   expect(get).toHaveBeenCalledWith('/api/risk/', expect.anything())
@@ -231,6 +265,10 @@ it('review permission allows a versioned decision with a required reason', async
   )
   await user.click(
     within(dialog).getByRole('button', { name: 'Mark false positive' })
+  )
+  const confirm = await screen.findByRole('alertdialog')
+  await user.click(
+    within(confirm).getByRole('button', { name: 'Mark false positive' })
   )
   await waitFor(() =>
     expect(post).toHaveBeenCalledWith('/api/risk/risk-42/review', {
@@ -251,7 +289,7 @@ it('a read-only operator can view events but cannot review them', async () => {
     },
   })
   mockRecords()
-  renderPage()
+  await renderPage()
   await userEvent.click(await screen.findByRole('button', { name: 'Details' }))
   const dialog = await screen.findByRole('dialog', {
     name: 'Risk event details',
@@ -277,7 +315,7 @@ it('a timed restriction requires confirmation and sends its duration with the ve
   const post = vi
     .spyOn(api, 'post')
     .mockResolvedValue({ data: { success: true, data: event } })
-  renderPage()
+  await renderPage()
   const user = userEvent.setup()
   await user.click(await screen.findByRole('button', { name: 'Details' }))
   const dialog = await screen.findByRole('dialog', {
@@ -319,7 +357,7 @@ it('a failed list request shows an error and retry instead of an empty success s
     .mockResolvedValue({
       data: { success: true, data: { items: [], total: 0 } },
     })
-  renderPage()
+  await renderPage()
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Failed to load risk events'
   )

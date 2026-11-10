@@ -132,3 +132,56 @@ export function riskActionText(
   }
   return label
 }
+
+export function riskStageLabel(
+  stage: string | undefined,
+  t: TFunction
+): string {
+  switch (stage) {
+    case 'input':
+      return t('Input')
+    case 'output':
+      return t('Output')
+    default:
+      return '—'
+  }
+}
+
+export function riskLevelLabel(
+  level: number | undefined,
+  t: TFunction
+): string {
+  if (!level || level <= 0) return '—'
+  return t('Level {{level}}', { level })
+}
+
+export function riskCategoryActionLabel(action: string, t: TFunction): string {
+  switch (action) {
+    case 'record':
+      return t('Record only')
+    case 'block':
+      return t('Block requests')
+    case 'block_restrict':
+      return t('Block and restrict')
+    default:
+      return action
+  }
+}
+
+/**
+ * 阶梯自动触发的限制/停用：事件带 restriction_until 但尚未经过人工审核。
+ * 人工确认后 review_status 变为 confirmed，不再标记自动。
+ */
+export function isAutoRestriction(event: {
+  action: string
+  restriction_until?: number
+  review_status: string
+}): boolean {
+  if (event.review_status !== 'pending') return false
+  if (event.action === 'disable') return true
+  return (
+    event.action === 'restrict' &&
+    !!event.restriction_until &&
+    event.restriction_until > 0
+  )
+}

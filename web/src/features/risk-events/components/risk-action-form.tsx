@@ -18,9 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
 import { useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -58,8 +60,10 @@ export function RiskActionForm(props: {
   const userId = useAuthStore((state) => state.auth.user?.id)
   const client = useQueryClient()
   const [duration, setDuration] = useState('0')
-  const [pendingRestriction, setPendingRestriction] =
-    useState<ReasonInput | null>(null)
+  const [pendingReview, setPendingReview] = useState<{
+    input: ReasonInput
+    status: 'confirmed' | 'false_positive'
+  } | null>(null)
   const form = useForm<ReasonInput>({
     resolver: zodResolver(reasonSchema),
     defaultValues: { reason: '' },
@@ -90,25 +94,67 @@ export function RiskActionForm(props: {
     onSuccess: async () => {
       form.reset()
       setDuration('0')
-      setPendingRestriction(null)
+      setPendingReview(null)
       await client.invalidateQueries({ queryKey: ['risk', userId] })
+      if (props.mode === 'review') {
+        await client.invalidateQueries({
+          queryKey: ['risk', 'admin', 'user-state'],
+        })
+      }
     },
-    onError: (error) =>
+    onError: async (error) => {
+      if (isAxiosError(error) && error.response?.status === 409) {
+        setPendingReview(null)
+        toast.error(t('The record was changed by someone else. Reloaded.'))
+        await client.invalidateQueries({ queryKey: ['risk', userId] })
+        await client.invalidateQueries({
+          queryKey: ['risk', 'admin', 'user-state'],
+        })
+        return
+      }
       handleServerError(
         error,
         t('Risk operation failed. Refresh the record before retrying.')
-      ),
+      )
+    },
   })
   const submit = (status?: 'confirmed' | 'false_positive') =>
     form.handleSubmit((input) => {
-      if (status === 'confirmed' && Number(duration) > 0) {
-        setPendingRestriction(input)
+      if (status) {
+        setPendingReview({ input, status })
         return
       }
       mutation.mutate({ ...input, status })
     })()
   const label =
     props.mode === 'appeal' ? t('Appeal reason') : t('Review reason')
+  let reviewConfirm = {
+    title: t('Confirm violation?'),
+    desc: t(
+      'This marks the event for user {{userId}} as a confirmed violation. No restriction is applied.',
+      { userId: props.event.user_id }
+    ),
+    confirmText: t('Confirm violation'),
+  }
+  if (pendingReview?.status === 'false_positive') {
+    reviewConfirm = {
+      title: t('Mark as false positive?'),
+      desc: t(
+        'This marks the event for user {{userId}} as a false positive. No restriction is applied.',
+        { userId: props.event.user_id }
+      ),
+      confirmText: t('Mark false positive'),
+    }
+  } else if (Number(duration) > 0) {
+    reviewConfirm = {
+      title: t('Restrict API access?'),
+      desc: t(
+        'This confirmed decision temporarily blocks new API calls for user {{userId}}. The user can still sign in and appeal.',
+        { userId: props.event.user_id }
+      ),
+      confirmText: t('Apply restriction'),
+    }
+  }
   return (
     <form
       className='space-y-3'
@@ -168,20 +214,21 @@ export function RiskActionForm(props: {
         </div>
       )}
       <ConfirmDialog
-        open={pendingRestriction !== null}
+        open={pendingReview !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingRestriction(null)
+          if (!open) setPendingReview(null)
         }}
-        title={t('Restrict API access?')}
-        desc={t(
-          'This confirmed decision temporarily blocks new API calls. The user can still sign in and appeal.'
-        )}
-        confirmText={t('Apply restriction')}
-        destructive
+        title={reviewConfirm.title}
+        desc={reviewConfirm.desc}
+        confirmText={reviewConfirm.confirmText}
+        destructive={pendingReview?.status !== 'false_positive'}
         isLoading={mutation.isPending}
         handleConfirm={() => {
-          if (pendingRestriction) {
-            mutation.mutate({ ...pendingRestriction, status: 'confirmed' })
+          if (pendingReview) {
+            mutation.mutate({
+              ...pendingReview.input,
+              status: pendingReview.status,
+            })
           }
         }}
       />
