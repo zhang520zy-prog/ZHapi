@@ -3282,7 +3282,6 @@
     "Instance": "實例",
     "Instances": "實例",
     "Insufficient": "不足",
-    "Insufficient balance": "餘額不足",
     "Insufficient permission to adjust this user": "無權調整此使用者的額度",
     "Integration guide": "接入指南",
     "Integration guide notes": "接入指南補充說明",
@@ -6548,7 +6547,6 @@
     "This operation is only supported for vLLM or SGLang channels": "此操作僅支援 vLLM 或 SGLang 渠道",
     "This page has not been created yet.": "此頁面尚未建立。",
     "This Passkey domain is not available on this website. Use its original website or another verification method.": "此通行金鑰網域無法在目前網站使用。請前往原網站或選擇其他驗證方式。",
-    "This plan does not allow balance redemption": "該套餐不允許使用餘額兌換",
     "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.": "此外掛没有內建回落版本，刪除或禁用后该平台将不可用。",
     "This plugin path does not resolve within the source repository.": "該外掛路徑並未指向來源儲存庫內的位置。",
     "This preview reads static plugin declarations. The gateway validates the plugin during installation.": "此預覽讀取外掛的靜態宣告，安裝時由閘道校驗外掛。",
@@ -7587,6 +7585,13 @@
     "Select amount": "選擇金額",
     "Top Up": "儲值",
     "Wallet sections": "錢包功能區",
-    "You can still top up with a redemption code": "仍可使用兌換碼儲值"
+    "You can still top up with a redemption code": "仍可使用兌換碼儲值",
+    "Purchased {{count}} / Limit {{limit}}": "已購 {{count}} / 限購 {{limit}}",
+    "Billing preference": "計費偏好",
+    "Quota to deduct": "將扣除額度",
+    "No payment method is available for this plan": "此方案目前沒有可用的付款方式",
+    "Insufficient balance": "餘額不足",
+    "Hosted checkout": "託管結帳頁",
+    "Final amount shown at checkout": "實付金額以結帳頁顯示為準"
   }
 }

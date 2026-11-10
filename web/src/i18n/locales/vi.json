@@ -3282,7 +3282,6 @@
     "Instance": "Phiên bản",
     "Instances": "Phiên bản",
     "Insufficient": "Không đủ",
-    "Insufficient balance": "Insufficient balance",
     "Insufficient permission to adjust this user": "Không đủ quyền điều chỉnh hạn mức của người dùng này",
     "Integration guide": "Integration guide",
     "Integration guide notes": "Integration guide notes",
@@ -6548,7 +6547,6 @@
     "This operation is only supported for vLLM or SGLang channels": "Thao tác này chỉ hỗ trợ kênh vLLM hoặc SGLang",
     "This page has not been created yet.": "Trang này chưa được tạo.",
     "This Passkey domain is not available on this website. Use its original website or another verification method.": "Tên miền khóa truy cập này không dùng được trên trang web hiện tại. Hãy dùng trang web ban đầu hoặc phương thức xác minh khác.",
-    "This plan does not allow balance redemption": "Gói này không cho phép thanh toán bằng số dư",
     "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.": "Plugin này không có bản tích hợp dự phòng. Xóa hoặc tắt plugin sẽ khiến nền tảng không khả dụng.",
     "This plugin path does not resolve within the source repository.": "Đường dẫn plugin này không nằm trong kho của nguồn.",
     "This preview reads static plugin declarations. The gateway validates the plugin during installation.": "Bản xem trước đọc khai báo tĩnh của plugin. Cổng sẽ kiểm tra plugin khi cài đặt.",
@@ -7587,6 +7585,13 @@
     "Select amount": "Chọn số tiền",
     "Top Up": "Nạp tiền",
     "Wallet sections": "Các mục của ví",
-    "You can still top up with a redemption code": "Vẫn có thể nạp bằng mã đổi thưởng"
+    "You can still top up with a redemption code": "Vẫn có thể nạp bằng mã đổi thưởng",
+    "Purchased {{count}} / Limit {{limit}}": "Đã mua {{count}} / Giới hạn {{limit}}",
+    "Billing preference": "Tùy chọn thanh toán",
+    "Quota to deduct": "Quota sẽ trừ",
+    "No payment method is available for this plan": "Gói này chưa có phương thức thanh toán khả dụng",
+    "Insufficient balance": "Số dư không đủ",
+    "Hosted checkout": "Thanh toán lưu trữ",
+    "Final amount shown at checkout": "Số tiền cuối cùng hiển thị khi thanh toán"
   }
 }

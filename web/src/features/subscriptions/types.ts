@@ -113,6 +113,30 @@ export interface SubscriptionPayResponse {
   url?: string
 }
 
+/**
+ * Server-computed quote for a subscription payment method
+ * (service.PaymentQuote). Strings are rendered verbatim; the frontend
+ * must not recompute or reparse them.
+ */
+export interface SubscriptionQuote {
+  credited_money: string
+  fee_rate_bps: number
+  fee: string
+  total: string
+  currency: string
+  fee_included: boolean
+}
+
+export interface SubscriptionQuoteResponse {
+  success: boolean
+  message?: string
+  /** Total payable as a server-formatted string (legacy field). */
+  data?: string
+  quote?: SubscriptionQuote
+  /** Balance-pay only: quota the purchase will deduct. */
+  quota?: number
+}
+
 export interface CreateUserSubscriptionRequest {
   plan_id: number
 }

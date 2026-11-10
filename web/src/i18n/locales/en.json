@@ -3282,7 +3282,6 @@
     "Instance": "Instance",
     "Instances": "Instances",
     "Insufficient": "Insufficient",
-    "Insufficient balance": "Insufficient balance",
     "Insufficient permission to adjust this user": "Insufficient permission to adjust this user",
     "Integration guide": "Integration guide",
     "Integration guide notes": "Integration guide notes",
@@ -6548,7 +6547,6 @@
     "This operation is only supported for vLLM or SGLang channels": "This operation is only supported for vLLM or SGLang channels",
     "This page has not been created yet.": "This page has not been created yet.",
     "This Passkey domain is not available on this website. Use its original website or another verification method.": "This Passkey domain is not available on this website. Use its original website or another verification method.",
-    "This plan does not allow balance redemption": "This plan does not allow balance redemption",
     "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.": "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.",
     "This plugin path does not resolve within the source repository.": "This plugin path does not resolve within the source repository.",
     "This preview reads static plugin declarations. The gateway validates the plugin during installation.": "This preview reads static plugin declarations. The gateway validates the plugin during installation.",
@@ -7587,6 +7585,13 @@
     "Select amount": "Select amount",
     "Top Up": "Top Up",
     "Wallet sections": "Wallet sections",
-    "You can still top up with a redemption code": "You can still top up with a redemption code"
+    "You can still top up with a redemption code": "You can still top up with a redemption code",
+    "Purchased {{count}} / Limit {{limit}}": "Purchased {{count}} / Limit {{limit}}",
+    "Billing preference": "Billing preference",
+    "Quota to deduct": "Quota to deduct",
+    "No payment method is available for this plan": "No payment method is available for this plan",
+    "Insufficient balance": "Insufficient balance",
+    "Hosted checkout": "Hosted checkout",
+    "Final amount shown at checkout": "Final amount shown at checkout"
   }
 }

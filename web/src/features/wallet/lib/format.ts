@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { formatFeeRateBps } from '@/lib/format'
+
 import { DEFAULT_DISCOUNT_RATE } from '../constants'
+
+export { formatFeeRateBps }
 
 // ============================================================================
 // Wallet-specific Formatting Functions
@@ -31,14 +35,6 @@ export function formatCreemPrice(
 ): string {
   const symbol = currency === 'EUR' ? '€' : '$'
   return `${symbol}${price.toFixed(2)}`
-}
-
-/**
- * Format a fee rate given in basis points (e.g. 150 -> "1.5%").
- */
-export function formatFeeRateBps(bps?: number): string {
-  const rate = (bps ?? 0) / 100
-  return `${Number.isInteger(rate) ? rate.toFixed(0) : Number.parseFloat(rate.toFixed(2))}%`
 }
 
 /**

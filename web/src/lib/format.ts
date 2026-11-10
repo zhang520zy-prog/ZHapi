@@ -62,6 +62,14 @@ export function formatCurrencyUSD(value: number | null | undefined): string {
   return formatCurrencyFromUSD(value == null ? null : (value as number))
 }
 
+/**
+ * Format a fee rate given in basis points (e.g. 150 -> "1.5%").
+ */
+export function formatFeeRateBps(bps?: number): string {
+  const rate = (bps ?? 0) / 100
+  return `${Number.isInteger(rate) ? rate.toFixed(0) : Number.parseFloat(rate.toFixed(2))}%`
+}
+
 // ============================================================================
 // Quota Formatting (500,000 units = $1)
 // ============================================================================

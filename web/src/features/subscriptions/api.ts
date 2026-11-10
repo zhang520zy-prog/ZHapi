@@ -29,6 +29,7 @@ import type {
   SubscriptionResetResult,
   SubscriptionPayResponse,
   SubscriptionPayRequest,
+  SubscriptionQuoteResponse,
   SelfSubscriptionData,
 } from './types'
 
@@ -134,17 +135,22 @@ export async function resetPlanSubscriptions(
 // User-facing Subscription Payment
 // ============================================================================
 
+// POST /api/subscription/quote — payment_method is `balance`, `epay:<type>`,
+// or `waffo_pancake`. Creem and Stripe have no quote branch on the backend:
+// Creem prices USD/EUR only and Stripe subscriptions carry Stripe-managed
+// pricing, so neither can be offered in the purchase flow.
+export async function requestSubscriptionQuote(data: {
+  plan_id: number
+  payment_method: string
+}): Promise<SubscriptionQuoteResponse> {
+  const res = await api.post('/api/subscription/quote', data)
+  return res.data
+}
+
 export async function paySubscriptionStripe(
   data: SubscriptionPayRequest
 ): Promise<SubscriptionPayResponse> {
   const res = await api.post('/api/subscription/stripe/pay', data)
-  return res.data
-}
-
-export async function paySubscriptionCreem(
-  data: SubscriptionPayRequest
-): Promise<SubscriptionPayResponse> {
-  const res = await api.post('/api/subscription/creem/pay', data)
   return res.data
 }
 

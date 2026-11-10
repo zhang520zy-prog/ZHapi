@@ -30,7 +30,7 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 import { getPublicPlans } from '../subscriptions/api'
 import { BillingTab } from './components/billing-tab'
 import { RechargeTab } from './components/recharge-tab'
-import { SubscriptionPlansCard } from './components/subscription-plans-card'
+import { SubscriptionTab } from './components/subscription-tab'
 import { useTopupInfo } from './hooks'
 import type { UserWalletData } from './types'
 
@@ -135,7 +135,7 @@ export function Wallet() {
           />
         )}
         {effectiveTab === 'subscription' && showSubscriptionTab && (
-          <SubscriptionPlansCard
+          <SubscriptionTab
             topupInfo={topupInfo}
             userQuota={userQuery.data?.quota}
             onPurchaseSuccess={refreshUser}

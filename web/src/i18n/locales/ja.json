@@ -3282,7 +3282,6 @@
     "Instance": "インスタンス",
     "Instances": "インスタンス",
     "Insufficient": "不足",
-    "Insufficient balance": "Insufficient balance",
     "Insufficient permission to adjust this user": "このユーザーのクォータを調整する権限がありません",
     "Integration guide": "Integration guide",
     "Integration guide notes": "Integration guide notes",
@@ -6548,7 +6547,6 @@
     "This operation is only supported for vLLM or SGLang channels": "この操作は vLLM または SGLang チャネルでのみ利用できます",
     "This page has not been created yet.": "このページはまだ作成されていません。",
     "This Passkey domain is not available on this website. Use its original website or another verification method.": "このパスキードメインは現在のサイトでは使えません。元のサイトか、別の認証方法を使用してください。",
-    "This plan does not allow balance redemption": "このプランでは残高での交換は許可されていません",
     "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.": "このプラグインには組み込みのフォールバックがありません。削除または無効化するとプラットフォームが利用できなくなります。",
     "This plugin path does not resolve within the source repository.": "このプラグインのパスはソースリポジトリ内を指していません。",
     "This preview reads static plugin declarations. The gateway validates the plugin during installation.": "このプレビューはプラグインの静的な宣言を読み取ります。インストール時にゲートウェイが検証します。",
@@ -7587,6 +7585,13 @@
     "Select amount": "金額を選択",
     "Top Up": "チャージ",
     "Wallet sections": "ウォレットセクション",
-    "You can still top up with a redemption code": "引き換えコードでチャージできます"
+    "You can still top up with a redemption code": "引き換えコードでチャージできます",
+    "Purchased {{count}} / Limit {{limit}}": "購入済み {{count}} / 上限 {{limit}}",
+    "Billing preference": "請求設定",
+    "Quota to deduct": "引き落としクォータ",
+    "No payment method is available for this plan": "このプランで利用できる支払い方法がありません",
+    "Insufficient balance": "残高不足",
+    "Hosted checkout": "ホスト型チェックアウト",
+    "Final amount shown at checkout": "最終金額はチェックアウト画面で表示されます"
   }
 }

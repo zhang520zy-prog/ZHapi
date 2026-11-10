@@ -3282,7 +3282,6 @@
     "Instance": "Экземпляр",
     "Instances": "Экземпляры",
     "Insufficient": "Недостаточно",
-    "Insufficient balance": "Insufficient balance",
     "Insufficient permission to adjust this user": "Недостаточно прав для изменения квоты этого пользователя",
     "Integration guide": "Integration guide",
     "Integration guide notes": "Integration guide notes",
@@ -6548,7 +6547,6 @@
     "This operation is only supported for vLLM or SGLang channels": "Эта операция доступна только для каналов vLLM или SGLang",
     "This page has not been created yet.": "Эта страница еще не создана.",
     "This Passkey domain is not available on this website. Use its original website or another verification method.": "Этот домен ключа доступа недоступен на текущем сайте. Используйте исходный сайт или другой способ проверки.",
-    "This plan does not allow balance redemption": "Этот план не разрешает оплату балансом",
     "This plugin has no factory fallback. Deleting or disabling it makes this platform unavailable.": "У этого плагина нет встроенной резервной версии. Его удаление или отключение сделает платформу недоступной.",
     "This plugin path does not resolve within the source repository.": "Этот путь плагина не ведёт внутрь репозитория источника.",
     "This preview reads static plugin declarations. The gateway validates the plugin during installation.": "Предпросмотр показывает статические объявления плагина. Шлюз проверит плагин при установке.",
@@ -7587,6 +7585,13 @@
     "Select amount": "Выберите сумму",
     "Top Up": "Пополнить",
     "Wallet sections": "Разделы кошелька",
-    "You can still top up with a redemption code": "Пополнить всё ещё можно кодом активации"
+    "You can still top up with a redemption code": "Пополнить всё ещё можно кодом активации",
+    "Purchased {{count}} / Limit {{limit}}": "Куплено {{count}} / Лимит {{limit}}",
+    "Billing preference": "Предпочтение оплаты",
+    "Quota to deduct": "Квота к списанию",
+    "No payment method is available for this plan": "Для этого плана нет доступных способов оплаты",
+    "Insufficient balance": "Недостаточно средств",
+    "Hosted checkout": "Оплата на стороне сервиса",
+    "Final amount shown at checkout": "Итоговая сумма показана при оформлении"
   }
 }
