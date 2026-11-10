@@ -178,3 +178,104 @@ func TestRiskEventLedgerDatabaseMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestRiskCategoryNameDatabaseMatrix(t *testing.T) {
+	prevMain, prevLog := common.MainDatabaseType(), common.LogDatabaseType()
+	t.Cleanup(func() {
+		common.SetDatabaseTypes(prevMain, prevLog)
+		initCol()
+	})
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			common.SetDatabaseTypes(common.DatabaseType(dialect), common.DatabaseType(dialect))
+			initCol()
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(":memory:")
+			case "mysql":
+				dsn := os.Getenv("TEST_MYSQL_DSN")
+				if dsn == "" {
+					t.Skip("TEST_MYSQL_DSN not configured")
+				}
+				driver = mysql.Open(dsn)
+			case "postgres":
+				dsn := os.Getenv("TEST_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("TEST_POSTGRES_DSN not configured")
+				}
+				driver = postgres.Open(dsn)
+			}
+			prefix := fmt.Sprintf("riskcat_%d_", time.Now().UnixNano())
+			db, err := gorm.Open(driver, &gorm.Config{NamingStrategy: schema.NamingStrategy{TablePrefix: prefix}, Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			if dialect == "sqlite" {
+				sqlDB.SetMaxOpenConns(1)
+			}
+			previous := DB
+			DB = db
+			t.Cleanup(func() {
+				DB = previous
+				_ = db.Migrator().DropTable(&RiskEventChange{}, &RiskAppeal{}, &RiskEvent{}, &RiskWordCategory{}, &RiskUserState{}, &User{})
+				_ = sqlDB.Close()
+			})
+			require.NoError(t, db.AutoMigrate(&User{}))
+			require.NoError(t, MigrateRiskEvents())
+			owner := User{Username: "risk-cat-user", Password: "unchanged", Role: common.RoleCommonUser, AffCode: "risk-cat-user"}
+			require.NoError(t, db.Create(&owner).Error)
+			require.NoError(t, db.Create(&RiskWordCategory{Key: "gambling", Name: "Gambling Words", Action: RiskWordActionBlockRestrict, Words: "placeholder", WordCount: 1, Status: RiskWordCategoryStatusEnabled, Version: 1}).Error)
+
+			// Display-name map resolves existing categories and omits deleted ones.
+			names, err := RiskCategoryDisplayNames([]string{"gambling", "gone-cat", ""})
+			require.NoError(t, err)
+			assert.Equal(t, "Gambling Words", names["gambling"])
+			_, ok := names["gone-cat"]
+			assert.False(t, ok, "deleted category must fall back to its key at the controller layer")
+			_, ok = names[""]
+			assert.False(t, ok)
+
+			older, err := RecordRiskEvent(RiskEventInput{UserID: owner.Id, TokenID: 1, Model: "m", Category: "gone-cat", Action: "restrict", Stage: "input", Level: 1})
+			require.NoError(t, err)
+			// Ensure the newer event sorts after the older one even on second-resolution timestamps.
+			newer, err := RecordRiskEvent(RiskEventInput{UserID: owner.Id, TokenID: 1, Model: "m", Category: "gambling", Action: "restrict", Stage: "input", Level: 2})
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&RiskEvent{}).Where("event_id = ?", newer.EventID).Update("created_at", older.CreatedAt+1).Error)
+
+			// SafeDTO JSON carries category_name but never secret fields or content.
+			dto := newer.SafeDTO()
+			dto.CategoryName = names[newer.Category]
+			encoded, err := common.Marshal(dto)
+			require.NoError(t, err)
+			assert.Contains(t, string(encoded), `"category_name":"Gambling Words"`)
+			for _, secret := range []string{"rule_id", "rule_version", "review_reason", "reviewer_id", "token_id", "word", "content"} {
+				assert.NotContains(t, string(encoded), secret)
+			}
+			assert.Equal(t, "gambling", dto.Category)
+
+			// No state row / unrestricted: state exposes no event fields.
+			state, err := GetRiskUserState(owner.Id)
+			require.NoError(t, err)
+			assert.Empty(t, state.EventID)
+			assert.Empty(t, state.CategoryName)
+
+			// Restricted state surfaces the newest restrict/disable event with the
+			// resolved category name.
+			require.NoError(t, db.Save(&RiskUserState{UserId: owner.Id, Level: 2, Hits: 2, RestrictedUntil: common.GetTimestamp() + 3600}).Error)
+			state, err = GetRiskUserState(owner.Id)
+			require.NoError(t, err)
+			assert.Equal(t, newer.EventID, state.EventID)
+			assert.Equal(t, "Gambling Words", state.CategoryName)
+			assert.False(t, state.Disabled)
+
+			// Deleted category falls back to the key itself.
+			require.NoError(t, db.Model(&RiskUserState{}).Where("user_id = ?", owner.Id).Updates(map[string]any{"restricted_until": common.GetTimestamp() + 7200}).Error)
+			require.NoError(t, db.Model(&RiskEvent{}).Where("event_id = ?", older.EventID).Update("created_at", newer.CreatedAt+2).Error)
+			state, err = GetRiskUserState(owner.Id)
+			require.NoError(t, err)
+			assert.Equal(t, older.EventID, state.EventID)
+			assert.Equal(t, "gone-cat", state.CategoryName)
+		})
+	}
+}

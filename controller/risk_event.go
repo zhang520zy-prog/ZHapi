@@ -37,6 +37,25 @@ func riskInt64Query(c *gin.Context, name string) (int64, error) {
 	return value, nil
 }
 
+// resolveRiskCategoryNames B2.7-1：批量解析类别 key → 显示名；查询失败或
+// 类别已删时回退 key 本身（用户不可见类别列表，不能暴露查询失败细节）。
+func resolveRiskCategoryNames(keys ...string) map[string]string {
+	names, err := model.RiskCategoryDisplayNames(keys)
+	if err != nil {
+		common.SysError("resolve risk category names failed: " + err.Error())
+		names = map[string]string{}
+	}
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := names[key]; !ok {
+			names[key] = key
+		}
+	}
+	return names
+}
+
 func riskList(c *gin.Context, admin bool) {
 	page := common.GetPageQuery(c)
 	if page.Page < 1 || page.Page > 1000001 || page.PageSize < 1 || page.PageSize > 100 {
@@ -69,12 +88,22 @@ func riskList(c *gin.Context, admin bool) {
 		return
 	}
 	page.SetTotal(int(total))
+	categoryKeys := make([]string, 0, len(rows))
+	for _, row := range rows {
+		categoryKeys = append(categoryKeys, row.Category)
+	}
+	names := resolveRiskCategoryNames(categoryKeys...)
 	if admin {
+		for i := range rows {
+			rows[i].CategoryName = names[rows[i].Category]
+		}
 		page.SetItems(rows)
 	} else {
 		items := make([]model.RiskEventDTO, 0, len(rows))
 		for _, row := range rows {
-			items = append(items, row.SafeDTO())
+			dto := row.SafeDTO()
+			dto.CategoryName = names[row.Category]
+			items = append(items, dto)
 		}
 		page.SetItems(items)
 	}
@@ -100,6 +129,7 @@ func GetRiskEventDetail(c *gin.Context) {
 		riskError(c, err)
 		return
 	}
+	event.CategoryName = resolveRiskCategoryNames(event.Category)[event.Category]
 	common.ApiSuccess(c, gin.H{"event": event, "appeals": appeals, "changes": changes})
 }
 
@@ -118,7 +148,9 @@ func GetRiskEventSelfDetail(c *gin.Context) {
 	for _, appeal := range appeals {
 		items = append(items, appeal.SafeDTO())
 	}
-	common.ApiSuccess(c, gin.H{"event": event.SafeDTO(), "appeals": items})
+	dto := event.SafeDTO()
+	dto.CategoryName = resolveRiskCategoryNames(event.Category)[event.Category]
+	common.ApiSuccess(c, gin.H{"event": dto, "appeals": items})
 }
 
 type riskAppealRequest struct {
@@ -166,5 +198,7 @@ func ReviewRiskEvent(c *gin.Context) {
 	recordRiskAudit(c, "risk.event.review", map[string]any{
 		"event_id": event.EventID, "status": event.ReviewStatus, "reason": request.Reason,
 	})
-	common.ApiSuccess(c, event.SafeDTO())
+	dto := event.SafeDTO()
+	dto.CategoryName = resolveRiskCategoryNames(event.Category)[event.Category]
+	common.ApiSuccess(c, dto)
 }

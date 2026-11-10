@@ -198,6 +198,26 @@ func ListRiskWordCategories() ([]RiskWordCategory, error) {
 	return rows, err
 }
 
+// RiskCategoryDisplayNames 批量解析类别 key → 显示名（B2.7-1）。
+// 类别被删除或 key 为空时 map 中不含该项，调用方回退 key 本身。
+func RiskCategoryDisplayNames(keys []string) (map[string]string, error) {
+	names := make(map[string]string, len(keys))
+	if len(keys) == 0 {
+		return names, nil
+	}
+	var rows []RiskWordCategory
+	err := DB.Select(commonKeyCol, "name").
+		Where(commonKeyCol+" IN ?", keys).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		names[row.Key] = row.Name
+	}
+	return names, nil
+}
+
 func GetRiskWordCategory(id int) (*RiskWordCategory, error) {
 	if id <= 0 {
 		return nil, ErrRiskInvalid

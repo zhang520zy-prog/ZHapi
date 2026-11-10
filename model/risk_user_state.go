@@ -264,11 +264,14 @@ func ReenableRiskUser(userId, actorID int, reason string) (int64, error) {
 }
 
 // RiskUserStateDTO 管理员/用户查看阶梯状态；不含任何词或原文。
+// EventID/CategoryName 仅在受限时下发（最近一条限制事件，供提示条用）。
 type RiskUserStateDTO struct {
-	Level           int   `json:"level"`
-	Hits            int   `json:"hits"`
-	RestrictedUntil int64 `json:"restricted_until"`
-	Disabled        bool  `json:"disabled"`
+	Level           int    `json:"level"`
+	Hits            int    `json:"hits"`
+	RestrictedUntil int64  `json:"restricted_until"`
+	Disabled        bool   `json:"disabled"`
+	EventID         string `json:"event_id,omitempty"`
+	CategoryName    string `json:"category_name,omitempty"`
 }
 
 func GetRiskUserState(userId int) (*RiskUserStateDTO, error) {
@@ -285,12 +288,45 @@ func GetRiskUserState(userId int) (*RiskUserStateDTO, error) {
 	if err := DB.Select("status").Take(&user, userId).Error; err == nil {
 		disabled = user.Status == common.UserStatusDisabled && state.Level >= RiskMaxLevel
 	}
-	return &RiskUserStateDTO{
+	dto := &RiskUserStateDTO{
 		Level:           state.Level,
 		Hits:            state.Hits,
 		RestrictedUntil: state.RestrictedUntil,
 		Disabled:        disabled,
-	}, nil
+	}
+	restricted := state.RestrictedUntil > common.GetTimestamp() || disabled
+	if restricted {
+		if err := fillLatestRestrictionEvent(dto, userId); err != nil {
+			return nil, err
+		}
+	}
+	return dto, nil
+}
+
+// fillLatestRestrictionEvent 取该用户最近一条限制/停用事件，填 event_id 与
+// category_name（B2.7-1：类别被删时回退为类别 key 本身）。
+func fillLatestRestrictionEvent(dto *RiskUserStateDTO, userId int) error {
+	var event RiskEvent
+	err := DB.Select("event_id", "category").
+		Where("user_id = ? AND action IN ?", userId, []string{"restrict", "disable"}).
+		Order("created_at DESC, id DESC").
+		Take(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	dto.EventID = event.EventID
+	dto.CategoryName = event.Category
+	names, err := RiskCategoryDisplayNames([]string{event.Category})
+	if err != nil {
+		return err
+	}
+	if name, ok := names[event.Category]; ok {
+		dto.CategoryName = name
+	}
+	return nil
 }
 
 // ListRiskUserCategoryHits 返回最近 30 天按类别的计数命中次数（F5.2 详情用）。

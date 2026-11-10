@@ -39,6 +39,9 @@ type RiskEvent struct {
 	RestrictionUntil int64  `json:"restriction_until" gorm:"type:bigint;index"`
 	Stage            string `json:"stage" gorm:"type:varchar(16);not null;default:''"`
 	Level            int    `json:"level" gorm:"not null;default:0"`
+	// CategoryName 为展示用瞬态字段（gorm:"-"），由查询侧按
+	// risk_word_categories 解析填充；类别被删时回退为 Category key 本身。
+	CategoryName string `json:"category_name" gorm:"-"`
 }
 
 // RiskEventInput 只带分类与处置信息，绝不带命中的词或请求原文。
@@ -65,6 +68,7 @@ type RiskEventDTO struct {
 	RestrictionUntil int64  `json:"restriction_until"`
 	Stage            string `json:"stage"`
 	Level            int    `json:"level"`
+	CategoryName     string `json:"category_name"`
 }
 
 func (event RiskEvent) SafeDTO() RiskEventDTO {
