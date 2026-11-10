@@ -24,11 +24,13 @@ export const MODEL_PRICING_SETTINGS_PATH =
   '/system-settings/billing/model-pricing'
 
 const MODEL_PRICE_ERROR_CODE = 'model_price_error'
+const SENSITIVE_WORDS_ERROR_CODE = 'sensitive_words_detected'
+const RISK_RESTRICTED_ERROR_CODE = 'risk_restricted'
 export const FALLBACK_ERROR_CONTENT = 'An unknown error occurred'
 
 type MessageErrorState = {
   content: string
-  kind: 'generic' | 'model-price'
+  kind: 'generic' | 'model-price' | 'content-blocked' | 'risk-restricted'
   showSettingsLink: boolean
 }
 
@@ -50,10 +52,17 @@ export function getMessageErrorState(
 
   const content = getMessageContent(message) || FALLBACK_ERROR_CONTENT
   const isModelPriceError = message.errorCode === MODEL_PRICE_ERROR_CODE
+  const isContentBlocked = message.errorCode === SENSITIVE_WORDS_ERROR_CODE
+  const isRiskRestricted = message.errorCode === RISK_RESTRICTED_ERROR_CODE
+
+  let kind: MessageErrorState['kind'] = 'generic'
+  if (isModelPriceError) kind = 'model-price'
+  else if (isContentBlocked) kind = 'content-blocked'
+  else if (isRiskRestricted) kind = 'risk-restricted'
 
   return {
     content,
-    kind: isModelPriceError ? 'model-price' : 'generic',
+    kind,
     showSettingsLink: isModelPriceError && isAdmin,
   }
 }

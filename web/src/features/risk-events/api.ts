@@ -24,6 +24,7 @@ import { createServerError } from '@/lib/server-error-message'
 
 export type RiskScope = 'all' | 'self'
 export type ReviewStatus = 'pending' | 'confirmed' | 'false_positive'
+export type RiskAction = 'record' | 'block' | 'restrict' | 'disable'
 export interface RiskEvent {
   event_id: string
   user_id?: number
@@ -31,6 +32,7 @@ export interface RiskEvent {
   model: string
   request_id: string
   category: string
+  category_name?: string
   action: string
   rule_id?: string
   rule_version?: string
@@ -40,6 +42,19 @@ export interface RiskEvent {
   review_reason?: string
   version: number
   restriction_until?: number
+  stage?: string
+  level?: number
+}
+export function riskStateQueryKey(userId: number | undefined) {
+  return ['risk', userId, 'self', 'state'] as const
+}
+export interface RiskSelfState {
+  level: number
+  hits: number
+  restricted_until: number
+  disabled: boolean
+  event_id?: string
+  category_name?: string
 }
 export interface RiskAppeal {
   id: number
@@ -83,6 +98,15 @@ export async function getRiskEvents(scope: RiskScope, params: RiskFilters) {
   const response = await api.get<
     ApiResponse<{ items: RiskEvent[]; total: number }>
   >(scope === 'all' ? '/api/risk/' : '/api/risk/self', { params })
+  if (!response.data.success || !response.data.data) {
+    throw createServerError(response.data, t('Failed to load risk events'))
+  }
+  return response.data.data
+}
+export async function getRiskSelfState() {
+  const response = await api.get<ApiResponse<RiskSelfState>>(
+    '/api/risk/self/state'
+  )
   if (!response.data.success || !response.data.data) {
     throw createServerError(response.data, t('Failed to load risk events'))
   }

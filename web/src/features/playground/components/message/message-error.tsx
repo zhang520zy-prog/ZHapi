@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { AlertCircle, AlertTriangle, Settings } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { AlertCircle, AlertTriangle, Settings, ShieldAlert } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -39,7 +40,8 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -71,6 +73,63 @@ export function MessageError({
 
   if (!errorState) {
     return null
+  }
+
+  if (errorState.kind === 'content-blocked') {
+    return (
+      <Alert variant='destructive' className={className}>
+        <ShieldAlert />
+        <AlertTitle>{t('Content inspection')}</AlertTitle>
+        <AlertDescription className='space-y-2'>
+          <p>
+            {t(
+              'Request content did not pass content inspection and this request was stopped'
+            )}
+          </p>
+          <Link
+            to='/risk-events'
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm' }),
+              'w-fit'
+            )}
+          >
+            {t('View risk events')}
+          </Link>
+          {actions}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (errorState.kind === 'risk-restricted') {
+    return (
+      <Alert variant='destructive' className={className}>
+        <ShieldAlert />
+        <AlertTitle>{t('Account API access is restricted')}</AlertTitle>
+        <AlertDescription className='space-y-2'>
+          <p>
+            {t(
+              'API access is temporarily restricted for this account. You can view the risk events or submit an appeal.'
+            )}
+          </p>
+          {errorState.content !== FALLBACK_ERROR_CONTENT && (
+            <p className='text-muted-foreground text-xs break-all'>
+              {errorState.content}
+            </p>
+          )}
+          <Link
+            to='/risk-events'
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm' }),
+              'w-fit'
+            )}
+          >
+            {t('View risk events')}
+          </Link>
+          {actions}
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   if (errorState.kind === 'model-price') {

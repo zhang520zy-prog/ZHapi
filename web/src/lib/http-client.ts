@@ -27,6 +27,10 @@ import {
 } from '@/lib/auth-session'
 import { handleServerError } from '@/lib/handle-server-error'
 import {
+  emitRiskRestricted,
+  isRiskRestrictedPayload,
+} from '@/lib/risk-restricted'
+import {
   getServerErrorMessage,
   safeServerErrorMessage,
 } from '@/lib/server-error-message'
@@ -95,6 +99,10 @@ api.interceptors.response.use(
     const config = error?.config as ApiRequestConfig | undefined
     const skipErrorHandler = config?.skipErrorHandler
     const status = error?.response?.status
+
+    if (isRiskRestrictedPayload(status, error?.response?.data)) {
+      emitRiskRestricted()
+    }
 
     if (status === 401) {
       if (config && !config.skipAuthRefresh && !config.authRetry) {

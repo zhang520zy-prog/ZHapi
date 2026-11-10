@@ -38,3 +38,11 @@ export async function getPrivacyPolicy(): Promise<LegalDocumentResponse> {
   })
   return res.data
 }
+
+export async function acceptUserAgreement(version: number) {
+  const res = await api.post<LegalDocumentResponse>(
+    '/api/user/agreement/accept',
+    { version }
+  )
+  return res.data
+}

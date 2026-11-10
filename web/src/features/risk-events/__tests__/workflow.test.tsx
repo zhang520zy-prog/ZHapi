@@ -37,6 +37,7 @@ const event = {
   model: 'chat-model',
   request_id: 'request-42',
   category: 'sensitive_keyword',
+  category_name: 'Sensitive keyword',
   action: 'block',
   created_at: 1788600600,
   review_status: 'pending',
@@ -109,6 +110,51 @@ it('ordinary users see only their risk records and can appeal without submitting
     })
   )
   expect(await within(dialog).findByText('Appeal submitted')).toBeVisible()
+})
+it('shows category name, action and appeal summary in list and detail', async () => {
+  mockRecords()
+  renderPage()
+  const row = await screen.findByText('chat-model')
+  const rowEl = row.closest('tr') as HTMLElement
+  expect(within(rowEl).getByText('Sensitive keyword')).toBeVisible()
+  expect(within(rowEl).getByText('Blocked')).toBeVisible()
+  await userEvent.click(within(rowEl).getByRole('button', { name: 'Details' }))
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Risk event details',
+  })
+  expect(await within(dialog).findByText('Not appealed')).toBeVisible()
+  expect(within(dialog).getByText('Sensitive keyword')).toBeVisible()
+  expect(within(dialog).getByText('Blocked')).toBeVisible()
+})
+it('a pending appeal disables further appeals in the detail dialog', async () => {
+  const pendingAppeal = {
+    id: 7,
+    reason: 'Please review',
+    created_at: 1788600601,
+    status: 'pending',
+    outcome: '',
+    version: 1,
+  }
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data: String(url).endsWith('risk-42')
+        ? { event, appeals: [pendingAppeal], changes: [] }
+        : { items: [event], total: 1 },
+    },
+  }))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Details' }))
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Risk event details',
+  })
+  expect(await within(dialog).findByText('Appeal in progress')).toBeVisible()
+  expect(
+    await within(dialog).findByText('Your appeal is already being processed.')
+  ).toBeVisible()
+  expect(
+    within(dialog).queryByLabelText('Appeal reason')
+  ).not.toBeInTheDocument()
 })
 it('review permission allows a versioned decision with a required reason', async () => {
   useAuthStore.getState().auth.setUser({

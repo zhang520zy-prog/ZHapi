@@ -21,6 +21,8 @@ import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
+import { AgreementConfirmDialog } from '@/features/legal/agreement-confirm-dialog'
+import { RiskRestrictionBanner } from '@/features/risk-events/components/restriction-banner'
 import { getCookie } from '@/lib/cookies'
 import { cn } from '@/lib/utils'
 
@@ -62,9 +64,11 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
             >
               {/* Content area: 1440px cap, 24px gutter desktop / 12px mobile. */}
               <div className='mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col px-3 sm:px-6'>
+                <RiskRestrictionBanner />
                 {props.children ?? <AnimatedOutlet />}
               </div>
             </SidebarInset>
+            <AgreementConfirmDialog />
           </div>
         </SidebarProvider>
       </SearchProvider>

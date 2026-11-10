@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 
 import { DataTablePage, useDataTable } from '@/components/data-table'
 import { SectionPageLayout } from '@/components/layout'
+import { StatusBadge } from '@/components/status-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,7 +48,7 @@ import {
   type RiskScope,
 } from './api'
 import { RiskDetailDialog } from './components/risk-detail-dialog'
-import { riskStatusLabel } from './status'
+import { riskActionText, riskActionVariant, riskStatusLabel } from './status'
 
 const EMPTY_EVENTS: RiskEvent[] = []
 export function RiskEvents() {
@@ -146,6 +147,27 @@ function RiskEventViewer(props: {
           dayjs.unix(row.original.created_at).format('YYYY-MM-DD HH:mm:ss'),
       },
       { accessorKey: 'model', header: t('Model') },
+      {
+        accessorKey: 'category',
+        header: t('Category'),
+        cell: ({ row }) => row.original.category_name || row.original.category,
+      },
+      {
+        accessorKey: 'action',
+        header: t('Disposition'),
+        cell: ({ row }) => (
+          <StatusBadge
+            variant={riskActionVariant(row.original.action)}
+            label={riskActionText(
+              row.original.action,
+              row.original.restriction_until,
+              row.original.created_at,
+              t
+            )}
+            copyable={false}
+          />
+        ),
+      },
       {
         accessorKey: 'review_status',
         header: t('Status'),

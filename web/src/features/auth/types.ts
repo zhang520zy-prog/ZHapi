@@ -130,6 +130,7 @@ export interface SystemStatus {
     custom_currency_exchange_rate?: number
     demo_site_enabled?: boolean
     user_agreement_enabled?: boolean
+    user_agreement_version?: number
     privacy_policy_enabled?: boolean
     oauth_register_enabled?: boolean
     register_enabled?: boolean
@@ -179,6 +180,7 @@ export interface SystemStatus {
   custom_currency_exchange_rate?: number
   demo_site_enabled?: boolean
   user_agreement_enabled?: boolean
+  user_agreement_version?: number
   privacy_policy_enabled?: boolean
   oauth_register_enabled?: boolean
   register_enabled?: boolean
@@ -195,7 +197,14 @@ export interface SystemStatus {
 
 export interface OAuthProvider {
   name: string
-  type: 'github' | 'google' | 'discord' | 'oidc' | 'linuxdo' | 'telegram' | 'wechat'
+  type:
+    | 'github'
+    | 'google'
+    | 'discord'
+    | 'oidc'
+    | 'linuxdo'
+    | 'telegram'
+    | 'wechat'
   enabled: boolean
   clientId?: string
   authEndpoint?: string

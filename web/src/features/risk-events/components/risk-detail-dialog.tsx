@@ -30,17 +30,27 @@ import dayjs from '@/lib/dayjs'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getRiskDetail, type RiskEvent, type RiskScope } from '../api'
-import { riskStatusLabel } from '../status'
+import {
+  appealStatusLabel,
+  latestAppealStatus,
+  riskActionText,
+  riskStatusLabel,
+} from '../status'
 import { RiskActionForm } from './risk-action-form'
 
 export function RiskDetailDialog(props: {
-  event: RiskEvent
+  event: Pick<RiskEvent, 'event_id'>
   scope: RiskScope
   canReview: boolean
   onAccessDenied: () => void
+  trigger?: React.ReactElement
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = props.open ?? internalOpen
+  const setOpen = props.onOpenChange ?? setInternalOpen
   return (
     <Dialog
       open={open}
@@ -50,17 +60,20 @@ export function RiskDetailDialog(props: {
         'A blocked request is a risk signal, not a confirmed violation. Normal requests do not wait for manual review.'
       )}
       trigger={
-        <Button size='sm' variant='ghost'>
-          {t('Details')}
-        </Button>
+        props.trigger ?? (
+          <Button size='sm' variant='ghost'>
+            {t('Details')}
+          </Button>
+        )
       }
     >
       {open && <RiskDetailContent {...props} />}
     </Dialog>
   )
 }
+
 function RiskDetailContent(props: {
-  event: RiskEvent
+  event: Pick<RiskEvent, 'event_id'>
   scope: RiskScope
   canReview: boolean
   onAccessDenied: () => void
@@ -94,11 +107,27 @@ function RiskDetailContent(props: {
   const pendingAppeals = new Set(
     detail.appeals.filter((appeal) => appeal.status === 'pending')
   )
+  const appealSummary = latestAppealStatus(detail.appeals)
   return (
     <div className='space-y-5 text-sm'>
       <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 break-all'>
+        <dt>{t('Appeal status')}</dt>
+        <dd>{appealStatusLabel(appealSummary, t)}</dd>
         <dt>{t('Status')}</dt>
         <dd>{riskStatusLabel(event.review_status, t)}</dd>
+        <dt>{t('Category')}</dt>
+        <dd>{event.category_name || event.category}</dd>
+        <dt>{t('Disposition')}</dt>
+        <dd>
+          {riskActionText(
+            event.action,
+            event.restriction_until,
+            event.created_at,
+            t
+          )}
+        </dd>
+        <dt>{t('Level')}</dt>
+        <dd>{event.level ?? 0}</dd>
         {!!event.restriction_until && (
           <>
             <dt>{t('Restriction expires')}</dt>
@@ -138,7 +167,6 @@ function RiskDetailContent(props: {
           'Conversation bodies, matched words and API keys are not retained in this ledger.'
         )}
       </p>
-      {props.scope === 'self' && <RiskActionForm event={event} mode='appeal' />}
       {props.scope === 'all' && props.canReview && (
         <RiskActionForm event={event} mode='review' />
       )}
@@ -179,6 +207,14 @@ function RiskDetailContent(props: {
           ))}
         </section>
       )}
+      {props.scope === 'self' &&
+        (appealSummary === 'pending' ? (
+          <p role='status' className='text-muted-foreground'>
+            {t('Your appeal is already being processed.')}
+          </p>
+        ) : (
+          <RiskActionForm event={event} mode='appeal' />
+        ))}
       <Button
         variant='outline'
         onClick={() => void query.refetch()}

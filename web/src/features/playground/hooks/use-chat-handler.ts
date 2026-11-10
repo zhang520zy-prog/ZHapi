@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { handleServerError } from '@/lib/handle-server-error'
+import { emitRiskRestricted } from '@/lib/risk-restricted'
 
 import { sendChatCompletion } from '../api'
 import { ERROR_MESSAGES } from '../constants'
@@ -223,6 +224,7 @@ export function useChatHandler({
   const handleStreamError = useCallback(
     (generation: number, error: string, errorCode?: string) => {
       if (generation !== requestGenerationRef.current) return
+      if (errorCode === 'risk_restricted') emitRiskRestricted()
       flushStreamUpdates(generation)
       setIsRequesting(false)
       const displayError = getDisplayError(error)
