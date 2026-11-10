@@ -20,7 +20,9 @@ import i18next from 'i18next'
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 
+import { isHttpUrl } from '@/lib/content-format'
 import { handleServerError } from '@/lib/handle-server-error'
+import { createServerError } from '@/lib/server-error-message'
 
 import {
   calculateAmount,
@@ -72,11 +74,24 @@ export interface PaymentAmountResult {
   quote?: PaymentQuote
 }
 
-export async function requestPaymentAmount(
+export interface PaymentQuoteResult {
+  /** Total amount to pay, derived from the server response for control flow only */
+  amount: number
+  /** Server-side quote (credited / fee / total), displayed verbatim */
+  quote: PaymentQuote | null
+}
+
+/**
+ * Request a server-side payment quote for the given top-up amount and payment
+ * type. Rejects with a server-aware error (`createServerError`) when the
+ * backend reports failure or returns no data, so React Query callers can show
+ * the server message inline instead of a toast.
+ */
+export async function requestPaymentQuote(
   topupAmount: number,
   paymentType: string,
   options: PaymentAmountOptions = {}
-): Promise<PaymentAmountResult> {
+): Promise<PaymentQuoteResult> {
   const calculators = options.calculators ?? defaultPaymentAmountCalculators
   let calculator = calculators.regular
   if (isStripePayment(paymentType)) {
@@ -96,39 +111,30 @@ export async function requestPaymentAmount(
 
   const response = await calculator(request)
   if (!isApiSuccess(response) || !response.data) {
-    return { amount: 0 }
+    throw createServerError(response, i18next.t('Failed to calculate amount'))
   }
 
-  return { amount: Number.parseFloat(response.data), quote: response.quote }
+  return {
+    amount: Number.parseFloat(response.data),
+    quote: response.quote ?? null,
+  }
+}
+
+export async function requestPaymentAmount(
+  topupAmount: number,
+  paymentType: string,
+  options: PaymentAmountOptions = {}
+): Promise<PaymentAmountResult> {
+  try {
+    const result = await requestPaymentQuote(topupAmount, paymentType, options)
+    return { amount: result.amount, quote: result.quote ?? undefined }
+  } catch {
+    return { amount: 0 }
+  }
 }
 
 export function usePayment() {
-  const [amount, setAmount] = useState<number>(0)
-  const [quote, setQuote] = useState<PaymentQuote | null>(null)
-  const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
-
-  // Calculate payment amount
-  const calculatePaymentAmount = useCallback(
-    async (topupAmount: number, paymentType: string, payMethodIndex?: number) => {
-      try {
-        setCalculating(true)
-        const result = await requestPaymentAmount(topupAmount, paymentType, {
-          payMethodIndex,
-        })
-        setAmount(result.amount)
-        setQuote(result.quote ?? null)
-        return result.amount
-      } catch {
-        setAmount(0)
-        setQuote(null)
-        return 0
-      } finally {
-        setCalculating(false)
-      }
-    },
-    []
-  )
 
   // Process payment
   const processPayment = useCallback(
@@ -156,7 +162,12 @@ export function usePayment() {
 
         // Handle Stripe payment
         if (isStripe && response.data?.pay_link) {
-          window.open(response.data.pay_link as string, '_blank')
+          const payLink = response.data.pay_link as string
+          if (!isHttpUrl(payLink)) {
+            toast.error(i18next.t('Invalid payment redirect URL'))
+            return false
+          }
+          window.open(payLink, '_blank')
           toast.success(i18next.t('Redirecting to payment page...'))
           return true
         }
@@ -165,6 +176,10 @@ export function usePayment() {
         if (!isStripe && response.data) {
           const url = (response as unknown as { url?: string }).url
           if (url) {
+            if (!isHttpUrl(url)) {
+              toast.error(i18next.t('Invalid payment redirect URL'))
+              return false
+            }
             submitPaymentForm(url, response.data)
             toast.success(i18next.t('Redirecting to payment page...'))
             return true
@@ -183,12 +198,7 @@ export function usePayment() {
   )
 
   return {
-    amount,
-    quote,
-    calculating,
     processing,
-    calculatePaymentAmount,
     processPayment,
-    setAmount,
   }
 }

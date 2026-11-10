@@ -19,10 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   PAYMENT_TYPES,
   DEFAULT_PRESET_MULTIPLIERS,
-  DEFAULT_PAYMENT_TYPE,
   DEFAULT_MIN_TOPUP,
 } from '../constants'
-import type { PaymentMethod, PresetAmount, TopupInfo } from '../types'
+import type { PresetAmount, TopupInfo } from '../types'
 
 // ============================================================================
 // Payment Processing Functions
@@ -91,60 +90,6 @@ export function isWaffoPayment(paymentType: string): boolean {
  */
 export function isWaffoPancakePayment(paymentType: string): boolean {
   return paymentType === PAYMENT_TYPES.WAFFO_PANCAKE
-}
-
-export interface PaymentProcessors {
-  regular: (topupAmount: number, paymentType: string) => Promise<boolean>
-  waffo: (topupAmount: number, payMethodIndex: number) => Promise<boolean>
-  waffoPancake: (topupAmount: number) => Promise<boolean>
-}
-
-export async function dispatchSelectedPayment(
-  paymentMethod: PaymentMethod,
-  topupAmount: number,
-  waffoMethodIndex: number | null,
-  processors: PaymentProcessors
-): Promise<boolean> {
-  if (isWaffoPayment(paymentMethod.type)) {
-    if (waffoMethodIndex === null) {
-      return false
-    }
-    return processors.waffo(topupAmount, waffoMethodIndex)
-  }
-
-  if (isWaffoPancakePayment(paymentMethod.type)) {
-    return processors.waffoPancake(topupAmount)
-  }
-
-  return processors.regular(topupAmount, paymentMethod.type)
-}
-
-/**
- * Get default payment type from topup info
- */
-export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
-  if (!topupInfo) {
-    return DEFAULT_PAYMENT_TYPE
-  }
-
-  // Return first available payment method or default
-  if (topupInfo.pay_methods?.length > 0) {
-    return topupInfo.pay_methods[0].type
-  }
-
-  if (topupInfo.enable_stripe_topup) {
-    return PAYMENT_TYPES.STRIPE
-  }
-
-  if (topupInfo.enable_waffo_topup) {
-    return PAYMENT_TYPES.WAFFO
-  }
-
-  if (topupInfo.enable_waffo_pancake_topup) {
-    return PAYMENT_TYPES.WAFFO_PANCAKE
-  }
-
-  return DEFAULT_PAYMENT_TYPE
 }
 
 /**

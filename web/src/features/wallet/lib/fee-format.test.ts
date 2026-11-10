@@ -18,7 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { formatFeeRateBps, formatQuoteMoney } from './format'
+import { formatServerMoney } from '@/lib/currency'
+
+import { formatFeeRateBps } from './format'
 
 describe('formatFeeRateBps', () => {
   test('renders whole-number rates without decimals', () => {
@@ -36,14 +38,20 @@ describe('formatFeeRateBps', () => {
   })
 })
 
-describe('formatQuoteMoney', () => {
-  test('prefixes known currency symbols', () => {
-    expect(formatQuoteMoney('101.50', 'CNY')).toBe('¥101.50')
-    expect(formatQuoteMoney('10.00', 'usd')).toBe('$10.00')
-    expect(formatQuoteMoney('5.00', 'EUR')).toBe('€5.00')
+describe('formatServerMoney', () => {
+  test('prefixes known currency symbols without reparsing the amount', () => {
+    expect(formatServerMoney('101.50', 'CNY')).toBe('¥101.50')
+    expect(formatServerMoney('10.00', 'usd')).toBe('$10.00')
+    expect(formatServerMoney('5.00', 'EUR')).toBe('€5.00')
   })
 
-  test('falls back to currency code for unknown currencies', () => {
-    expect(formatQuoteMoney('100', 'JPY')).toBe('JPY 100')
+  test('falls back to the currency code for unknown currencies', () => {
+    expect(formatServerMoney('100', 'ABC')).toBe('ABC 100')
+  })
+
+  test('keeps the server string when currency is missing or amount absent', () => {
+    expect(formatServerMoney('9.99', '')).toBe('9.99')
+    expect(formatServerMoney(null, 'CNY')).toBe('-')
+    expect(formatServerMoney('', 'CNY')).toBe('-')
   })
 })

@@ -22,15 +22,12 @@ import { z } from 'zod'
 import { Wallet } from '@/features/wallet'
 
 const walletSearchSchema = z.object({
+  tab: z.enum(['topup', 'subscription', 'billing']).optional(),
+  /** Legacy deep link — the wallet redirects it to ?tab=billing. */
   show_history: z.boolean().optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/wallet/')({
-  component: RouteComponent,
+  component: Wallet,
   validateSearch: walletSearchSchema,
 })
-
-function RouteComponent() {
-  const { show_history } = Route.useSearch()
-  return <Wallet initialShowHistory={show_history} />
-}

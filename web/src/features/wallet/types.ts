@@ -59,7 +59,6 @@ export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
 }
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
-export type AffiliateTransferResponse = ApiResponse
 export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
@@ -153,6 +152,8 @@ export interface TopupInfo {
   pay_methods: PaymentMethod[]
   /** Minimum topup amount for online topup */
   min_topup: number
+  /** Maximum topup amount for online topup (not currently sent by the backend) */
+  max_topup?: number
   /** Minimum topup amount for Stripe */
   stripe_min_topup: number
   /** Preset amount options */
@@ -241,14 +242,6 @@ export interface AmountRequest {
   payment_method?: string
   /** Server-side Waffo payment method index */
   pay_method_index?: number
-}
-
-/**
- * Affiliate quota transfer request
- */
-export interface AffiliateTransferRequest {
-  /** Quota amount to transfer */
-  quota: number
 }
 
 /**

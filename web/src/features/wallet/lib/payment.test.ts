@@ -19,8 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, test } from 'vitest'
 
 import { PAYMENT_TYPES } from '../constants'
+import { payTargetId, payTargetQuoteParams } from './pay-target'
 import {
-  dispatchSelectedPayment,
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
@@ -36,50 +36,48 @@ describe('payment type classification', () => {
   })
 })
 
-describe('payment dispatch', () => {
-  test('keeps the selected Waffo method index through confirmation', async () => {
-    const calls: string[] = []
-    const success = await dispatchSelectedPayment(
-      { name: 'Waffo Card', type: PAYMENT_TYPES.WAFFO },
-      120,
-      3,
-      {
-        regular: async () => {
-          calls.push('regular')
-          return false
-        },
-        waffo: async (amount, index) => {
-          calls.push(`waffo:${amount}:${index}`)
-          return true
-        },
-        waffoPancake: async () => {
-          calls.push('pancake')
-          return false
-        },
-      }
-    )
-
-    expect(success).toBe(true)
-    expect(calls).toEqual(['waffo:120:3'])
+describe('pay target', () => {
+  test('gives each selection a stable, distinct id', () => {
+    expect(
+      payTargetId({
+        kind: 'standard',
+        method: { name: 'Alipay', type: 'alipay' },
+      })
+    ).toBe('std:alipay')
+    expect(
+      payTargetId({
+        kind: 'waffo',
+        method: { name: 'Waffo Card' },
+        index: 3,
+      })
+    ).toBe('waffo:3')
+    expect(payTargetId({ kind: 'waffoPancake' })).toBe('waffo_pancake')
+    expect(payTargetId({ kind: 'creem' })).toBe('creem')
   })
 
-  test('does not create a Waffo order without a selected method index', async () => {
-    let called = false
-    const success = await dispatchSelectedPayment(
-      { name: 'Waffo Card', type: PAYMENT_TYPES.WAFFO },
-      120,
-      null,
-      {
-        regular: async () => false,
-        waffo: async () => {
-          called = true
-          return true
-        },
-        waffoPancake: async () => false,
-      }
-    )
+  test('keeps the Waffo method index in the quote request params', () => {
+    expect(
+      payTargetQuoteParams({
+        kind: 'waffo',
+        method: { name: 'Waffo Card' },
+        index: 3,
+      })
+    ).toEqual({ paymentType: PAYMENT_TYPES.WAFFO, payMethodIndex: 3 })
+  })
 
-    expect(success).toBe(false)
-    expect(called).toBe(false)
+  test('passes the method type for standard methods', () => {
+    expect(
+      payTargetQuoteParams({
+        kind: 'standard',
+        method: { name: 'Alipay', type: 'alipay' },
+      })
+    ).toEqual({ paymentType: 'alipay' })
+    expect(payTargetQuoteParams({ kind: 'waffoPancake' })).toEqual({
+      paymentType: PAYMENT_TYPES.WAFFO_PANCAKE,
+    })
+  })
+
+  test('returns no quote params for Creem product pricing', () => {
+    expect(payTargetQuoteParams({ kind: 'creem' })).toBeNull()
   })
 })

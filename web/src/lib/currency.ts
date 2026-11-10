@@ -635,3 +635,48 @@ export function formatLocalCurrencyAmount(
 
   return formatCurrencyValue(amount, merged, meta)
 }
+
+/**
+ * Format a money string returned verbatim by the server with the symbol of
+ * the given ISO 4217 currency code.
+ *
+ * The amount text is never parsed, converted, or re-rounded — the server's
+ * decimal string passes through unchanged and only a currency symbol (or the
+ * code itself when Intl cannot resolve one) is prepended. Use this for any
+ * server-computed money value such as quote rows or billing entries, where
+ * client-side arithmetic would violate the display-only contract.
+ *
+ * @example
+ * formatServerMoney('101.50', 'CNY') → "¥101.50"
+ * formatServerMoney('4.20', 'EUR') → "€4.20"
+ * formatServerMoney(null, 'CNY') → "-"
+ * formatServerMoney('9.99', '') → "9.99"
+ * formatServerMoney('9.99', 'ABC') → "ABC 9.99"
+ */
+export function formatServerMoney(
+  amount: string | null | undefined,
+  currency: string | null | undefined,
+  options?: { locale?: Intl.LocalesArgument }
+): string {
+  if (amount == null || amount === '') return '-'
+  const code = (currency ?? '').trim().toUpperCase()
+  if (!code) return amount
+
+  try {
+    const symbol = new Intl.NumberFormat(options?.locale, {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value
+    // Intl echoes back unresolvable codes instead of throwing; keep the code
+    // readable by separating it from the amount rather than gluing them.
+    if (!symbol || symbol === code) return `${code} ${amount}`
+    return `${symbol}${amount}`
+  } catch {
+    return `${code} ${amount}`
+  }
+}

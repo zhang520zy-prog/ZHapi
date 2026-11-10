@@ -41,21 +41,6 @@ export function formatFeeRateBps(bps?: number): string {
   return `${Number.isInteger(rate) ? rate.toFixed(0) : Number.parseFloat(rate.toFixed(2))}%`
 }
 
-const QUOTE_CURRENCY_SYMBOLS: Record<string, string> = {
-  CNY: '¥',
-  USD: '$',
-  EUR: '€',
-}
-
-/**
- * Format a money string from a server PaymentQuote with its currency symbol.
- */
-export function formatQuoteMoney(amount: string, currency: string): string {
-  const code = currency?.toUpperCase() ?? ''
-  const symbol = QUOTE_CURRENCY_SYMBOLS[code] ?? (code ? `${code} ` : '')
-  return `${symbol}${amount}`
-}
-
 /**
  * Format large quota numbers with K/M suffix
  */
@@ -67,21 +52,6 @@ export function formatQuotaShort(quota: number): string {
     return `${(quota / 1000).toFixed(1)}K`
   }
   return quota.toString()
-}
-
-/**
- * Format currency amount that is already in local currency.
- * This is used for payment amounts that have been calculated via priceRatio.
- */
-export function formatCurrency(amount: number | string): string {
-  const numeric =
-    typeof amount === 'number' ? amount : Number.parseFloat(String(amount))
-  if (!Number.isFinite(numeric)) return '-'
-
-  return new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: Math.abs(numeric) >= 1 ? 2 : 4,
-  }).format(numeric)
 }
 
 /**
