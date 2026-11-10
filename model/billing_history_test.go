@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -319,6 +320,64 @@ func billingCutoffAndTitleScenario(f *commissionFixture, t *testing.T) {
 	assert.Equal(t, "月度套餐", entries[2].Title)
 }
 
+// billingIdScenario 每行携带按来源表拼接的稳定 id：余额结算发票手续费
+// 没有单号，前端行 key 只能靠 id 区分；kind=all 全量与跨页都不得重复。
+func billingIdScenario(f *commissionFixture, t *testing.T) {
+	withBillingTables(t)
+	u := f.makeUser("bill_id", 0)
+	now := common.GetTimestamp()
+
+	require.NoError(t, f.db.Create(&TopUp{UserId: u.Id, Amount: 1, Money: 1.0,
+		TradeNo: "id_tu", PaymentProvider: PaymentProviderEpay, Status: common.TopUpStatusSuccess,
+		Currency: "CNY", CreateTime: now, CompleteTime: now}).Error)
+	require.NoError(t, f.db.Create(&TopUp{UserId: u.Id, Amount: 3, Money: 3.0,
+		TradeNo: "id_fee", PaymentProvider: PaymentProviderBalance, PaymentMethod: "invoice_fee",
+		Status: common.TopUpStatusSuccess, CreateTime: now - 1, CompleteTime: now - 1}).Error)
+	require.NoError(t, f.db.Create(&SubscriptionOrder{UserId: u.Id, PlanId: 0, Money: 20.0,
+		TradeNo: "id_sub", PaymentProvider: PaymentProviderBalance, PaymentMethod: PaymentMethodBalance,
+		Status: common.TopUpStatusSuccess, Currency: "CNY",
+		CreateTime: now - 2, CompleteTime: now - 2}).Error)
+	// 两条余额结算发票手续费：trade_no 为空，是 AA-1 的出错场景。
+	for i := range 2 {
+		require.NoError(t, f.db.Create(&InvoiceRequest{
+			UserId: u.Id, Settlement: InvoiceSettlementBalance, TradeNo: "",
+			FeeCny: "2.00", FeeRateBps: 200, FeePaidAt: now - int64(10+i),
+			Status: InvoiceStatusIssued, CreatedAt: now - int64(10+i),
+			UpdatedAt: now - int64(10+i),
+		}).Error)
+	}
+
+	collect := func(page, size int) []*BillingEntry {
+		entries, _, err := GetUserBillingEntries(u.Id, BillingKindAll, "", billingPage(page, size))
+		require.NoError(t, err)
+		return entries
+	}
+
+	all := collect(1, 10)
+	require.Len(t, all, 5)
+	seen := map[string]bool{}
+	prefixes := map[string]int{}
+	for _, e := range all {
+		require.NotEmpty(t, e.ID)
+		assert.False(t, seen[e.ID], "duplicate billing id %s", e.ID)
+		seen[e.ID] = true
+		prefix, _, _ := strings.Cut(e.ID, ":")
+		prefixes[prefix]++
+	}
+	assert.Equal(t, map[string]int{"topup": 2, "subscription": 1, "invoice": 2}, prefixes)
+
+	// 跨页：同一条记录 id 不变，且两页 id 无重复。
+	page1 := collect(1, 2)
+	page2 := collect(2, 2)
+	page3 := collect(3, 2)
+	paged := map[string]bool{}
+	for _, e := range append(append(page1, page2...), page3...) {
+		assert.False(t, paged[e.ID], "id %s repeated across pages", e.ID)
+		paged[e.ID] = true
+	}
+	assert.Equal(t, seen, paged)
+}
+
 func TestBillingHistoryMatrix(t *testing.T) {
 	scenarios := map[string]func(*commissionFixture, *testing.T){
 		"merge":            billingScenario,
@@ -327,6 +386,7 @@ func TestBillingHistoryMatrix(t *testing.T) {
 		"quota":            billingQuotaScenario,
 		"invoice_fee":      billingInvoiceFeeScenario,
 		"cutoff_and_title": billingCutoffAndTitleScenario,
+		"id":               billingIdScenario,
 	}
 	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
 		for name, scenario := range scenarios {

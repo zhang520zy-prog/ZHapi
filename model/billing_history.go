@@ -26,7 +26,10 @@ const (
 
 // BillingEntry 单条账单记录。金额一律字符串、按币种小数位输出；
 // fee_money 在快照缺失的老订单（currency=”）上为 null；quota 可空。
+// ID 按来源表拼接（topup:/subscription:/invoice:），供前端作行 key——
+// 余额结算的发票手续费没有单号，trade_no 不足以唯一标识一行。
 type BillingEntry struct {
+	ID              string  `json:"id"`
 	Kind            string  `json:"kind"`
 	TradeNo         string  `json:"trade_no"`
 	Status          string  `json:"status"`
@@ -68,6 +71,7 @@ func billingTopUpEntry(t *TopUp) BillingEntry {
 	if t.PaymentMethod == "invoice_fee" {
 		money := decimal.NewFromFloat(t.Money).StringFixed(2)
 		return BillingEntry{
+			ID:              "topup:" + strconv.Itoa(t.Id),
 			Kind:            BillingKindInvoiceFee,
 			TradeNo:         t.TradeNo,
 			Status:          t.Status,
@@ -89,6 +93,7 @@ func billingTopUpEntry(t *TopUp) BillingEntry {
 		quota = &v
 	}
 	return BillingEntry{
+		ID:              "topup:" + strconv.Itoa(t.Id),
 		Kind:            BillingKindTopup,
 		TradeNo:         t.TradeNo,
 		Status:          t.Status,
@@ -114,6 +119,7 @@ func billingSubscriptionEntry(o *SubscriptionOrder, title string) BillingEntry {
 		}
 	}
 	return BillingEntry{
+		ID:              "subscription:" + strconv.Itoa(o.Id),
 		Kind:            BillingKindSubscription,
 		TradeNo:         o.TradeNo,
 		Status:          o.Status,
@@ -147,6 +153,7 @@ func parseChargedQuota(payload string) (int64, bool) {
 func billingInvoiceRequestEntry(inv *InvoiceRequest) BillingEntry {
 	fee := inv.FeeCny
 	return BillingEntry{
+		ID:              "invoice:" + strconv.Itoa(inv.Id),
 		Kind:            BillingKindInvoiceFee,
 		TradeNo:         inv.TradeNo,
 		Status:          inv.Status,
