@@ -59,7 +59,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { AnnouncementPopupDialog } from '@/features/announcements/announcement-popup'
+import type { PopupAnnouncement } from '@/features/announcements/types'
 import dayjs from '@/lib/dayjs'
 import { handleServerError } from '@/lib/handle-server-error'
 
@@ -68,9 +71,15 @@ import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
 type Announcement = {
-  id: number
+  /** Server-assigned; absent on locally added rows (B6.1/F6.1). */
+  id?: number
+  /** Local-only row key; never serialized into the saved JSON. */
+  localId: string
+  title?: string
   content: string
   publishDate: string
+  expireDate?: string
+  popup?: boolean
   type: 'default' | 'ongoing' | 'success' | 'warning' | 'error'
   extra?: string
 }
@@ -80,18 +89,43 @@ type AnnouncementsSectionProps = {
   data: string
 }
 
-const announcementSchema = z.object({
-  content: z
-    .string()
-    .min(1, 'Content is required')
-    .max(500, 'Content must be less than 500 characters'),
-  publishDate: z.string().min(1, 'Publish date is required'),
-  type: z.enum(['default', 'ongoing', 'success', 'warning', 'error']),
-  extra: z
-    .string()
-    .max(100, 'Extra must be less than 100 characters')
-    .optional(),
-})
+const announcementSchema = z
+  .object({
+    title: z
+      .string()
+      .max(60, 'Title must be less than 60 characters')
+      .optional(),
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      .max(2000, 'Content must be less than 2000 characters'),
+    publishDate: z.string().min(1, 'Publish date is required'),
+    expireDate: z.string().optional(),
+    popup: z.boolean(),
+    /** Form-only flag; stripped before save. */
+    remindAgain: z.boolean(),
+    type: z.enum(['default', 'ongoing', 'success', 'warning', 'error']),
+    extra: z
+      .string()
+      .max(100, 'Extra must be less than 100 characters')
+      .optional(),
+  })
+  .refine(
+    (values) => {
+      if (!values.expireDate) return true
+      const published = Date.parse(values.publishDate)
+      const expires = Date.parse(values.expireDate)
+      return (
+        Number.isFinite(published) &&
+        Number.isFinite(expires) &&
+        expires > published
+      )
+    },
+    {
+      message: 'Expiry must be later than the publish date',
+      path: ['expireDate'],
+    }
+  )
 
 type AnnouncementFormValues = z.infer<typeof announcementSchema>
 
@@ -139,18 +173,23 @@ export function AnnouncementsSection({
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isEnabled, setIsEnabled] = useState(enabled)
   const [hasChanges, setHasChanges] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [showDialog, setShowDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<Announcement | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<'single' | 'batch'>('single')
+  const [preview, setPreview] = useState<PopupAnnouncement[] | null>(null)
 
   const form = useForm<AnnouncementFormValues>({
     resolver: zodResolver(announcementSchema),
     defaultValues: {
+      title: '',
       content: '',
       publishDate: new Date().toISOString(),
+      expireDate: '',
+      popup: false,
+      remindAgain: false,
       type: 'default',
       extra: '',
     },
@@ -163,9 +202,11 @@ export function AnnouncementsSection({
         setAnnouncements(
           parsed.map((item, idx) => ({
             ...item,
-            id: item.id || idx + 1,
+            localId:
+              typeof item.id === 'number' ? `srv:${item.id}` : `row:${idx}`,
           }))
         )
+        setSelectedIds([])
       }
     } catch {
       setAnnouncements([])
@@ -192,8 +233,12 @@ export function AnnouncementsSection({
   const handleAdd = () => {
     setEditingAnnouncement(null)
     form.reset({
+      title: '',
       content: '',
       publishDate: new Date().toISOString(),
+      expireDate: '',
+      popup: false,
+      remindAgain: false,
       type: 'default',
       extra: '',
     })
@@ -203,8 +248,12 @@ export function AnnouncementsSection({
   const handleEdit = (announcement: Announcement) => {
     setEditingAnnouncement(announcement)
     form.reset({
+      title: announcement.title || '',
       content: announcement.content,
       publishDate: announcement.publishDate,
+      expireDate: announcement.expireDate || '',
+      popup: announcement.popup === true,
+      remindAgain: false,
       type: announcement.type,
       extra: announcement.extra || '',
     })
@@ -229,13 +278,13 @@ export function AnnouncementsSection({
   const confirmDelete = () => {
     if (deleteTarget === 'single' && editingAnnouncement) {
       setAnnouncements((prev) =>
-        prev.filter((item) => item.id !== editingAnnouncement.id)
+        prev.filter((item) => item.localId !== editingAnnouncement.localId)
       )
       setHasChanges(true)
       toast.success(t('Announcement deleted. Click "Save Settings" to apply.'))
     } else if (deleteTarget === 'batch') {
       setAnnouncements((prev) =>
-        prev.filter((item) => !selectedIds.includes(item.id))
+        prev.filter((item) => !selectedIds.includes(item.localId))
       )
       setSelectedIds([])
       setHasChanges(true)
@@ -250,16 +299,30 @@ export function AnnouncementsSection({
   }
 
   const handleSubmitForm = (values: AnnouncementFormValues) => {
+    const { remindAgain, ...fields } = values
     if (editingAnnouncement) {
       setAnnouncements((prev) =>
         prev.map((item) =>
-          item.id === editingAnnouncement.id ? { ...item, ...values } : item
+          item.localId === editingAnnouncement.localId
+            ? {
+                ...item,
+                ...fields,
+                // Remind-again: drop the server id so the backend assigns a
+                // fresh one and every account sees the popup once more.
+                id: remindAgain ? undefined : item.id,
+                localId: remindAgain
+                  ? `local:${crypto.randomUUID()}`
+                  : item.localId,
+              }
+            : item
         )
       )
       toast.success(t('Announcement updated. Click "Save Settings" to apply.'))
     } else {
-      const newId = Math.max(...announcements.map((item) => item.id), 0) + 1
-      setAnnouncements((prev) => [...prev, { id: newId, ...values }])
+      setAnnouncements((prev) => [
+        ...prev,
+        { localId: `local:${crypto.randomUUID()}`, ...fields },
+      ])
       toast.success(t('Announcement added. Click "Save Settings" to apply.'))
     }
     setHasChanges(true)
@@ -268,24 +331,52 @@ export function AnnouncementsSection({
 
   const handleSaveAll = async () => {
     try {
+      const payload = announcements.map(({ localId: _localId, ...item }) => {
+        const { id, title, expireDate, ...rest } = item
+        const entry: Record<string, unknown> = { ...rest }
+        // Only server-assigned ids go out; new rows carry no id (B6.1 audit).
+        if (id !== undefined) entry.id = id
+        if (title?.trim()) entry.title = title.trim()
+        if (expireDate) entry.expireDate = expireDate
+        return entry
+      })
       await updateOption.mutateAsync({
         key: 'console_setting.announcements',
-        value: JSON.stringify(announcements),
+        value: JSON.stringify(payload),
       })
       setHasChanges(false)
-      toast.success(t('Announcements saved successfully'))
+      toast.success(
+        t(
+          'Saved. Popup announcements will be shown the next time each user enters the console.'
+        )
+      )
     } catch (error) {
       handleServerError(error, t('Failed to save announcements'))
     }
   }
 
-  const toggleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? announcements.map((item) => item.id) : [])
+  const handlePreview = () => {
+    const values = form.getValues()
+    setPreview([
+      {
+        title: values.title?.trim() || undefined,
+        content: values.content,
+        publishDate: values.publishDate,
+        expireDate: values.expireDate || undefined,
+        popup: true,
+        type: values.type,
+        extra: values.extra,
+      },
+    ])
   }
 
-  const toggleSelectOne = (id: number, checked: boolean) => {
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? announcements.map((item) => item.localId) : [])
+  }
+
+  const toggleSelectOne = (localId: string, checked: boolean) => {
     setSelectedIds((prev) =>
-      checked ? [...prev, id] : prev.filter((item) => item !== id)
+      checked ? [...prev, localId] : prev.filter((item) => item !== localId)
     )
   }
 
@@ -349,7 +440,7 @@ export function AnnouncementsSection({
 
         <StaticDataTable
           data={sortedAnnouncements}
-          getRowKey={(announcement) => announcement.id}
+          getRowKey={(announcement) => announcement.localId}
           emptyContent={t(
             'No announcements yet. Click "Add Announcement" to create one.'
           )}
@@ -368,9 +459,9 @@ export function AnnouncementsSection({
               className: 'w-12',
               cell: (announcement) => (
                 <Checkbox
-                  checked={selectedIds.includes(announcement.id)}
+                  checked={selectedIds.includes(announcement.localId)}
                   onCheckedChange={(checked) =>
-                    toggleSelectOne(announcement.id, checked as boolean)
+                    toggleSelectOne(announcement.localId, checked as boolean)
                   }
                 />
               ),
@@ -400,19 +491,42 @@ export function AnnouncementsSection({
             {
               id: 'type',
               header: t('Type'),
-              cell: (announcement) => (
-                <StatusBadge
-                  label={
-                    typeOptions.find((opt) => opt.value === announcement.type)
-                      ?.label
-                  }
-                  variant={
-                    typeOptions.find((opt) => opt.value === announcement.type)
-                      ?.badgeVariant ?? 'neutral'
-                  }
-                  copyable={false}
-                />
-              ),
+              cell: (announcement) => {
+                const expired =
+                  !!announcement.expireDate &&
+                  Date.parse(announcement.expireDate) <= Date.now()
+                return (
+                  <div className='flex flex-wrap items-center gap-1'>
+                    <StatusBadge
+                      label={
+                        typeOptions.find(
+                          (opt) => opt.value === announcement.type
+                        )?.label
+                      }
+                      variant={
+                        typeOptions.find(
+                          (opt) => opt.value === announcement.type
+                        )?.badgeVariant ?? 'neutral'
+                      }
+                      copyable={false}
+                    />
+                    {announcement.popup ? (
+                      <StatusBadge
+                        label={t('Popup')}
+                        variant='info'
+                        copyable={false}
+                      />
+                    ) : null}
+                    {expired ? (
+                      <StatusBadge
+                        label={t('Expired')}
+                        variant='neutral'
+                        copyable={false}
+                      />
+                    ) : null}
+                  </div>
+                )
+              },
             },
             {
               id: 'extra',
@@ -458,6 +572,9 @@ export function AnnouncementsSection({
             >
               {t('Cancel')}
             </Button>
+            <Button type='button' variant='outline' onClick={handlePreview}>
+              {t('Preview')}
+            </Button>
             <Button type='submit' form={ANNOUNCEMENT_FORM_ID}>
               {editingAnnouncement ? t('Update') : t('Add')}
             </Button>
@@ -470,6 +587,47 @@ export function AnnouncementsSection({
             onSubmit={form.handleSubmit(handleSubmitForm)}
             className='space-y-4'
           >
+            <FormField
+              control={form.control}
+              name='title'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Title (Optional)')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t(
+                        'Shown as the popup title (max 60 characters)'
+                      )}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='popup'
+              render={({ field }) => (
+                <FormItem>
+                  <div className='flex items-center justify-between gap-4'>
+                    <FormLabel>{t('Popup on console entry')}</FormLabel>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </div>
+                  <FormDescription>
+                    {t(
+                      'When enabled, this announcement pops up once per account when a user enters the console.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name='content'
@@ -486,12 +644,65 @@ export function AnnouncementsSection({
                     />
                   </FormControl>
                   <FormDescription>
-                    {t('Maximum 500 characters. Supports Markdown and HTML.')}
+                    {t('{{count}}/2000 characters', {
+                      count: field.value?.length ?? 0,
+                    })}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name='expireDate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Expiry (Optional)')}</FormLabel>
+                  <FormControl>
+                    <DateTimePicker
+                      value={field.value ? new Date(field.value) : undefined}
+                      onChange={(date) =>
+                        field.onChange(date ? date.toISOString() : '')
+                      }
+                      placeholder={t('No expiry')}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'After expiry the popup no longer shows, but the announcement stays in the list.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {editingAnnouncement?.popup === true ? (
+              <FormField
+                control={form.control}
+                name='remindAgain'
+                render={({ field }) => (
+                  <FormItem>
+                    <div className='flex items-center gap-2'>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className='!mt-0'>
+                        {t('Remind again')}
+                      </FormLabel>
+                    </div>
+                    <FormDescription>
+                      {t(
+                        'When checked and saved, this announcement pops up again for every user as a new announcement.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             <FormField
               control={form.control}
               name='publishDate'
@@ -587,6 +798,14 @@ export function AnnouncementsSection({
           </form>
         </Form>
       </Dialog>
+
+      <AnnouncementPopupDialog
+        open={preview !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null)
+        }}
+        items={preview ?? []}
+      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

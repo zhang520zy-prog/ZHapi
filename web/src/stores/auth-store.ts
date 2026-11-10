@@ -53,6 +53,7 @@ export interface AuthUser {
   language?: string
   setting?: Record<string, unknown> | string
   agreement_version?: number
+  announcement_acked_ids?: number[]
   stripe_customer?: string
   sidebar_modules?: string
   permissions?: UserPermissions

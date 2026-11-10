@@ -21,6 +21,7 @@ import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
+import { AnnouncementPopup } from '@/features/announcements/announcement-popup'
 import { AgreementConfirmDialog } from '@/features/legal/agreement-confirm-dialog'
 import { RiskRestrictionBanner } from '@/features/risk-events/components/restriction-banner'
 import { getCookie } from '@/lib/cookies'
@@ -69,6 +70,7 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
               </div>
             </SidebarInset>
             <AgreementConfirmDialog />
+            <AnnouncementPopup />
           </div>
         </SidebarProvider>
       </SearchProvider>
