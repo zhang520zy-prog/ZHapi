@@ -17,7 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -99,8 +105,10 @@ it('submits new announcements without an id even after deleting the latest row i
   const checkboxes = screen.getAllByRole('checkbox')
   await user.click(checkboxes[1])
   await user.click(screen.getByRole('button', { name: /Delete \(/ }))
-  const deleteButtons = screen.getAllByRole('button', { name: 'Delete' })
-  await user.click(deleteButtons[deleteButtons.length - 1])
+  const confirmDialog = await screen.findByRole('alertdialog')
+  await user.click(
+    within(confirmDialog).getByRole('button', { name: 'Delete' })
+  )
 
   await addViaDialog('brand new')
   await user.click(screen.getByRole('button', { name: 'Save Settings' }))

@@ -821,4 +821,17 @@ export const STATIC_I18N_KEYS = [
   'Vendor name and icon must not exceed 128 characters.',
   'Shown',
   'Not shown',
+  // Announcement form zod messages (passed to t() via FormMessage) and
+  // dynamic type-badge labels (passed to t() via option.label).
+  'Title must be less than 60 characters',
+  'Content must be less than 2000 characters',
+  'Expiry must be later than the publish date',
+  'Content is required',
+  'Publish date is required',
+  'Extra must be less than 100 characters',
+  'Default',
+  'Ongoing',
+  'Success',
+  'Warning',
+  'Error',
 ] as const

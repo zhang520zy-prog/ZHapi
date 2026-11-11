@@ -18,7 +18,22 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import i18n from 'i18next'
+import 'dayjs/locale/zh-cn'
+import 'dayjs/locale/zh-tw'
 
 dayjs.extend(relativeTime)
+
+const DAYJS_LOCALE: Record<string, string> = {
+  zhCN: 'zh-cn',
+  zhTW: 'zh-tw',
+}
+
+const syncDayjsLocale = (language?: string) => {
+  dayjs.locale(DAYJS_LOCALE[language ?? ''] ?? 'en')
+}
+
+syncDayjsLocale(i18n.language)
+i18n.on('languageChanged', syncDayjsLocale)
 
 export default dayjs

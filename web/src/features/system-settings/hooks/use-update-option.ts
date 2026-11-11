@@ -47,9 +47,16 @@ const STATUS_RELATED_KEYS = new Set([
   'passkey.rp_id',
   'passkey.legacy_rp_ids',
   'passkey.origins',
+  'console_setting.announcements',
+  'console_setting.announcements_enabled',
 ])
 
-export function useUpdateOption() {
+type UseUpdateOptionOptions = {
+  /** Set to false when the caller shows its own success toast. */
+  successToast?: boolean
+}
+
+export function useUpdateOption(options?: UseUpdateOptionOptions) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -70,7 +77,9 @@ export function useUpdateOption() {
           }
         }
 
-        toast.success(i18next.t('Setting updated successfully'))
+        if (options?.successToast !== false) {
+          toast.success(i18next.t('Setting updated successfully'))
+        }
       } else {
         handleServerError(data, i18next.t('Failed to update setting'))
       }

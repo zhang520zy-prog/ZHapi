@@ -169,7 +169,7 @@ export function AnnouncementsSection({
   data,
 }: AnnouncementsSectionProps) {
   const { t } = useTranslation()
-  const updateOption = useUpdateOption()
+  const updateOption = useUpdateOption({ successToast: false })
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isEnabled, setIsEnabled] = useState(enabled)
   const [hasChanges, setHasChanges] = useState(false)
@@ -388,18 +388,7 @@ export function AnnouncementsSection({
     })
   }, [announcements])
 
-  const getRelativeTime = (date: string) => {
-    const now = new Date()
-    const past = new Date(date)
-    const diffMs = now.getTime() - past.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    return `${diffDays}d ago`
-  }
+  const getRelativeTime = (date: string) => dayjs(date).fromNow()
 
   return (
     <SettingsSection title={t('Announcements')}>
@@ -469,8 +458,17 @@ export function AnnouncementsSection({
             {
               id: 'content',
               header: t('Content'),
-              cellClassName: 'max-w-xs truncate',
-              cell: (announcement) => announcement.content,
+              cellClassName: 'max-w-xs',
+              cell: (announcement) => (
+                <div className='flex min-w-0 flex-col gap-0.5'>
+                  {announcement.title?.trim() ? (
+                    <span className='truncate font-medium'>
+                      {announcement.title}
+                    </span>
+                  ) : null}
+                  <span className='truncate'>{announcement.content}</span>
+                </div>
+              ),
             },
             {
               id: 'publish-date',
@@ -492,28 +490,32 @@ export function AnnouncementsSection({
               id: 'type',
               header: t('Type'),
               cell: (announcement) => {
+                const typeOption = typeOptions.find(
+                  (opt) => opt.value === announcement.type
+                )
+                const scheduled =
+                  Date.parse(announcement.publishDate) > Date.now()
                 const expired =
                   !!announcement.expireDate &&
                   Date.parse(announcement.expireDate) <= Date.now()
                 return (
                   <div className='flex flex-wrap items-center gap-1'>
                     <StatusBadge
-                      label={
-                        typeOptions.find(
-                          (opt) => opt.value === announcement.type
-                        )?.label
-                      }
-                      variant={
-                        typeOptions.find(
-                          (opt) => opt.value === announcement.type
-                        )?.badgeVariant ?? 'neutral'
-                      }
+                      label={typeOption ? t(typeOption.label) : undefined}
+                      variant={typeOption?.badgeVariant ?? 'neutral'}
                       copyable={false}
                     />
                     {announcement.popup ? (
                       <StatusBadge
                         label={t('Popup')}
                         variant='info'
+                        copyable={false}
+                      />
+                    ) : null}
+                    {scheduled ? (
+                      <StatusBadge
+                        label={t('Scheduled')}
+                        variant='warning'
                         copyable={false}
                       />
                     ) : null}
@@ -654,6 +656,30 @@ export function AnnouncementsSection({
             />
             <FormField
               control={form.control}
+              name='publishDate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Publish Date')}</FormLabel>
+                  <FormControl>
+                    <DateTimePicker
+                      value={field.value ? new Date(field.value) : undefined}
+                      onChange={(date) =>
+                        field.onChange(date ? date.toISOString() : '')
+                      }
+                      placeholder={t('Select publish date')}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Date and time when this announcement should be displayed'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name='expireDate'
               render={({ field }) => (
                 <FormItem>
@@ -705,30 +731,6 @@ export function AnnouncementsSection({
             ) : null}
             <FormField
               control={form.control}
-              name='publishDate'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Publish Date')}</FormLabel>
-                  <FormControl>
-                    <DateTimePicker
-                      value={field.value ? new Date(field.value) : undefined}
-                      onChange={(date) =>
-                        field.onChange(date ? date.toISOString() : '')
-                      }
-                      placeholder={t('Select publish date')}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t(
-                      'Date and time when this announcement should be displayed'
-                    )}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name='type'
               render={({ field }) => (
                 <FormItem>
@@ -741,7 +743,7 @@ export function AnnouncementsSection({
                           <div
                             className={`h-3 w-3 rounded-full ${option.color}`}
                           />
-                          {option.label}
+                          {t(option.label)}
                         </div>
                       ),
                     }))}
@@ -763,7 +765,7 @@ export function AnnouncementsSection({
                               <div
                                 className={`h-3 w-3 rounded-full ${option.color}`}
                               />
-                              {option.label}
+                              {t(option.label)}
                             </div>
                           </SelectItem>
                         ))}
