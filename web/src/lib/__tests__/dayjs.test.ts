@@ -38,6 +38,10 @@ describe('dayjs locale sync', () => {
   it.each(['fr', 'ja', 'ru', 'vi', 'xx-YY'])(
     'falls back to en for unsupported or invalid language %s',
     async (lang) => {
+      // Start from a non-en locale so the assertion would fail if the
+      // fallback mapping did not run.
+      await i18n.changeLanguage('zhCN')
+      expect(dayjs.locale()).toBe('zh-cn')
       await i18n.changeLanguage(lang)
       expect(dayjs.locale()).toBe('en')
     }
@@ -57,9 +61,10 @@ describe('dayjs locale sync', () => {
 
   it('keeps ISO week bounds on Monday–Sunday in every language', async () => {
     // 2026-11-11 is a Wednesday; ISO week runs 11-09 (Mon) → 11-15 (Sun).
-    const wednesday = dayjs('2026-11-11T12:00:00')
+    // Instances capture the locale at creation time — build inside the loop.
     for (const lang of ['en', 'zhCN', 'zhTW']) {
       await i18n.changeLanguage(lang)
+      const wednesday = dayjs('2026-11-11T12:00:00')
       expect(wednesday.startOf('isoWeek').format('YYYY-MM-DD')).toBe(
         '2026-11-09'
       )
