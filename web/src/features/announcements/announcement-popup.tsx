@@ -177,6 +177,7 @@ export function AnnouncementPopup() {
       : 0
   const agreementBlocking =
     !!user &&
+    status?.user_agreement_enabled === true &&
     currentVersion > 0 &&
     (user.agreement_version ?? 0) < currentVersion
 

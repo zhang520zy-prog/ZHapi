@@ -42,13 +42,20 @@ import { AgreementConfirmDialog } from '../agreement-confirm-dialog'
 
 const AGREEMENT_DOC = '# Terms\n\n1. Be nice.\n'
 
-function mockApi(options: { version?: number; acceptFails?: boolean }) {
+function mockApi(options: {
+  version?: number
+  enabled?: boolean
+  acceptFails?: boolean
+}) {
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     if (String(url) === '/api/status') {
       return {
         data: {
           success: true,
-          data: { user_agreement_version: options.version ?? 0 },
+          data: {
+            user_agreement_version: options.version ?? 0,
+            user_agreement_enabled: options.enabled ?? true,
+          },
         },
       }
     }
@@ -118,6 +125,21 @@ afterEach(() => {
   useAuthStore.getState().auth.reset()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+})
+
+it('stays hidden when the agreement body is cleared but version stays > 0', async () => {
+  useAuthStore.getState().auth.setUser({
+    id: 1,
+    username: 'account',
+    role: 1,
+    agreement_version: 0,
+  })
+  mockApi({ version: 1, enabled: false })
+  await renderDialog()
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith('/api/status'))
+  expect(
+    screen.queryByRole('dialog', { name: 'User agreement updated' })
+  ).not.toBeInTheDocument()
 })
 
 it('stays hidden when the current agreement version is 0', async () => {

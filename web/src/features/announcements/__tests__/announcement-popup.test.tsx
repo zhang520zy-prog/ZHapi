@@ -68,6 +68,7 @@ function mockApi(options: {
   announcements?: PopupAnnouncement[]
   announcementsEnabled?: boolean
   agreementVersion?: number
+  agreementEnabled?: boolean
   ackFails?: boolean
   ackedIds?: number[]
 }) {
@@ -80,6 +81,7 @@ function mockApi(options: {
             announcements: options.announcements ?? [],
             announcements_enabled: options.announcementsEnabled ?? true,
             user_agreement_version: options.agreementVersion ?? 0,
+            user_agreement_enabled: options.agreementEnabled ?? true,
           },
         },
       }
@@ -148,6 +150,17 @@ it('shows only popup announcements that are published, unexpired and unseen', as
   expect(screen.queryByText('Notice 4')).not.toBeInTheDocument()
   expect(screen.queryByText('Notice 5')).not.toBeInTheDocument()
   expect(screen.queryByText('Notice 6')).not.toBeInTheDocument()
+})
+
+it('opens normally when the agreement body is cleared but version stays > 0', async () => {
+  setUser(makeUser({ agreement_version: 0 }))
+  mockApi({
+    announcements: [eligibleAnnouncement(1)],
+    agreementVersion: 1,
+    agreementEnabled: false,
+  })
+  renderPopup()
+  expect(await screen.findByRole('dialog')).toBeInTheDocument()
 })
 
 it('stays closed while the agreement confirmation is pending', async () => {

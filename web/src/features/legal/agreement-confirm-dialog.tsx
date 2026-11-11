@@ -56,7 +56,10 @@ export function AgreementConfirmDialog() {
       : 0
   const acceptedVersion = user?.agreement_version ?? 0
   const mustConfirm =
-    !!user && currentVersion > 0 && acceptedVersion < currentVersion
+    !!user &&
+    status?.user_agreement_enabled === true &&
+    currentVersion > 0 &&
+    acceptedVersion < currentVersion
 
   const agreement = useQuery({
     queryKey: ['legal', 'user-agreement'],
