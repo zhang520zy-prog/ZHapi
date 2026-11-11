@@ -17,12 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import dayjs from 'dayjs'
+import isoWeek from 'dayjs/plugin/isoWeek'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import i18n from 'i18next'
 import 'dayjs/locale/zh-cn'
 import 'dayjs/locale/zh-tw'
 
 dayjs.extend(relativeTime)
+// ISO weeks (Mon–Sun) are locale-independent; usage-logs "this week" relies on
+// them so the range starts Monday in every UI language.
+dayjs.extend(isoWeek)
 
 const DAYJS_LOCALE: Record<string, string> = {
   zhCN: 'zh-cn',

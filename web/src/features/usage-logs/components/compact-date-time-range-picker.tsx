@@ -105,8 +105,8 @@ export function CompactDateTimeRangePicker({
         end: now.endOf('day').toDate(),
       },
       week: {
-        start: now.startOf('week').toDate(),
-        end: now.endOf('week').toDate(),
+        start: now.startOf('isoWeek').toDate(),
+        end: now.endOf('isoWeek').toDate(),
       },
       '30d': {
         start: now.subtract(29, 'day').startOf('day').toDate(),

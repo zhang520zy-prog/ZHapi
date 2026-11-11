@@ -25,6 +25,7 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -225,4 +226,36 @@ it('shows popup and expired badges in the list', async () => {
   )
   expect(screen.getAllByText('Popup')).toHaveLength(2)
   expect(screen.getByText('Expired')).toBeInTheDocument()
+})
+
+it('shows a Scheduled badge for announcements published in the future', async () => {
+  renderSection(
+    JSON.stringify([
+      {
+        id: 9,
+        content: 'scheduled popup',
+        publishDate: '2099-01-01T00:00:00Z',
+        type: 'default',
+        popup: true,
+      },
+    ])
+  )
+  expect(await screen.findByText('Scheduled')).toBeInTheDocument()
+})
+
+it('shows only the section success toast when saving', async () => {
+  const put = mockPut()
+  const toastSuccess = vi.spyOn(toast, 'success')
+  renderSection()
+  const user = userEvent.setup()
+
+  await addViaDialog('single toast')
+  toastSuccess.mockClear()
+  await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+
+  await waitFor(() => expect(put).toHaveBeenCalled())
+  await waitFor(() => expect(toastSuccess).toHaveBeenCalledTimes(1))
+  expect(toastSuccess).toHaveBeenLastCalledWith(
+    'Saved. Popup announcements will be shown the next time each user enters the console.'
+  )
 })
