@@ -1,0 +1,77 @@
+# RelayDesk release deployment (console-only split build)
+#
+# Quick Start:
+#   1. Copy `.env.example` to `.env` and set SESSION_SECRET / CRYPTO_SECRET /
+#      DISTRIBUTOR_ACCOUNT_SECRET (openssl rand -hex 32 each, keep them offline).
+#   2. docker compose -f docker-compose.release.yml --env-file .env up -d --build
+#   3. Access at http://localhost:3000
+#
+# ⚠️  IMPORTANT: Change all default passwords/secrets before deploying to production!
+#    CRYPTO_SECRET protects stored payment-account snapshots; losing it makes
+#    encrypted rows unrecoverable. Keep the three secrets distinct.
+
+services:
+  new-api:
+    build: .
+    container_name: relaydesk
+    restart: always
+    command: --log-dir /app/logs
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - SQL_DSN=postgresql://root:123456@postgres:5432/new-api # ⚠️ IMPORTANT: Change the password in production!
+      - REDIS_CONN_STRING=redis://:123456@redis:6379 # ⚠️ IMPORTANT: Change the password in production!
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - CRYPTO_SECRET=${CRYPTO_SECRET:-}
+      - DISTRIBUTOR_ACCOUNT_SECRET=${DISTRIBUTOR_ACCOUNT_SECRET:-}
+      - TZ=Asia/Shanghai
+      - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)
+      - BATCH_UPDATE_ENABLED=true # 是否启用批量更新 (Whether to enable batch update)
+#      - SESSION_COOKIE_SECURE=true  # true：启用 Secure Refresh Cookie 和严格 refresh/logout OriginGuard；false/未配置：关闭 OriginGuard，仅用于本地 HTTP (true: Secure cookie + strict refresh/logout OriginGuard; false/unset: guard disabled for local HTTP only)
+#      - SESSION_COOKIE_TRUSTED_URL=https://example.com,https://admin.example.com  # Secure=true 时必填的精确 HTTPS Origin；不是 relay CORS 白名单，不支持通配符/路径 (Required exact HTTPS origins when Secure=true; not a relay CORS allowlist, no wildcard/path)
+#      - TRUSTED_PROXIES=172.20.0.0/16  # 未配置时信任回环/RFC1918/fc00::/7 并告警，none 为严格模式，显式列表替代默认值 (Unset trusts loopback/RFC 1918/fc00::/7 with a warning; none trusts no proxies; an explicit list replaces defaults)
+#      - LOG_SQL_DSN=postgresql://root:123456@postgres:5432/new-api-log # OPTIONAL: separate log database
+#      - SYNC_FREQUENCY=60  # 缓存回源同步周期（秒），默认 60 (Cache-to-database sync interval in seconds, default 60)
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - relaydesk-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:8
+    container_name: relaydesk-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "123456"]  # ⚠️ IMPORTANT: Change this password in production!
+    networks:
+      - relaydesk-network
+
+  postgres:
+    image: postgres:16
+    container_name: relaydesk-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 123456  # ⚠️ IMPORTANT: Change this password in production!
+      POSTGRES_DB: new-api
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - relaydesk-network
+#    ports:
+#      - "5432:5432"  # Uncomment if you need to access PostgreSQL from outside Docker
+
+volumes:
+  pg_data:
+
+networks:
+  relaydesk-network:
+    driver: bridge

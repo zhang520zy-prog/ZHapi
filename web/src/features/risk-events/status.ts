@@ -73,7 +73,7 @@ export function riskStatusLabel(status: string, t: TFunction) {
   }
 }
 
-export function riskActionLabel(action: string, t: TFunction) {
+function riskActionLabel(action: string, t: TFunction) {
   switch (action) {
     case 'record':
       return t('Recorded')
@@ -100,7 +100,7 @@ export function riskActionVariant(action: string): StatusVariant {
   }
 }
 
-export function restrictionDurationText(seconds: number, t: TFunction): string {
+function restrictionDurationText(seconds: number, t: TFunction): string {
   const minutes = Math.max(1, Math.round(seconds / 60))
   if (minutes < 60) {
     return minutes === 1

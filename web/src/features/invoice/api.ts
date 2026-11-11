@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-export type InvoiceStatus =
+type InvoiceStatus =
   | 'awaiting_payment'
   | 'pending'
   | 'processing'
@@ -28,13 +28,13 @@ export type InvoiceStatus =
 
 export type InvoiceSettlement = 'balance' | 'direct'
 
-export interface InvoiceTypeOption {
+interface InvoiceTypeOption {
   key: string
   label?: string
   rate_bps: number
 }
 
-export interface InvoiceProfile {
+interface InvoiceProfile {
   buyer_name: string
   tax_no: string
   category: string

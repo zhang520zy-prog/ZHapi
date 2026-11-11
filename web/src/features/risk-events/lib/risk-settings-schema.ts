@@ -18,9 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
 
-export const RISK_MIN_DURATION = 60
-export const RISK_MAX_DURATION = 30 * 86400
-export const RISK_DURATION_SLOTS = 3
+const RISK_MIN_DURATION = 60
+const RISK_MAX_DURATION = 30 * 86400
+const RISK_DURATION_SLOTS = 3
 export const RISK_LEVEL_COUNT = 4
 
 const durationSeconds = z

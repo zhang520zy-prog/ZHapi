@@ -23,8 +23,7 @@ import { api } from '@/lib/api'
 import { createServerError } from '@/lib/server-error-message'
 
 export type RiskScope = 'all' | 'self'
-export type ReviewStatus = 'pending' | 'confirmed' | 'false_positive'
-export type RiskAction = 'record' | 'block' | 'restrict' | 'disable'
+type ReviewStatus = 'pending' | 'confirmed' | 'false_positive'
 export interface RiskEvent {
   event_id: string
   user_id?: number
@@ -64,7 +63,7 @@ export interface RiskAppeal {
   outcome: string
   version: number
 }
-export interface RiskChange {
+interface RiskChange {
   id: number
   action: string
   status: string

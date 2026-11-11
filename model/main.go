@@ -19,13 +19,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// 列名/布尔字面量默认值与非 PG 方言一致；InitDB 里的 initCol 按实际方言覆盖。
+// 列名默认值与非 PG 方言一致；InitDB 里的 initCol 按实际方言覆盖。
 var commonGroupCol = "`group`"
 var commonKeyCol = "`key`"
-var commonTrueVal = "1"
-var commonFalseVal = "0"
 
-var logKeyCol = "`key`"
 var logGroupCol = "`group`"
 
 // jsonScanBytes 归一化 json 列的驱动返回值:不同驱动/协议模式下同一列可能
@@ -46,21 +43,12 @@ func initCol() {
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		commonGroupCol = `"group"`
 		commonKeyCol = `"key"`
-		commonTrueVal = "true"
-		commonFalseVal = "false"
 	} else {
 		commonGroupCol = "`group`"
 		commonKeyCol = "`key`"
-		commonTrueVal = "1"
-		commonFalseVal = "0"
 	}
-	switch common.LogDatabaseType() {
-	case common.DatabaseTypePostgreSQL:
+	if common.UsingLogDatabase(common.DatabaseTypePostgreSQL) {
 		logGroupCol = `"group"`
-		logKeyCol = `"key"`
-	default:
-		logGroupCol = "`group`"
-		logKeyCol = "`key`"
 	}
 }
 
