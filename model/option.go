@@ -337,8 +337,12 @@ func validateOptionValue(key string, value string) error {
 		return operation_setting.ValidateFeeRateBpsJSON(value)
 	}
 	if key == "legal.user_agreement_version" {
-		if v, err := strconv.Atoi(strings.TrimSpace(value)); err != nil || v < 0 {
+		v, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || v < 0 {
 			return errors.New("user_agreement_version 必须是不小于 0 的整数")
+		}
+		if v > 0 && strings.TrimSpace(system_setting.GetLegalSettings().UserAgreement) == "" {
+			return errors.New("user_agreement_version 大于 0 前必须先填写协议正文")
 		}
 	}
 	if key == console_setting.AnnouncementNextIDOption {

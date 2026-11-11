@@ -151,6 +151,15 @@ func TestAgreementVersionDatabaseMatrix(t *testing.T) {
 			require.Error(t, model.UpdateOption("legal.user_agreement_version", "abc"))
 			require.NoError(t, model.UpdateOption("legal.user_agreement_version", "3"))
 			assert.Equal(t, 3, legal.UserAgreementVersion)
+
+			// 正文为空时不允许升到大于 0，升 0 仍合法。
+			legal.UserAgreement = "  "
+			require.Error(t, model.UpdateOption("legal.user_agreement_version", "4"))
+			assert.Equal(t, 3, legal.UserAgreementVersion)
+			require.NoError(t, model.UpdateOption("legal.user_agreement_version", "0"))
+			assert.Equal(t, 0, legal.UserAgreementVersion)
+			legal.UserAgreement = "test agreement"
+			require.NoError(t, model.UpdateOption("legal.user_agreement_version", "3"))
 		})
 	}
 }
