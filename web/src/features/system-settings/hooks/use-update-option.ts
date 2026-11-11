@@ -49,6 +49,7 @@ const STATUS_RELATED_KEYS = new Set([
   'passkey.origins',
   'console_setting.announcements',
   'console_setting.announcements_enabled',
+  'legal.user_agreement_version',
 ])
 
 type UseUpdateOptionOptions = {

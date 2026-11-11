@@ -17,10 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
 import type { Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Form,
   FormControl,
@@ -60,6 +64,7 @@ const _systemInfoSchema = z.object({
   legal: z.object({
     user_agreement: z.string().optional(),
     privacy_policy: z.string().optional(),
+    user_agreement_version: z.coerce.number().optional(),
   }),
 })
 
@@ -77,6 +82,9 @@ function normalizeValue(value: unknown): string {
 export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const updateOptionSilent = useUpdateOption({ successToast: false })
+  const [requireReconfirm, setRequireReconfirm] = useState(false)
+  const [reconfirmDialogOpen, setReconfirmDialogOpen] = useState(false)
 
   const normalizedDefaults: SystemInfoFormValues = {
     SystemName: normalizeValue(defaultValues.SystemName),
@@ -92,6 +100,8 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     legal: {
       user_agreement: normalizeValue(defaultValues.legal?.user_agreement),
       privacy_policy: normalizeValue(defaultValues.legal?.privacy_policy),
+      user_agreement_version:
+        Number(defaultValues.legal?.user_agreement_version) || 0,
     },
   }
 
@@ -116,8 +126,30 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     legal: z.object({
       user_agreement: z.string().optional(),
       privacy_policy: z.string().optional(),
+      user_agreement_version: z.coerce.number().optional(),
     }),
   })
+
+  const currentVersion = normalizedDefaults.legal.user_agreement_version ?? 0
+  const nextVersion = currentVersion + 1
+
+  const bumpAgreementVersion = async () => {
+    try {
+      await updateOptionSilent.mutateAsync({
+        key: 'legal.user_agreement_version',
+        value: String(nextVersion),
+      })
+    } catch {
+      // onError 已提示；复选框保持勾选，允许重试
+      return
+    }
+    toast.success(
+      t('Saved. The agreement version is now {{version}}.', {
+        version: nextVersion,
+      })
+    )
+    setRequireReconfirm(false)
+  }
 
   const { form, handleSubmit, handleReset, isDirty, isSubmitting } =
     useSettingsForm<SystemInfoFormValues>({
@@ -138,8 +170,31 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
             value: v,
           })
         }
+        if (requireReconfirm) {
+          await bumpAgreementVersion()
+        }
       },
     })
+
+  const agreementBody = form.watch('legal.user_agreement') ?? ''
+  const hasAgreementBody = agreementBody.trim().length > 0
+
+  const handleSaveClick = () => {
+    if (requireReconfirm) {
+      setReconfirmDialogOpen(true)
+      return
+    }
+    void handleSubmit()
+  }
+
+  const handleConfirmReconfirm = () => {
+    setReconfirmDialogOpen(false)
+    if (isDirty) {
+      void handleSubmit()
+      return
+    }
+    void bumpAgreementVersion()
+  }
 
   return (
     <>
@@ -149,9 +204,13 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
         <Form {...form}>
           <SettingsForm onSubmit={handleSubmit}>
             <SettingsPageFormActions
-              onSave={handleSubmit}
+              onSave={handleSaveClick}
               onReset={handleReset}
-              isSaving={isSubmitting || updateOption.isPending}
+              isSaving={
+                isSubmitting ||
+                updateOption.isPending ||
+                updateOptionSilent.isPending
+              }
               isResetDisabled={!isDirty}
             />
             <FormDirtyIndicator isDirty={isDirty} />
@@ -348,6 +407,40 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       )}
                     </FormDescription>
                     <FormMessage />
+                    <div className='mt-3 space-y-1.5'>
+                      <p className='text-muted-foreground text-sm'>
+                        {t('Current agreement version: {{version}}', {
+                          version: currentVersion,
+                        })}
+                      </p>
+                      <div className='flex items-center gap-2'>
+                        <Checkbox
+                          id='agreement-require-reconfirm'
+                          checked={requireReconfirm}
+                          disabled={!hasAgreementBody}
+                          onCheckedChange={(checked) =>
+                            setRequireReconfirm(checked === true)
+                          }
+                        />
+                        <label
+                          htmlFor='agreement-require-reconfirm'
+                          className='text-sm leading-none font-medium'
+                        >
+                          {t('Require all users to re-confirm')}
+                        </label>
+                      </div>
+                      <p className='text-muted-foreground text-sm'>
+                        {hasAgreementBody
+                          ? t(
+                              'After saving, the agreement version increases from {{current}} to {{next}}; all users must re-read and accept the agreement the next time they enter the console.',
+                              {
+                                current: currentVersion,
+                                next: nextVersion,
+                              }
+                            )
+                          : t('Fill in the user agreement first')}
+                      </p>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -380,6 +473,19 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
           </SettingsForm>
         </Form>
       </SettingsSection>
+
+      <ConfirmDialog
+        open={reconfirmDialogOpen}
+        onOpenChange={setReconfirmDialogOpen}
+        title={t('Require all users to re-confirm the agreement?')}
+        desc={t(
+          'All users will be asked to read and accept the user agreement again the next time they enter the console. Changed fields are saved first, then the agreement version increases from {{current}} to {{next}}.',
+          { current: currentVersion, next: nextVersion }
+        )}
+        confirmText={t('Confirm and save')}
+        handleConfirm={handleConfirmReconfirm}
+        isLoading={isSubmitting || updateOptionSilent.isPending}
+      />
     </>
   )
 }
