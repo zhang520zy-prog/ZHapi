@@ -7,8 +7,16 @@
 #   3. Access at http://localhost:3000
 #
 # ⚠️  IMPORTANT: Change all default passwords/secrets before deploying to production!
-#    CRYPTO_SECRET protects stored payment-account snapshots; losing it makes
-#    encrypted rows unrecoverable. Keep the three secrets distinct.
+#    SESSION_SECRET and CRYPTO_SECRET are REQUIRED — compose refuses to start
+#    when they are unset (an empty SESSION_SECRET falls back to a random value
+#    that rotates every restart and logs everyone out).
+#    CRYPTO_SECRET signs token/file-cache keys and task-artifact download links;
+#    losing it only rebuilds caches and invalidates issued links.
+#    DISTRIBUTOR_ACCOUNT_SECRET is optional: it only encrypts distributor
+#    withdrawal-account snapshots. Distribution is disabled by default in this
+#    release, but set it anyway and keep it offline — once withdrawal data
+#    exists, losing the key makes those snapshots undecryptable.
+#    Keep the three secrets distinct.
 
 services:
   new-api:
