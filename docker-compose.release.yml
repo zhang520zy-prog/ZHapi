@@ -32,8 +32,8 @@ services:
     environment:
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api # ⚠️ IMPORTANT: Change the password in production!
       - REDIS_CONN_STRING=redis://:123456@redis:6379 # ⚠️ IMPORTANT: Change the password in production!
-      - SESSION_SECRET=${SESSION_SECRET:-}
-      - CRYPTO_SECRET=${CRYPTO_SECRET:-}
+      - SESSION_SECRET=${SESSION_SECRET:?请在 .env 中设置 SESSION_SECRET}
+      - CRYPTO_SECRET=${CRYPTO_SECRET:?请在 .env 中设置 CRYPTO_SECRET}
       - DISTRIBUTOR_ACCOUNT_SECRET=${DISTRIBUTOR_ACCOUNT_SECRET:-}
       - TZ=Asia/Shanghai
       - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)
