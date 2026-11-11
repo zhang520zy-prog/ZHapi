@@ -27,7 +27,6 @@ export type Vec3 = { x: number; y: number; z: number }
 
 /** Möbius shell → layered waves → DNA double helix → vortex tunnel → data ocean. */
 export const SHAPE_COUNT = 5
-export const SHAPE_NAMES = ['mobius', 'wave', 'dna', 'vortex', 'ocean'] as const
 export const DNA_INDEX = 2
 export const VORTEX_INDEX = 3
 export const OCEAN_INDEX = 4

@@ -23,24 +23,8 @@ export {
   openExternalSpeedTest,
   getDefaultPingStatus,
 } from './api-info'
-export {
-  chartColorAlpha,
-  getChartLabelColor,
-  getChartOtherColor,
-  getChartSeriesColor,
-  getChartSeriesColors,
-  getChartStateStrokeColor,
-} from './chart-colors'
 export { processChartData, processUserChartData } from './charts'
-export {
-  buildMetricTrend,
-  getGreetingKey,
-  getRunwayRange,
-  resolveDashboardRange,
-  sumUsageField,
-  type DashboardRangeKey,
-  type ResolvedDashboardRange,
-} from './dashboard-range'
+export { buildMetricTrend, sumUsageField } from './dashboard-range'
 export {
   buildDashboardFlowData,
   buildFlowSankeySpec,
@@ -53,8 +37,6 @@ export {
   getQuotaHealth,
   getQuotaHealthBadgeVariant,
   getQuotaHealthLabelKey,
-  type QuotaHealth,
-  type QuotaHealthLevel,
 } from './quota-health'
 export { safeDivide, calculateDashboardStats } from './stats'
 export { getPreviewText } from './text'
