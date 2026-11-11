@@ -61,13 +61,9 @@ func SetRelayRouter(router *gin.Engine) {
 		})
 	}
 
-	playgroundRouter := router.Group("/pg")
-	playgroundRouter.Use(middleware.RouteTag("relay"))
-	playgroundRouter.Use(middleware.SystemPerformanceCheck())
-	playgroundRouter.Use(middleware.UserAuth(), middleware.Distribute())
-	{
-		playgroundRouter.POST("/chat/completions", controller.Playground)
-	}
+	// 试用场（/pg/chat/completions）：产品方 2026-11-11 决定不对用户开放（不可把控的
+	// 风险），故不再注册此路由组。controller.Playground 等上游代码保留，便于后续
+	// 合并上游更新；如需恢复，按上游原样重建该路由组。
 	relayV1Router := router.Group("/v1")
 	relayV1Router.Use(middleware.RouteTag("relay"))
 	relayV1Router.Use(middleware.SystemPerformanceCheck())

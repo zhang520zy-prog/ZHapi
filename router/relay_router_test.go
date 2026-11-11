@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,6 +88,57 @@ func TestListModelsSupportsOpenAIAndGeminiAuthentication(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPlaygroundRouteIsNotRegistered(t *testing.T) {
+	// 产品方 2026-11-11 决定关闭试用场：/pg 路由组不再注册。已登录用户调用
+	// /pg/chat/completions 必须返回 404，且路由未注册即不会进入转发链路。
+	previousSecret := common.SessionSecret
+	previousActiveLimit := common.UserSessionActiveLimit
+	previousIssuanceLimit := common.UserSessionIssuanceLimit
+	previousIssuanceWindow := common.UserSessionIssuanceWindowSeconds
+	previousRevokedRetention := common.UserSessionRevokedRetentionDays
+	previousAlertThreshold := common.UserSessionHourlyAlertThreshold
+	common.SessionSecret = "test-session-secret-with-sufficient-entropy"
+	common.UserSessionActiveLimit = common.DefaultUserSessionActiveLimit
+	common.UserSessionIssuanceLimit = common.DefaultUserSessionIssuanceLimit
+	common.UserSessionIssuanceWindowSeconds = int64(common.DefaultUserSessionIssuanceWindowSeconds)
+	common.UserSessionRevokedRetentionDays = common.DefaultUserSessionRevokedRetentionDays
+	common.UserSessionHourlyAlertThreshold = common.DefaultUserSessionHourlyAlertThreshold
+	t.Cleanup(func() {
+		common.SessionSecret = previousSecret
+		common.UserSessionActiveLimit = previousActiveLimit
+		common.UserSessionIssuanceLimit = previousIssuanceLimit
+		common.UserSessionIssuanceWindowSeconds = previousIssuanceWindow
+		common.UserSessionRevokedRetentionDays = previousRevokedRetention
+		common.UserSessionHourlyAlertThreshold = previousAlertThreshold
+	})
+	setupRelayRouterTestDB(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.UserSession{}, &model.AuthFlow{}))
+
+	user := model.User{
+		Username:    "pg-user",
+		Status:      common.UserStatusEnabled,
+		Group:       "default",
+		Quota:       100,
+		AuthVersion: 1,
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+
+	bundle, err := service.CreateLoginSession(user.Id, "password", "127.0.0.1", "test-agent")
+	require.NoError(t, err)
+
+	engine := gin.New()
+	SetRelayRouter(engine)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/pg/chat/completions", strings.NewReader(
+		`{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"hi"}]}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", bundle.AccessToken)
+	engine.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
 }
 
 func setupRelayRouterTestDB(t *testing.T) {
